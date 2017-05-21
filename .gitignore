@@ -1,0 +1,23 @@
+# build artifacts
+build/maia
+.gopath/pkg/
+build/install/
+build/docker.tar
+
+# test artifacts
+pkg/test/migrations/*.sql
+unittest.db
+build/cover.out
+build/*.cover.out
+build/cover.html
+*.actual
+
+# vendoring artifacts
+.golangvend-cache/
+
+# custom configuration files used during development
+*test*.yaml
+*config*.yaml
+
+# other
+.idea*
