@@ -40,7 +40,7 @@ func Prometheus(prometheusAPIURL string) Driver {
 	if promCli.client == nil {
 		promCli.init(prometheusAPIURL)
 	}
-	return promCli
+	return &promCli
 }
 
 func (promCli *prometheusClient) init(prometheusAPIURL string) {
@@ -59,7 +59,7 @@ func (promCli *prometheusClient) init(prometheusAPIURL string) {
 
 }
 
-func (promCli *prometheusClient) ListMetrics(tenantId string) ([]Metric, error) {
+func (promCli *prometheusClient) ListMetrics(tenantId string) ([]*Metric, error) {
 
 	var value model.Value
 	var resultVector model.Vector
@@ -76,7 +76,7 @@ func (promCli *prometheusClient) ListMetrics(tenantId string) ([]Metric, error) 
 		fmt.Println("Could not get value for query %s from Prometheus due to type mismatch.", projectQuery)
 	}
 
-	var metrics []Metric
+	var metrics []*Metric
 
 
 	for _,v := range resultVector {
@@ -87,7 +87,7 @@ func (promCli *prometheusClient) ListMetrics(tenantId string) ([]Metric, error) 
 				Value: v.Value.String(),
 				Timestamp: v.Timestamp.String(),
 				}
-		metrics = append(metrics, metric)
+		metrics = append(metrics, &metric)
 	}
 
 	return metrics, nil

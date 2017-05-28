@@ -47,7 +47,7 @@ func namesForIds(keystoneDriver keystone.Driver, idMap map[string]string, target
 	nameMap := map[string]string{}
 	var err error
 
-	// Now add the names for IDs in the event
+	// Now add the names for IDs in the metrics
 	domainId := idMap["domain"]
 	if domainId != "" {
 		nameMap["domain"], err = keystoneDriver.DomainName(domainId)

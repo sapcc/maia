@@ -24,7 +24,7 @@ package storage
 type Driver interface {
 
 	/********** requests to Prometheus **********/
-	ListMetrics(tenantId string) ([]Metric, error)
+	ListMetrics(tenantId string) ([]*Metric, error)
 }
 
 type Metric struct {
