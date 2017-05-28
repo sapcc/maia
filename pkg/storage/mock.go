@@ -26,7 +26,7 @@ func Mock() (Driver) {
 	return mock{}
 }
 
-func (m mock) GetMetrics(tenantId string) ([]*Metrics,error) {
+func (m mock) ListMetrics(tenantId string) ([]Metric,error) {
 	return nil,nil
 }
 

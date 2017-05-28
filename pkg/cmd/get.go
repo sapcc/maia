@@ -31,20 +31,17 @@ import (
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
-	Use:   "get",
-	Short: "Get all metrics within the current project scope.",
-	Long:  `Get all metrics within the current project scope.`,
+	Use:   "list",
+	Short: "List all metrics within the current project scope.",
+	Long:  `List all metrics within the current project scope.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return errors.New("You must specify exactly one event ID.")
-		}
 
 		token := auth.GetToken(keystoneDriver)
 		if !token.Require("metrics:show") {
-			return errors.New("You are not authorised to view metrics.")
+			return errors.New("You are not authorised to view metrics within the current scope.")
 		}
 
-		metric, err := maia.GetMetrics(token.TenantId(), keystoneDriver, storageDriver)
+		metric, err := maia.ListMetrics(token.TenantId(), keystoneDriver, storageDriver)
 		if err != nil {
 			return err
 		}

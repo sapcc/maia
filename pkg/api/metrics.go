@@ -22,27 +22,23 @@ package api
 import (
 	"net/http"
 
-	"fmt"
-	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/sapcc/maia/pkg/maia"
 	"github.com/sapcc/maia/pkg/util"
-	"strconv"
 )
 
-// EventList is the model for JSON returned by the ListEvents API call
+// MetricList is the model for JSON returned by the ListEvents API call
 type MetricList struct {
-	NextURL string              `json:"next,omitempty"`
-	PrevURL string              `json:"previous,omitempty"`
-	Metrics  []*maia.ListMetrics `json:"metrics"`
-	Total   int                 `json:"total"`
+	NextURL string         `json:"next,omitempty"`
+	PrevURL string         `json:"previous,omitempty"`
+	Metrics []*maia.Metric `json:"metrics"`
 }
 
-//ListEvents handles GET /v1/events.
-func (p *v1Provider) ListEvents(res http.ResponseWriter, req *http.Request) {
-	util.LogDebug("* api.ListEvents: Check token")
+//ListMetrics handles GET /v1/metrics.
+func (p *v1Provider) ListMetrics(res http.ResponseWriter, req *http.Request) {
+	util.LogDebug("* api.ListMetrics: Check token")
 	token := p.CheckToken(req)
-	if !token.Require(res, "event:list") {
+	if !token.Require(res, "metric:list") {
 		return
 	}
 
@@ -53,40 +49,16 @@ func (p *v1Provider) ListEvents(res http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	metrics, err := maia.GetMetrics(tenantId, p.keystone, p.storage)
+	metrics, err := maia.ListMetrics(tenantId, p.keystone, p.storage)
 	if ReturnError(res, err) {
-		util.LogError("api.ListEvents: error %s", err)
+		util.LogError("api.ListMetrics: error %s", err)
 		return
 	}
 
 	metricList := MetricList{Metrics: metrics}
 
+	//TODO: json vs prometheus text format
 	ReturnJSON(res, 200, metricList)
-}
-
-//GetEvent handles GET /v1/metrics/projects/:project_id.
-func (p *v1Provider) GetEventDetails(res http.ResponseWriter, req *http.Request) {
-	token := p.CheckToken(req)
-	if !token.Require(res, "metric:show") {
-		return
-	}
-
-	tenantId, err := getTenantId(req, res)
-	if err != nil {
-		return
-	}
-
-	metric, err := maia.GetMetrics(tenantId, p.keystone, p.storage)
-
-	if ReturnError(res, err) {
-		return
-	}
-	if metric == nil {
-		err := fmt.Errorf("No metrics found for project %s", tenantId)
-		http.Error(res, err.Error(), 404)
-		return
-	}
-	ReturnJSON(res, 200, metric)
 }
 
 func getTenantId(r *http.Request, w http.ResponseWriter) (string, error) {

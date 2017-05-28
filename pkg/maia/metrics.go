@@ -28,11 +28,13 @@ import (
 )
 
 // ListMetrics contains high-level data about a metric, intended as a list item
-type ListMetrics struct {
+type Metric struct {
+	Type string
+	Value string
 }
 
 // GetMetrics returns a list of matching metrics (with filtering)
-func GetMetrics(tenantId string, keystoneDriver keystone.Driver, metricsStore storage.Driver) ([]*ListMetrics, error) {
+func ListMetrics(tenantId string, keystoneDriver keystone.Driver, metricsStore storage.Driver) ([]*Metric, error) {
 
 	util.LogDebug("maia.GetMetrics: tenant id is %s", tenantId)
 

@@ -24,10 +24,12 @@ package storage
 type Driver interface {
 
 	/********** requests to Prometheus **********/
-	GetMetrics(tenantId string) ([]*Metrics, error)
+	ListMetrics(tenantId string) ([]Metric, error)
 }
 
-// EventDetail contains the CADF payload, enhanced with names for IDs
-type Metrics struct {
-
+type Metric struct {
+	Type string
+	Value string
+	Timestamp string
+	Metric string
 }
