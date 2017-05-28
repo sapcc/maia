@@ -24,9 +24,15 @@ import (
 	"fmt"
 	"time"
 
+	"bytes"
+
+	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/api/prometheus"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 	"github.com/sapcc/maia/pkg/util"
+	"math"
 )
 
 type prometheusClient struct {
@@ -68,7 +74,7 @@ func (promCli *prometheusClient) ListMetrics(tenantId string) ([]*Metric, error)
 	value, err := promCli.client.Query(context.Background(), projectQuery, time.Now())
 	if err != nil {
 		util.LogError("Could not execute query %s using Prometheus.", projectQuery)
-		return nil,err
+		return nil, err
 	}
 
 	resultVector, ok := value.(model.Vector)
@@ -78,17 +84,31 @@ func (promCli *prometheusClient) ListMetrics(tenantId string) ([]*Metric, error)
 
 	var metrics []*Metric
 
-
-	for _,v := range resultVector {
-		//TODO
+	for _, v := range resultVector {
+		//TODO: json output
 		metric := Metric{
-				Type: v.String(),
-				Metric: v.Metric.String(),
-				Value: v.Value.String(),
-				Timestamp: v.Timestamp.String(),
-				}
+			Type:      v.String(),
+			Metric:    v.Metric.String(),
+			Value:     v.Value.String(),
+			Timestamp: v.Timestamp.String(),
+		}
 		metrics = append(metrics, &metric)
 	}
+
+	//TODO: metrics to text output
+	var out bytes.Buffer
+	var metricFamily = &dto.MetricFamily{
+		Name: proto.String("name"),
+		Help: proto.String("help"),
+		Metric: []*dto.Metric{
+			&dto.Metric{
+				Counter: &dto.Counter{
+					Value: proto.Float64(math.Inf(-1)),
+				},
+			},
+		},
+	}
+	expfmt.MetricFamilyToText(&out, metricFamily)
 
 	return metrics, nil
 }
