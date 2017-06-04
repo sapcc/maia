@@ -20,7 +20,6 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -32,7 +31,7 @@ import (
 
 // Set up and start the API server, hooking it up to the API router
 func Server(keystone keystone.Driver, storage storage.Driver) error {
-	fmt.Println("API")
+
 	mainRouter := mux.NewRouter()
 
 	//hook up the v1 API (this code is structured so that a newer API version can

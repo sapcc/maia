@@ -395,6 +395,16 @@ func (d keystone) RefreshToken() error {
 	return nil
 }
 
+func (d keystone) SetAuthOptions(username string, password string, tenantId string) *gophercloud.AuthOptions {
+	return &gophercloud.AuthOptions{
+		IdentityEndpoint: viper.GetString("keystone.auth_url"),
+		Username:         username,
+		Password:         password,
+		// Note: gophercloud only allows for user & project in the same domain
+		TenantID: tenantId,
+	}
+}
+
 func (d keystone) AuthOptions() *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),

@@ -37,6 +37,7 @@ import (
 
 type prometheusClient struct {
 	client prometheus.QueryAPI
+	config prometheus.Config
 }
 
 var promCli prometheusClient
@@ -50,12 +51,13 @@ func Prometheus(prometheusAPIURL string) Driver {
 }
 
 func (promCli *prometheusClient) init(prometheusAPIURL string) {
-	util.LogDebug("Initializing Prometheus Client.")
+	util.LogDebug("Initializing Client for Prometheus %s .",prometheusAPIURL)
 
 	config := prometheus.Config{
 		Address:   prometheusAPIURL,
 		Transport: prometheus.DefaultTransport,
 	}
+	promCli.config = config
 	client, err := prometheus.New(config)
 	if err != nil {
 		util.LogError("Failed to initialize. Prometheus is not reachable: %s.", prometheusAPIURL)
@@ -69,11 +71,13 @@ func (promCli *prometheusClient) ListMetrics(tenantId string) ([]*Metric, error)
 
 	var value model.Value
 	var resultVector model.Vector
-	var projectQuery = fmt.Sprintf("{project_id='%s'}", tenantId)
+	var projectQuery = "{quantile='0.5'}" //TODO fmt.Sprintf("{project_id='%s'}", tenantId)
 
+	//  /api/v1/query?query={project_id="<projectId>}'
 	value, err := promCli.client.Query(context.Background(), projectQuery, time.Now())
+
 	if err != nil {
-		util.LogError("Could not execute query %s using Prometheus.", projectQuery)
+		util.LogError("Could not execute query %s using Prometheus %s .",projectQuery,promCli.config.Address)
 		return nil, err
 	}
 

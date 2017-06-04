@@ -63,7 +63,7 @@ func main() {
 
 func parseCmdlineFlags() {
 	// Get config file location
-	configPath = flag.String("f", "maia.conf", "specifies the location of the TOML-format configuration file")
+	configPath = flag.String("config.file", "maia.conf", "specifies the location of the TOML-format configuration file")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
@@ -122,7 +122,11 @@ func configuredStorageDriver() storage.Driver {
 	driverName := viper.GetString("maia.storage_driver")
 	switch driverName {
 	case "prometheus":
-		prometheusApiUrl := viper.GetString("maia.storage_driver.prometheus_api_url")
+		prometheusApiUrl := viper.GetString("maia.prometheus_api_url")
+		if prometheusApiUrl == "" {
+			util.LogFatal("Invalid endpoint for prometheus.")
+			return nil
+		}
 		driver := storage.Prometheus(prometheusApiUrl)
 		if driver == nil {
 			util.LogFatal("Couldn't initialize Prometheus storage driver with given endpoint: \"%s\"", prometheusApiUrl)

@@ -25,10 +25,17 @@ import (
 	"strings"
 
 	"bytes"
+	"time"
+
 	"github.com/gorilla/mux"
+	"github.com/prometheus/common/expfmt"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
+
+	dto "github.com/prometheus/client_model/go"
 )
+
+const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
 
 //versionData is used by version advertisement handlers.
 type versionData struct {
@@ -47,7 +54,7 @@ type versionLinkData struct {
 
 type v1Provider struct {
 	keystone    keystone.Driver
-	storage  storage.Driver
+	storage     storage.Driver
 	versionData versionData
 }
 
@@ -83,6 +90,27 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 	r.Methods("GET").Path("/v1/metrics").HandlerFunc(p.ListMetrics)
 
 	return r, p.versionData
+}
+
+// Content-Encoding gzip
+// Content-Length
+// Content-Type application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=delimited
+// Date
+// Connection close
+
+func ReturnMetrics(w http.ResponseWriter, format expfmt.Format, code int, data *dto.MetricFamily) {
+
+	time := time.Now().UTC().Format(RFC822)
+	enc := expfmt.NewEncoder(w, format)
+
+	w.Header().Set("Content-Encoding", "gzip")
+	w.Header().Set("Content-Type", "application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=delimited")
+	//w.Header().Set("Content-Length", "")
+	w.Header().Set("Date", time)
+	w.Header().Set("Connection", "close")
+
+	enc.Encode(data)
+
 }
 
 //ReturnJSON is a convenience function for HTTP handlers returning JSON data.
