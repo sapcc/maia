@@ -124,7 +124,14 @@ func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
 	}
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(response.Body)
-	io.WriteString(w, buf.String())
+	body := buf.String()
+	// request to prometheus was successful, but nothing was found
+	if len(body) == 0 {
+		code = 404
+	}
+	w.WriteHeader(code)
+
+	io.WriteString(w, body)
 
 }
 
