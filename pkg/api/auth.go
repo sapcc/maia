@@ -27,12 +27,12 @@ import (
 	"os"
 
 	base64 "encoding/base64"
+	"fmt"
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"strings"
-	"fmt"
 )
 
 //Token represents a user's token, as passed through the X-Auth-Token header of
@@ -61,18 +61,17 @@ func (b *BasicAuth) String() string {
 	}
 
 	if b.ProjectId != "" {
-		scope = fmt.Sprintf("projectId: %s",b.ProjectId)
+		scope = fmt.Sprintf("projectId: %s", b.ProjectId)
 	} else if b.DomainId != "" {
-		scope = fmt.Sprintf("domainId: %s",b.DomainId)
+		scope = fmt.Sprintf("domainId: %s", b.DomainId)
 	}
 
 	if b.Password != "" {
 		password = "<hidden>"
 	}
 
-	return fmt.Sprintf("username: %s \n%s \npassword: %s",username,scope,password)
+	return fmt.Sprintf("username: %s \n%s \npassword: %s", username, scope, password)
 }
-
 
 // Get credentials from Authorization header provided by Prometheus basic_auth
 func (p *v1Provider) CheckBasicAuth(r *http.Request) *BasicAuth {
@@ -128,7 +127,7 @@ func (p *v1Provider) CheckToken(r *http.Request) *Token {
 }
 
 func (p *v1Provider) GetToken(auth *BasicAuth) *Token {
-	p.keystone.SetAuthOptions(auth.Username,auth.Password,auth.ProjectId)
+	p.keystone.SetAuthOptions(auth.Username, auth.Password, auth.ProjectId)
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
 	t.context, t.err = p.keystone.Authenticate(p.keystone.AuthOptions())
 	return t

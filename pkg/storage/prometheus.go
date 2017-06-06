@@ -20,27 +20,33 @@
 package storage
 
 import (
-	"context"
 	"fmt"
-	"time"
 
-	"bytes"
+	"net/http"
 
-	"github.com/gogo/protobuf/proto"
+	"net/url"
+
 	"github.com/prometheus/client_golang/api/prometheus"
-	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
 	"github.com/sapcc/maia/pkg/util"
-	"math"
+	"github.com/spf13/viper"
 )
 
-type prometheusClient struct {
-	client prometheus.QueryAPI
-	config prometheus.Config
+type prometheusStorageClient struct {
+	client     *prometheus.QueryAPI
+	config     *prometheus.Config
+	httpClient *http.Client
 }
 
-var promCli prometheusClient
+var promCli prometheusStorageClient
+
+var prometheusCoreHeaders = make(map[string]string)
+
+func initPrometheusCoreHeaders() {
+	prometheusCoreHeaders["User-Agent"] = "Prometheus/"
+	prometheusCoreHeaders["Accept"] = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
+	prometheusCoreHeaders["Accept-Encoding"] = "gzip"
+	prometheusCoreHeaders["Connection"] = "close"
+}
 
 // Initialise and return the Prometheus driver
 func Prometheus(prometheusAPIURL string) Driver {
@@ -50,69 +56,59 @@ func Prometheus(prometheusAPIURL string) Driver {
 	return &promCli
 }
 
-func (promCli *prometheusClient) init(prometheusAPIURL string) {
-	util.LogDebug("Initializing Client for Prometheus %s .",prometheusAPIURL)
+func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
+	var httpCli *http.Client
+
+	util.LogDebug("Initializing Client for Prometheus %s .", prometheusAPIURL)
 
 	config := prometheus.Config{
 		Address:   prometheusAPIURL,
 		Transport: prometheus.DefaultTransport,
 	}
-	promCli.config = config
+	promCli.config = &config
 	client, err := prometheus.New(config)
 	if err != nil {
 		util.LogError("Failed to initialize. Prometheus is not reachable: %s.", prometheusAPIURL)
 		panic(err.Error())
 	}
-	promCli.client = prometheus.NewQueryAPI(client)
+	promCli.client = &prometheus.NewQueryAPI(client)
 
+	initPrometheusCoreHeaders()
+
+	if viper.GetString("maia.proxy") != "" {
+		proxyUrl, err := url.Parse("http://localhost:8889")
+		if err != nil {
+			util.LogError("Could not set proxy: %s .\n%s",proxyUrl,err.Error())
+			httpCli = &http.Client{}
+		} else {
+			httpCli = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
+		}
+	}
+	promCli.httpClient = httpCli
 }
 
-func (promCli *prometheusClient) ListMetrics(tenantId string) ([]*Metric, error) {
+func (promCli *prometheusStorageClient) ListMetrics(tenantId string) (*http.Response, error) {
 
-	var value model.Value
-	var resultVector model.Vector
-	var projectQuery = "{quantile='0.5'}" //TODO fmt.Sprintf("{project_id='%s'}", tenantId)
+	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantId)
+	prometheusAPIURL := promCli.config.Address
 
-	//  /api/v1/query?query={project_id="<projectId>}'
-	value, err := promCli.client.Query(context.Background(), projectQuery, time.Now())
-
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/federate?match[]=%s", prometheusAPIURL, projectQuery), nil)
 	if err != nil {
-		util.LogError("Could not execute query %s using Prometheus %s .",projectQuery,promCli.config.Address)
+		util.LogError("Could not create request.\n", err.Error())
 		return nil, err
 	}
 
-	resultVector, ok := value.(model.Vector)
-	if !ok {
-		fmt.Println("Could not get value for query %s from Prometheus due to type mismatch.", projectQuery)
+	for k, v := range prometheusCoreHeaders {
+		req.Header.Add(k, v)
 	}
 
-	var metrics []*Metric
+	proxyUrl, _ := url.Parse("http://localhost:8889")
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
 
-	for _, v := range resultVector {
-		//TODO: json output
-		metric := Metric{
-			Type:      v.String(),
-			Metric:    v.Metric.String(),
-			Value:     v.Value.String(),
-			Timestamp: v.Timestamp.String(),
-		}
-		metrics = append(metrics, &metric)
+	resp, err := client.Do(req)
+	if err != nil {
+		util.LogError("Request failed.\n%s", err.Error())
+		return nil, err
 	}
-
-	//TODO: metrics to text output
-	var out bytes.Buffer
-	var metricFamily = &dto.MetricFamily{
-		Name: proto.String("name"),
-		Help: proto.String("help"),
-		Metric: []*dto.Metric{
-			&dto.Metric{
-				Counter: &dto.Counter{
-					Value: proto.Float64(math.Inf(-1)),
-				},
-			},
-		},
-	}
-	expfmt.MetricFamilyToText(&out, metricFamily)
-
-	return metrics, nil
+	return resp, nil
 }

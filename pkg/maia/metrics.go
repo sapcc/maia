@@ -29,7 +29,7 @@ import (
 
 // ListMetrics contains high-level data about a metric, intended as a list item
 type Metric struct {
-	Type string
+	Type  string
 	Value string
 }
 

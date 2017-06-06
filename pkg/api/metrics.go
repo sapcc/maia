@@ -21,19 +21,11 @@ package api
 
 import (
 	"net/http"
-	"strconv"
-
-	"github.com/golang/protobuf/proto"
 
 	"github.com/pkg/errors"
 	"github.com/sapcc/maia/pkg/maia"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-
-	"fmt"
-
-	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
 )
 
 // MetricList is the model for JSON returned by the ListMetrics API call
@@ -72,51 +64,12 @@ func (p *v1Provider) ListMetrics(res http.ResponseWriter, req *http.Request) {
 		//}
 	}
 
-	var mMetricFamily dto.MetricFamily
-
-	vector, err := p.storage.ListMetrics(auth.ProjectId)
+	response, err := p.storage.ListMetrics(auth.ProjectId)
 	if err != nil {
 		util.LogError("Could not get metrics for project %s", auth.ProjectId)
-	} else {
-
-		for _, v := range vector {
-			//util.LogInfo(fmt.Sprintf("%s %s", v.Metric, v.Value))
-
-			mMetricFamily = dto.MetricFamily{
-				Name:   proto.String(v.Metric),
-				Type:   dto.MetricType_GAUGE.Enum(),
-				Metric: []*dto.Metric{},
-			}
-
-			value,_ := strconv.ParseFloat(v.Value,64)
-
-			mMetricFamily.Metric = append(mMetricFamily.Metric,
-				&dto.Metric{
-					Label: []*dto.LabelPair{
-						{
-							Name:  proto.String("service"),
-							Value: proto.String("maia"),
-						},
-					},
-					Gauge: &dto.Gauge{Value: proto.Float64(value)},
-				},
-			)
-
-		}
 	}
 
-	//var metricFamilies []*dto.MetricFamily
-
-	//metricFamilies = append(metricFamilies, &mMetricFamily)
-
-	ReturnMetrics(res, expfmt.Negotiate(req.Header), 200, &mMetricFamily)
-
-	// Content-Encoding gzip
-	// Content-Length
-	// Content-Type application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=delimited
-	// Date
-	// Connection close
-
+	ReturnResponse(res, 200, response)
 }
 
 func getTenantId(r *http.Request, w http.ResponseWriter) (string, error) {

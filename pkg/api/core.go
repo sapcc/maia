@@ -33,9 +33,12 @@ import (
 	"github.com/sapcc/maia/pkg/storage"
 
 	dto "github.com/prometheus/client_model/go"
+	"io"
 )
 
 const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
+
+var prometheusCoreHeaders = make(map[string]string)
 
 //versionData is used by version advertisement handlers.
 type versionData struct {
@@ -56,6 +59,13 @@ type v1Provider struct {
 	keystone    keystone.Driver
 	storage     storage.Driver
 	versionData versionData
+}
+
+func initCoreHeaders() {
+	prometheusCoreHeaders["User-Agent"] = "Prometheus/"
+	prometheusCoreHeaders["Accept"] = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
+	prometheusCoreHeaders["Accept-Encoding"] = "gzip"
+	prometheusCoreHeaders["Connection"] = "close"
 }
 
 //NewV1Router creates a http.Handler that serves the Maia v1 API.
@@ -92,24 +102,29 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 	return r, p.versionData
 }
 
-// Content-Encoding gzip
-// Content-Length
-// Content-Type application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=delimited
-// Date
-// Connection close
-
+//ReturnMetrics returns metrics in the prometheus text format
 func ReturnMetrics(w http.ResponseWriter, format expfmt.Format, code int, data *dto.MetricFamily) {
-
+	//headers
 	time := time.Now().UTC().Format(RFC822)
-	enc := expfmt.NewEncoder(w, format)
-
-	w.Header().Set("Content-Encoding", "gzip")
-	w.Header().Set("Content-Type", "application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=delimited")
-	//w.Header().Set("Content-Length", "")
 	w.Header().Set("Date", time)
-	w.Header().Set("Connection", "close")
-
+	initCoreHeaders()
+	for k, v := range prometheusCoreHeaders {
+		w.Header().Set(k, v)
+	}
+	// body
+	enc := expfmt.NewEncoder(w, format)
 	enc.Encode(data)
+}
+
+//ReturnResponse forwards a received response
+func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
+
+	for k, v := range response.Header {
+		w.Header().Set(k, strings.Join(v, ";"))
+	}
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(response.Body)
+	io.WriteString(w, buf.String())
 
 }
 

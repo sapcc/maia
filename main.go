@@ -76,9 +76,6 @@ func setDefaultConfig() {
 	viper.SetDefault("maia.storage_driver", "prometheus")
 	viper.SetDefault("API.ListenAddress", "0.0.0.0:8789")
 	viper.SetDefault("prometheus.url", "localhost:9090")
-	// index.max_result_window defaults to 10000, as per
-	// https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules.html
-	viper.SetDefault("prometheus.max_result_window", "10000")
 }
 
 func readConfig(configPath *string) {
@@ -132,7 +129,8 @@ func configuredStorageDriver() storage.Driver {
 			util.LogFatal("Couldn't initialize Prometheus storage driver with given endpoint: \"%s\"", prometheusApiUrl)
 			return nil
 		}
-		util.LogInfo("Using Prometheus storage driver with endpoint: \"%s\"",prometheusApiUrl)
+		util.LogInfo("Using Prometheus storage driver with endpoint: \"%s\"", prometheusApiUrl)
+
 		return driver
 	case "mock":
 		util.LogInfo("Using Mock storage driver.")

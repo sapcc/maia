@@ -19,22 +19,15 @@
 
 package storage
 
+import "net/http"
+
 type mock struct{}
 
 // Mock Prometheus driver with static data
-func Mock() (Driver) {
+func Mock() Driver {
 	return mock{}
 }
 
-func (m mock) ListMetrics(tenantId string) ([]*Metric,error) {
-	return nil,nil
+func (m mock) ListMetrics(tenantId string) (*http.Response, error) {
+	return nil, nil
 }
-
-var mockMetrics = []byte(`
-{
-	[
-		{
-		}
-	]
-}
-`)
