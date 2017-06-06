@@ -20,3 +20,28 @@ Via Makefile
 * `make && make install` to install to `/usr`
 * `make && make install PREFIX=/some/path` to install to `/some/path`
 * `make docker` to build the Docker image (set image name and tag with the `DOCKER_IMAGE` and `DOCKER_TAG` variables)
+
+
+# Using Maia
+
+Maia can be used with an unmodified Prometheus. You can download Prometheus from its [website](https://prometheus.io/download/).
+To configure Prometheus receive data from Maia the following job configuration has to be applied.
+In the `basic_auth` section a valid user id, project id and password, corresponding to your OpenStack User and Project, has to be provided.
+The user is required to have the `metric-list` role.
+
+```yaml
+scrape_configs:
+
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'maia'
+    metrics_path: "/v1/metrics"
+    basic_auth:
+      # Corresponds to your OpenStack User and Project
+      username: <user_id>@<project_id>
+      password: <password>
+
+    static_configs:
+      - targets: ['maia.<region>.cloud.sap:8789']
+  
+```
+

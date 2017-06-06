@@ -32,8 +32,8 @@ import (
 )
 
 type prometheusStorageClient struct {
-	client     *prometheus.QueryAPI
-	config     *prometheus.Config
+	client     prometheus.QueryAPI
+	config     prometheus.Config
 	httpClient *http.Client
 }
 
@@ -65,20 +65,20 @@ func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
 		Address:   prometheusAPIURL,
 		Transport: prometheus.DefaultTransport,
 	}
-	promCli.config = &config
+	promCli.config = config
 	client, err := prometheus.New(config)
 	if err != nil {
 		util.LogError("Failed to initialize. Prometheus is not reachable: %s.", prometheusAPIURL)
 		panic(err.Error())
 	}
-	promCli.client = &prometheus.NewQueryAPI(client)
+	promCli.client = prometheus.NewQueryAPI(client)
 
 	initPrometheusCoreHeaders()
 
 	if viper.GetString("maia.proxy") != "" {
 		proxyUrl, err := url.Parse("http://localhost:8889")
 		if err != nil {
-			util.LogError("Could not set proxy: %s .\n%s",proxyUrl,err.Error())
+			util.LogError("Could not set proxy: %s .\n%s", proxyUrl, err.Error())
 			httpCli = &http.Client{}
 		} else {
 			httpCli = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
@@ -102,10 +102,7 @@ func (promCli *prometheusStorageClient) ListMetrics(tenantId string) (*http.Resp
 		req.Header.Add(k, v)
 	}
 
-	proxyUrl, _ := url.Parse("http://localhost:8889")
-	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
-
-	resp, err := client.Do(req)
+	resp, err := promCli.httpClient.Do(req)
 	if err != nil {
 		util.LogError("Request failed.\n%s", err.Error())
 		return nil, err
