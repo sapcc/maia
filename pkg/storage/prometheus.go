@@ -75,8 +75,8 @@ func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
 
 	initPrometheusCoreHeaders()
 
-	if viper.GetString("maia.proxy") != "" {
-		proxyUrl, err := url.Parse("http://localhost:8889")
+	if viper.IsSet("maia.proxy") {
+		proxyUrl, err := url.Parse(viper.GetString("maia.proxy"))
 		if err != nil {
 			util.LogError("Could not set proxy: %s .\n%s", proxyUrl, err.Error())
 			httpCli = http.Client{}
