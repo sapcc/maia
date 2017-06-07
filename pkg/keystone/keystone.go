@@ -387,7 +387,7 @@ func (d keystone) RefreshToken() error {
 
 	util.LogDebug("Keystone URL: %s", keystone.Endpoint)
 
-	result := tokens.Create(keystone, d.AuthOptions())
+	result := tokens.Create(keystone, d.AuthOptionsFromConfig())
 	token, err := result.ExtractToken()
 	if err != nil {
 		return fmt.Errorf("cannot read token: %v", err)
@@ -406,7 +406,7 @@ func (d keystone) RefreshToken() error {
 	return nil
 }
 
-func (d keystone) SetAuthOptions(username string, password string, tenantId string) *gophercloud.AuthOptions {
+func (d keystone) AuthOptionsFromBasicAuth(username string, password string, tenantId string) *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		UserID:           username,
@@ -416,7 +416,7 @@ func (d keystone) SetAuthOptions(username string, password string, tenantId stri
 	}
 }
 
-func (d keystone) AuthOptions() *gophercloud.AuthOptions {
+func (d keystone) AuthOptionsFromConfig() *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		Username:         viper.GetString("keystone.username"),

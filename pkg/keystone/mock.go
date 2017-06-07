@@ -76,7 +76,7 @@ func (d mock) UserId(name string) (string, error) {
 	return "eb5cd8f904b06e8b2a6eb86c8b04c08e6efb89b92da77905cc8c475f30b0b812", nil
 }
 
-func (d mock) SetAuthOptions(username string, password string, projectId string) *gophercloud.AuthOptions {
+func (d mock) AuthOptionsFromBasicAuth(username string, password string, projectId string) *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		Username:         username,
@@ -86,7 +86,7 @@ func (d mock) SetAuthOptions(username string, password string, projectId string)
 	}
 }
 
-func (d mock) AuthOptions() *gophercloud.AuthOptions {
+func (d mock) AuthOptionsFromConfig() *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		Username:         viper.GetString("keystone.username"),

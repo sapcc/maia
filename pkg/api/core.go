@@ -34,6 +34,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"io"
+	"fmt"
 )
 
 const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
@@ -127,7 +128,8 @@ func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
 	buf.ReadFrom(response.Body)
 	body := buf.String()
 	// request to prometheus was successful, but nothing was found
-	if len(body) == 0 {
+	if (w.Header().Get("Content-Length") == string(0)) || (len(body) == 0) {
+		fmt.Println("---->",w.Header().Get("Content-Length"))
 		code = 404
 	}
 	w.WriteHeader(code)

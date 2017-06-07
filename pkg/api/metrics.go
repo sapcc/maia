@@ -64,6 +64,10 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 	if viper.IsSet("keystone") {
 		util.LogDebug("Using keystone backend.")
 		token := p.GetTokenFromBasicAuth(auth)
+		if token.err != nil {
+			util.LogError(token.err.Error())
+			return
+		}
 
 		//TODO: cache and check token instead of always sending requests
 		//token := p.CheckToken(req)

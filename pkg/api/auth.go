@@ -127,9 +127,8 @@ func (p *v1Provider) CheckToken(r *http.Request) *Token {
 }
 
 func (p *v1Provider) GetTokenFromBasicAuth(auth *BasicAuth) *Token {
-	authOpts := p.keystone.SetAuthOptions(auth.Username, auth.Password, auth.ProjectId)
+	authOpts := p.keystone.AuthOptionsFromBasicAuth(auth.Username, auth.Password, auth.ProjectId)
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
-
 	t.context, t.err = p.keystone.Authenticate(authOpts)
 	return t
 }

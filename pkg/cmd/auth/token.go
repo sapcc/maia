@@ -40,7 +40,7 @@ type Token struct {
 func GetToken(keystoneDriver keystone.Driver) *Token {
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
 
-	credentials := keystoneDriver.AuthOptions()
+	credentials := keystoneDriver.AuthOptionsFromConfig()
 
 	t.Context, t.err = keystoneDriver.Authenticate(credentials)
 	return t

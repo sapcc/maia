@@ -32,8 +32,8 @@ type Driver interface {
 	//clients can be derived. For mock drivers, this returns nil, so test code
 	//should be prepared to handle a nil Client() where appropriate.
 	Client() *gophercloud.ProviderClient
-	AuthOptions() *gophercloud.AuthOptions
-	SetAuthOptions(username string, password string, projectId string) *gophercloud.AuthOptions
+	AuthOptionsFromConfig() *gophercloud.AuthOptions
+	AuthOptionsFromBasicAuth(username string, password string, projectId string) *gophercloud.AuthOptions
 	/********** requests to Keystone **********/
 	ListDomains() ([]KeystoneDomain, error)
 	ListProjects() ([]KeystoneProject, error)
