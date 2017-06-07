@@ -116,7 +116,8 @@ func ReturnMetrics(w http.ResponseWriter, format expfmt.Format, code int, data *
 	enc.Encode(data)
 }
 
-//ReturnResponse forwards a received response
+//ReturnResponse basically forwards a received response.
+//Returns 404 if no metrics where found
 func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
 
 	for k, v := range response.Header {
