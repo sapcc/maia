@@ -149,14 +149,14 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 	}
 }
 
-//ReturnError produces an error response with HTTP status code 500 if the given
+//ReturnError produces an error response with HTTP status code if the given
 //error is non-nil. Otherwise, nothing is done and false is returned.
-func ReturnError(w http.ResponseWriter, err error) bool {
+func ReturnError(w http.ResponseWriter, err error, code int) bool {
 	if err == nil {
 		return false
 	}
 
-	http.Error(w, err.Error(), 500)
+	http.Error(w, err.Error(), code)
 	return true
 }
 

@@ -36,10 +36,15 @@ type MetricList struct {
 }
 
 //ListMetrics handles GET /v1/metrics.
-func (p *v1Provider) ListMetrics(res http.ResponseWriter, req *http.Request) {
+func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 	util.LogDebug("api.ListMetrics")
 
 	auth := p.CheckBasicAuth(req)
+	if auth.err != nil {
+		util.LogError(auth.err.Error())
+		ReturnError(w,auth.err,404)
+		return
+	}
 
 	tenantId := ""
 	if auth != nil {
@@ -48,6 +53,8 @@ func (p *v1Provider) ListMetrics(res http.ResponseWriter, req *http.Request) {
 		} else if auth.DomainId != "" {
 			tenantId = auth.DomainId
 		} else {
+			util.LogError("No project_id or domain_id found. Aborting.")
+			ReturnError(w,auth.err,404)
 			return
 		}
 
@@ -69,7 +76,7 @@ func (p *v1Provider) ListMetrics(res http.ResponseWriter, req *http.Request) {
 		util.LogError("Could not get metrics for project %s", auth.ProjectId)
 	}
 
-	ReturnResponse(res, 200, response)
+	ReturnResponse(w, 200, response)
 }
 
 func getTenantId(r *http.Request, w http.ResponseWriter) (string, error) {

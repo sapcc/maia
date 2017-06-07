@@ -34,7 +34,7 @@ import (
 type prometheusStorageClient struct {
 	client     prometheus.QueryAPI
 	config     prometheus.Config
-	httpClient *http.Client
+	httpClient http.Client
 }
 
 var promCli prometheusStorageClient
@@ -57,7 +57,7 @@ func Prometheus(prometheusAPIURL string) Driver {
 }
 
 func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
-	var httpCli *http.Client
+	var httpCli http.Client
 
 	util.LogDebug("Initializing Client for Prometheus %s .", prometheusAPIURL)
 
@@ -79,9 +79,9 @@ func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
 		proxyUrl, err := url.Parse("http://localhost:8889")
 		if err != nil {
 			util.LogError("Could not set proxy: %s .\n%s", proxyUrl, err.Error())
-			httpCli = &http.Client{}
+			httpCli = http.Client{}
 		} else {
-			httpCli = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
+			httpCli = http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
 		}
 	}
 	promCli.httpClient = httpCli
