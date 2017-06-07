@@ -142,7 +142,7 @@ func (t *Token) Require(w http.ResponseWriter, rule string) bool {
 		return false
 	}
 
-	if os.Getenv("DEBUG") == "1" {
+	if os.Getenv("MAIA_DEBUG") == "1" {
 		t.context.Logger = log.Printf //or any other function with the same signature
 	}
 	if !t.enforcer.Enforce(rule, t.context) {
