@@ -26,7 +26,6 @@ import (
 	"github.com/sapcc/maia/pkg/maia"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"fmt"
 )
 
 // MetricList is the model for JSON returned by the ListMetrics API call
@@ -43,7 +42,7 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 	auth := p.CheckBasicAuth(req)
 	if auth.err != nil {
 		util.LogError(auth.err.Error())
-		ReturnError(w,auth.err,404)
+		ReturnError(w, auth.err, 404)
 		return
 	}
 
@@ -55,14 +54,12 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 			tenantId = auth.DomainId
 		} else {
 			util.LogError("No project_id or domain_id found. Aborting.")
-			ReturnError(w,auth.err,404)
+			ReturnError(w, auth.err, 404)
 			return
 		}
 	}
 
 	util.LogDebug("Getting metrics for project/domain: %s .", tenantId)
-
-	fmt.Println("--",viper.IsSet("keystone"))
 
 	// if [keystone] section in config
 	if viper.IsSet("keystone") {

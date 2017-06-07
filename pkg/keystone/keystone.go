@@ -22,6 +22,10 @@ package keystone
 import (
 	"fmt"
 
+	"net/http"
+	"net/url"
+	"sync"
+
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -29,9 +33,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"sync"
-	"net/url"
-	"net/http"
 )
 
 // Real keystone implementation
@@ -86,9 +87,8 @@ func (d keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
 		}
 	}
 
-	return openstack.NewIdentityV3(providerClient,
-		gophercloud.EndpointOpts{Availability: gophercloud.AvailabilityPublic},
-	)
+	return openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})//gophercloud.EndpointOpts{Availability: gophercloud.AvailabilityPublic},
+
 }
 
 func (d keystone) Client() *gophercloud.ProviderClient {
@@ -407,13 +407,10 @@ func (d keystone) RefreshToken() error {
 }
 
 func (d keystone) SetAuthOptions(username string, password string, tenantId string) *gophercloud.AuthOptions {
-
-
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		Username:         username,
+		UserID:           username,
 		Password:         password,
-		DomainName:       viper.GetString("keystone.user_domain_name"),
 		// Note: gophercloud only allows for user & project in the same domain
 		TenantID: tenantId,
 	}
