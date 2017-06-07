@@ -30,6 +30,8 @@ import (
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"sync"
+	"net/url"
+	"net/http"
 )
 
 // Real keystone implementation
@@ -75,6 +77,15 @@ func (d keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
 		}
 	}
 
+	if viper.IsSet("maia.proxy") {
+		proxyUrl, err := url.Parse(viper.GetString("maia.proxy"))
+		if err != nil {
+			util.LogError("Could not set proxy for gophercloud client: %s .\n%s", proxyUrl, err.Error())
+		} else {
+			providerClient.HTTPClient.Transport = &http.Transport{Proxy: http.ProxyURL(proxyUrl)}
+		}
+	}
+
 	return openstack.NewIdentityV3(providerClient,
 		gophercloud.EndpointOpts{Availability: gophercloud.AvailabilityPublic},
 	)
@@ -85,7 +96,7 @@ func (d keystone) Client() *gophercloud.ProviderClient {
 
 	err := viper.UnmarshalKey("keystone", &kc)
 	if err != nil {
-		fmt.Printf("unable to decode into struct, %v", err)
+		util.LogError("unable to decode into struct, %v", err)
 	}
 
 	return nil
@@ -396,10 +407,13 @@ func (d keystone) RefreshToken() error {
 }
 
 func (d keystone) SetAuthOptions(username string, password string, tenantId string) *gophercloud.AuthOptions {
+
+
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		Username:         username,
 		Password:         password,
+		DomainName:       viper.GetString("keystone.user_domain_name"),
 		// Note: gophercloud only allows for user & project in the same domain
 		TenantID: tenantId,
 	}

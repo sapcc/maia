@@ -31,6 +31,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const prometheusFederateUrl = "federate?match[]="
+
 type prometheusStorageClient struct {
 	client     prometheus.QueryAPI
 	config     prometheus.Config
@@ -92,7 +94,7 @@ func (promCli *prometheusStorageClient) ListMetrics(tenantId string) (*http.Resp
 	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantId)
 	prometheusAPIURL := promCli.config.Address
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/federate?match[]=%s", prometheusAPIURL, projectQuery), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s%s", prometheusAPIURL, prometheusFederateUrl, projectQuery), nil)
 	if err != nil {
 		util.LogError("Could not create request.\n", err.Error())
 		return nil, err
