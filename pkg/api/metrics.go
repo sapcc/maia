@@ -22,7 +22,6 @@ package api
 import (
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/sapcc/maia/pkg/maia"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
@@ -66,7 +65,7 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 		util.LogDebug("Using keystone backend.")
 		token := p.GetTokenFromBasicAuth(auth)
 
-		//TODO: caching and check token
+		//TODO: cache and check token instead of always sending requests
 		//token := p.CheckToken(req)
 
 		if !token.Require(w, "metric:list") {
@@ -80,22 +79,4 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 	}
 
 	ReturnResponse(w, 200, response)
-}
-
-func getTenantId(r *http.Request, w http.ResponseWriter) (string, error) {
-	projectId := r.FormValue("project_id")
-	domainId := r.FormValue("domain_id")
-	var tenantId string
-	if projectId != "" {
-		tenantId = projectId
-	}
-	if domainId != "" {
-		if projectId != "" {
-			err := errors.New("domain_id and project_id cannot both be specified")
-			http.Error(w, err.Error(), 400)
-			return "", err
-		}
-		tenantId = domainId
-	}
-	return tenantId, nil
 }
