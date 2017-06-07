@@ -46,4 +46,5 @@ scrape_configs:
 ```
 
 Prometheus' targets page ( Status -> Targets ) should the new job and the endpoint with `State UP`. 
-The `Error` column should be empty. Else it might indicate a failed authorization ( `401 Unauthorized`), in which case you want to verify the credentials and role assignments. 
+The `Error` column should be empty. 
+It might indicate a failed authorization ( `401 Unauthorized`) or that no metrics where found for the given scope (`404`), in which cases you might want to verify the credentials and role assignments.
