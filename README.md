@@ -16,7 +16,7 @@ It was originally designed for the SAP Converged Cloud.
 
 Via Makefile
 
-* `make` to just compile and run the binaries from the `build/` directory
+* `make` to compile and run the binaries from the `build/` directory
 * `make && make install` to install to `/usr`
 * `make && make install PREFIX=/some/path` to install to `/some/path`
 * `make docker` to build the Docker image (set image name and tag with the `DOCKER_IMAGE` and `DOCKER_TAG` variables)
@@ -25,9 +25,9 @@ Via Makefile
 # Using Maia
 
 Maia can be used with an unmodified Prometheus. You can download Prometheus from its [website](https://prometheus.io/download/).
-To configure Prometheus receive data from Maia the following job configuration has to be applied.
+To configure Prometheus to receive data from Maia, the following job configuration has to be applied.
 In the `basic_auth` section a valid user id, project id and password, corresponding to your OpenStack User and Project, has to be provided.
-The user is required to have the `metric-list` role.
+Moreover the user is required to have the `metric-list` role.
 
 ```yaml
 scrape_configs:
@@ -45,3 +45,5 @@ scrape_configs:
   
 ```
 
+Prometheus' targets page ( Status -> Targets ) should the new job and the endpoint with `State UP`. 
+The `Error` column should be empty. Else it might indicate a failed authorization ( `401 Unauthorized`), in which case you want to verify the credentials and role assignments. 
