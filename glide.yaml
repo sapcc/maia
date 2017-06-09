@@ -1,4 +1,4 @@
-package: github.com/sapcc/maia
+package: .
 flatten: true
 import:
 - package: github.com/databus23/goslo.policy
