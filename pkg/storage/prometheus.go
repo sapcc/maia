@@ -167,3 +167,26 @@ func (promCli *prometheusStorageClient) ListMetrics(tenantID string) (*http.Resp
 	}
 	return resp, nil
 }
+
+func (promCli *prometheusStorageClient) Federate(tenantId string) (*http.Response, error) {
+
+	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantId)
+	prometheusAPIURL := promCli.config.Address
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s%s", prometheusAPIURL, prometheusFederateUrl, projectQuery), nil)
+	if err != nil {
+		util.LogError("Could not create request.\n", err.Error())
+		return nil, err
+	}
+
+	for k, v := range prometheusCoreHeaders {
+		req.Header.Add(k, v)
+	}
+
+	resp, err := promCli.httpClient.Do(req)
+	if err != nil {
+		util.LogError("Request failed.\n%s", err.Error())
+		return nil, err
+	}
+	return resp, nil
+}
