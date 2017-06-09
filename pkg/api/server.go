@@ -30,6 +30,15 @@ import (
 )
 
 // Set up and start the API server, hooking it up to the API router
+// The server needs to implement the following subset of the P8S API
+// - /federate (for federation)
+// - /api/v1/label/*/values (for metric names, label values)
+// - /api/v1/query (for single metric values / single-stats)
+// - /api/v1/query_range (for graphing a metric over time)
+// - /api/v1/series (to obtain available labels for a metric)
+//
+// Tenant isolation is enforced by enhancing those queries with an additional label-constraint selector for the tenant
+// For /label/*/values this does not work straightforward. It has to be emulated with a pricey call to series
 func Server(keystone keystone.Driver, storage storage.Driver) error {
 
 	mainRouter := mux.NewRouter()
