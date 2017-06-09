@@ -93,17 +93,6 @@ imports:
   - util/stats
   - util/strutil
   - util/testutil
-- name: github.com/sapcc/maia
-  version: 44bc1c563aa239ab7ca6f6183db4426d4cc5ba35
-  subpackages:
-  - pkg/api
-  - pkg/cmd
-  - pkg/cmd/auth
-  - pkg/keystone
-  - pkg/maia
-  - pkg/storage
-  - pkg/test
-  - pkg/util
 - name: github.com/Sirupsen/logrus
   version: 85b1699d505667d13f8ac4478c1debbf85d6c5de
 - name: github.com/spf13/afero
