@@ -26,5 +26,5 @@ import "net/http"
 type Driver interface {
 
 	/********** requests to Prometheus **********/
-	ListMetrics(tenantId string) (*http.Response, error)
+	ListMetrics(tenantID string) (*http.Response, error)
 }

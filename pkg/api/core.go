@@ -32,11 +32,12 @@ import (
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 
+	"fmt"
 	dto "github.com/prometheus/client_model/go"
 	"io"
-	"fmt"
 )
 
+// RFC822 timestamp format
 const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
 
 var prometheusCoreHeaders = make(map[string]string)
@@ -129,7 +130,7 @@ func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
 	body := buf.String()
 	// request to prometheus was successful, but nothing was found
 	if (w.Header().Get("Content-Length") == string(0)) || (len(body) == 0) {
-		fmt.Println("---->",w.Header().Get("Content-Length"))
+		fmt.Println("---->", w.Header().Get("Content-Length"))
 		code = 404
 	}
 	w.WriteHeader(code)

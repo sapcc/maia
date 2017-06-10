@@ -87,7 +87,7 @@ func (d keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
 		}
 	}
 
-	return openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})//gophercloud.EndpointOpts{Availability: gophercloud.AvailabilityPublic},
+	return openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{}) //gophercloud.EndpointOpts{Availability: gophercloud.AvailabilityPublic},
 
 }
 

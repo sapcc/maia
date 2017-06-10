@@ -33,7 +33,7 @@ type Driver interface {
 	//should be prepared to handle a nil Client() where appropriate.
 	Client() *gophercloud.ProviderClient
 	AuthOptionsFromConfig() *gophercloud.AuthOptions
-	AuthOptionsFromBasicAuth(username string, password string, projectId string) *gophercloud.AuthOptions
+	AuthOptionsFromBasicAuth(username string, password string, projectID string) *gophercloud.AuthOptions
 	/********** requests to Keystone **********/
 	ListDomains() ([]KeystoneDomain, error)
 	ListProjects() ([]KeystoneProject, error)

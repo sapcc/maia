@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const prometheusFederateUrl = "federate?match[]="
+const prometheusFederateURL = "federate?match[]="
 
 type prometheusStorageClient struct {
 	client     prometheus.QueryAPI
@@ -50,7 +50,7 @@ func initPrometheusCoreHeaders() {
 	prometheusCoreHeaders["Connection"] = "close"
 }
 
-// Initialise and return the Prometheus driver
+// Prometheus initialises and returns the Prometheus driver
 func Prometheus(prometheusAPIURL string) Driver {
 	if promCli.client == nil {
 		promCli.init(prometheusAPIURL)
@@ -78,23 +78,23 @@ func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
 	initPrometheusCoreHeaders()
 
 	if viper.IsSet("maia.proxy") {
-		proxyUrl, err := url.Parse(viper.GetString("maia.proxy"))
+		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
 		if err != nil {
-			util.LogError("Could not set proxy: %s .\n%s", proxyUrl, err.Error())
+			util.LogError("Could not set proxy: %s .\n%s", proxyURL, err.Error())
 			httpCli = http.Client{}
 		} else {
-			httpCli = http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
+			httpCli = http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 		}
 	}
 	promCli.httpClient = httpCli
 }
 
-func (promCli *prometheusStorageClient) ListMetrics(tenantId string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) ListMetrics(tenantID string) (*http.Response, error) {
 
-	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantId)
+	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantID)
 	prometheusAPIURL := promCli.config.Address
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s%s", prometheusAPIURL, prometheusFederateUrl, projectQuery), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s%s", prometheusAPIURL, prometheusFederateURL, projectQuery), nil)
 	if err != nil {
 		util.LogError("Could not create request.\n", err.Error())
 		return nil, err
