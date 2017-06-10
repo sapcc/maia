@@ -43,10 +43,11 @@ type Token struct {
 	err      error
 }
 
+//BasicAuth represents a user authorization passed trough by a base64 encoded Authorization header of a request.
 type BasicAuth struct {
 	Username  string
-	ProjectId string
-	DomainId  string
+	ProjectID string
+	DomainID  string
 	Password  string
 	err       error
 }
@@ -60,10 +61,10 @@ func (b *BasicAuth) String() string {
 		username = b.Username
 	}
 
-	if b.ProjectId != "" {
-		scope = fmt.Sprintf("projectId: %s", b.ProjectId)
-	} else if b.DomainId != "" {
-		scope = fmt.Sprintf("domainId: %s", b.DomainId)
+	if b.ProjectID != "" {
+		scope = fmt.Sprintf("projectId: %s", b.ProjectID)
+	} else if b.DomainID != "" {
+		scope = fmt.Sprintf("domainId: %s", b.DomainID)
 	}
 
 	if b.Password != "" {
@@ -77,7 +78,7 @@ func (b *BasicAuth) String() string {
 func (p *v1Provider) CheckBasicAuth(r *http.Request) *BasicAuth {
 
 	username := ""
-	scopeId := ""
+	scopeID := ""
 	password := ""
 
 	authHeader := r.Header.Get("Authorization")
@@ -103,12 +104,12 @@ func (p *v1Provider) CheckBasicAuth(r *http.Request) *BasicAuth {
 			username = a[0]
 		}
 		if a[1] != "" {
-			scopeId = a[1]
+			scopeID = a[1]
 		}
 	}
 
 	//TODO: only project for now. ask keystone, wether it's a project or domain
-	return &BasicAuth{Username: username, ProjectId: scopeId, Password: password}
+	return &BasicAuth{Username: username, ProjectID: scopeID, Password: password}
 }
 
 //CheckToken checks the validity of the request's X-Auth-Token in keystone, and
@@ -127,7 +128,7 @@ func (p *v1Provider) CheckToken(r *http.Request) *Token {
 }
 
 func (p *v1Provider) GetTokenFromBasicAuth(auth *BasicAuth) *Token {
-	authOpts := p.keystone.AuthOptionsFromBasicAuth(auth.Username, auth.Password, auth.ProjectId)
+	authOpts := p.keystone.AuthOptionsFromBasicAuth(auth.Username, auth.Password, auth.ProjectID)
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
 	t.context, t.err = p.keystone.Authenticate(authOpts)
 	return t

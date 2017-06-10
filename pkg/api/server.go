@@ -29,7 +29,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Set up and start the API server, hooking it up to the API router
+// Server sets up and starts the API server, hooking it up to the API router
 func Server(keystone keystone.Driver, storage storage.Driver) error {
 
 	mainRouter := mux.NewRouter()

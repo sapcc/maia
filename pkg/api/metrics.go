@@ -45,12 +45,12 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	tenantId := ""
+	tenantID := ""
 	if auth != nil {
-		if auth.ProjectId != "" {
-			tenantId = auth.ProjectId
-		} else if auth.DomainId != "" {
-			tenantId = auth.DomainId
+		if auth.ProjectID != "" {
+			tenantID = auth.ProjectID
+		} else if auth.DomainID != "" {
+			tenantID = auth.DomainID
 		} else {
 			util.LogError("No project_id or domain_id found. Aborting.")
 			ReturnError(w, auth.err, 404)
@@ -58,7 +58,7 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	util.LogDebug("Getting metrics for project/domain: %s .", tenantId)
+	util.LogDebug("Getting metrics for project/domain: %s", tenantID)
 
 	// if [keystone] section in config
 	if viper.IsSet("keystone") {
@@ -77,9 +77,9 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	response, err := p.storage.ListMetrics(auth.ProjectId)
+	response, err := p.storage.ListMetrics(auth.ProjectID)
 	if err != nil {
-		util.LogError("Could not get metrics for project %s", auth.ProjectId)
+		util.LogError("Could not get metrics for project %s", auth.ProjectID)
 	}
 
 	ReturnResponse(w, 200, response)
