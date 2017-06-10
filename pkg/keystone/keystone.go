@@ -406,7 +406,14 @@ func (d keystone) RefreshToken() error {
 	return nil
 }
 
-func (d keystone) AuthOptionsFromBasicAuth(username string, password string, tenantId string) *gophercloud.AuthOptions {
+func (d keystone) AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.AuthOptions {
+	return &gophercloud.AuthOptions{
+		IdentityEndpoint: viper.GetString("keystone.auth_url"),
+		TokenID: tokenID,
+	}
+}
+
+func (d keystone) AuthOptionsFromBasicAuthCredentials(username string, password string, tenantId string) *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		UserID:           username,
