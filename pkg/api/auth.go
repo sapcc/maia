@@ -33,6 +33,7 @@ import (
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"strings"
+	"github.com/gophercloud/gophercloud"
 )
 
 //Token represents a user's token, as passed through the X-Auth-Token header of
@@ -49,6 +50,7 @@ type BasicAuth struct {
 	ProjectID string
 	DomainID  string
 	Password  string
+	TokenID string
 	err       error
 }
 
@@ -57,14 +59,18 @@ func (b *BasicAuth) String() string {
 	scope := "None"
 	password := "None"
 
+	if b.TokenID != "" {
+		return fmt.Sprintf("tokenID: %s", b.TokenID)
+	}
+
 	if b.Username != "" {
 		username = b.Username
 	}
 
 	if b.ProjectID != "" {
-		scope = fmt.Sprintf("projectId: %s", b.ProjectID)
+		scope = fmt.Sprintf("projectID: %s", b.ProjectID)
 	} else if b.DomainID != "" {
-		scope = fmt.Sprintf("domainId: %s", b.DomainID)
+		scope = fmt.Sprintf("domainID: %s", b.DomainID)
 	}
 
 	if b.Password != "" {
@@ -80,33 +86,46 @@ func (p *v1Provider) CheckBasicAuth(r *http.Request) *BasicAuth {
 	username := ""
 	scopeID := ""
 	password := ""
+	tokenID := ""
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return &BasicAuth{err: errors.New("Authorization header missing")}
 	}
-	// example authHeader: Basic base64enc(user@project:password)
+	// example authHeader: Basic base64enc(user@project:password) or base64enc(token:<token>)
 	basicAuthHeader, _ := base64.StdEncoding.DecodeString(strings.Fields(authHeader)[1])
 
 	basicAuth := strings.Split(string(basicAuthHeader), ":")
 
 	if len(basicAuth) != 2 {
+		util.LogError("Insufficient parameters for basic authentication. Provide user@project and password or token@tokenID")
+		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user@project and password or token@tokenID")}
+	}
+
+	username = basicAuth[0]
+
+	// authentication using token
+	if username == "token" {
+		util.LogDebug("Authenticate using token")
+		tokenID = basicAuth[1]
+		if tokenID == "" {
+			return &BasicAuth{err: errors.New("Tried token based authentication with empty tokenID.")}
+		}
+		return &BasicAuth{TokenID: tokenID}
+	}
+
+	util.LogDebug("Authenticate using credentials")
+
+	// authentication using username,projectid and password
+
+	a := strings.Split(basicAuth[1], "@")
+	if len(a) != 2 {
 		util.LogError("Insufficient parameters for basic authentication. Provide user@project and password")
 		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user@project and password")}
 	}
 
-	password = basicAuth[1]
-
-	a := strings.Split(basicAuth[0], "@")
-
-	if len(a) == 2 {
-		if a[0] != "" {
-			username = a[0]
-		}
-		if a[1] != "" {
-			scopeID = a[1]
-		}
-	}
+	scopeID = a[0]
+	password = a[1]
 
 	//TODO: only project for now. ask keystone, wether it's a project or domain
 	return &BasicAuth{Username: username, ProjectID: scopeID, Password: password}
@@ -128,7 +147,12 @@ func (p *v1Provider) CheckToken(r *http.Request) *Token {
 }
 
 func (p *v1Provider) GetTokenFromBasicAuth(auth *BasicAuth) *Token {
-	authOpts := p.keystone.AuthOptionsFromBasicAuth(auth.Username, auth.Password, auth.ProjectID)
+	var authOpts *gophercloud.AuthOptions
+	if auth.TokenID != "" {
+		authOpts = p.keystone.AuthOptionsFromBasicAuthToken(auth.TokenID)
+	} else {
+		authOpts = p.keystone.AuthOptionsFromBasicAuthCredentials(auth.Username, auth.Password, auth.ProjectID)
+	}
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
 	t.context, t.err = p.keystone.Authenticate(authOpts)
 	return t
