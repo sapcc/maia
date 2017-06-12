@@ -30,6 +30,7 @@ import (
 	"fmt"
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gorilla/mux"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"strings"
@@ -73,8 +74,60 @@ func (b *BasicAuth) String() string {
 	return fmt.Sprintf("username: %s \n%s \npassword: %s", username, scope, password)
 }
 
+type handlerFunc func(w http.ResponseWriter, req *http.Request)
+
+// Decorate HandlerFunc with authentication and authorization checks
+func AuthorizedHandlerFunc(f func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) handlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		util.LogDebug("authenticate")
+
+		auth := CheckBasicAuth(req)
+		if auth.err != nil {
+			util.LogError(auth.err.Error())
+			ReturnError(w, auth.err, 404)
+			return
+		}
+
+		tenantId := ""
+		if auth != nil {
+			if auth.ProjectId != "" {
+				tenantId = auth.ProjectId
+			} else if auth.DomainId != "" {
+				tenantId = auth.DomainId
+			} else {
+				util.LogError("No project_id or domain_id found. Aborting.")
+				ReturnError(w, auth.err, 404)
+				return
+			}
+		}
+
+		util.LogDebug("authorize for project/domain: %s .", tenantId)
+
+		// authorize call
+		// if [keystone] section in config
+		if viper.IsSet("keystone") {
+			util.LogDebug("Using keystone backend.")
+			token := GetTokenFromBasicAuth(auth, keystone)
+			if token.err != nil {
+				util.LogError(token.err.Error())
+				return
+			}
+
+			//TODO: cache and check token instead of always sending requests
+			//token := CheckToken(req, keystone)
+
+			if !token.Require(w, rule) {
+				return
+			}
+		}
+
+		// do it!
+		f(w, req, auth.ProjectId)
+	}
+}
+
 // Get credentials from Authorization header provided by Prometheus basic_auth
-func (p *v1Provider) CheckBasicAuth(r *http.Request) *BasicAuth {
+func CheckBasicAuth(r *http.Request) *BasicAuth {
 
 	username := ""
 	scopeId := ""
@@ -114,22 +167,22 @@ func (p *v1Provider) CheckBasicAuth(r *http.Request) *BasicAuth {
 //CheckToken checks the validity of the request's X-Auth-Token in keystone, and
 //returns a Token instance for checking authorization. Any errors that occur
 //during this function are deferred until Require() is called.
-func (p *v1Provider) CheckToken(r *http.Request) *Token {
+func CheckToken(r *http.Request, keystone keystone.Driver) *Token {
 	str := r.Header.Get("X-Auth-Token")
 	if str == "" {
 		return &Token{err: errors.New("X-Auth-Token header missing")}
 	}
 
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
-	t.context, t.err = p.keystone.ValidateToken(str)
+	t.context, t.err = keystone.ValidateToken(str)
 	t.context.Request = mux.Vars(r)
 	return t
 }
 
-func (p *v1Provider) GetTokenFromBasicAuth(auth *BasicAuth) *Token {
-	authOpts := p.keystone.AuthOptionsFromBasicAuth(auth.Username, auth.Password, auth.ProjectId)
+func GetTokenFromBasicAuth(auth *BasicAuth, keystone keystone.Driver) *Token {
+	authOpts := keystone.AuthOptionsFromBasicAuth(auth.Username, auth.Password, auth.ProjectId)
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
-	t.context, t.err = p.keystone.Authenticate(authOpts)
+	t.context, t.err = keystone.Authenticate(authOpts)
 	return t
 }
 

@@ -99,14 +99,14 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 	})
 
 	// TODO: what is /metrics? It is not a Prometheus API
-	r.Methods("GET").Path("/v1/metrics").HandlerFunc(p.ListMetrics)
+	r.Methods("GET").Path("/v1/metrics").HandlerFunc(AuthorizedHandlerFunc(p.ListMetrics, p.keystone, "metrics:list"))
 
-	r.Methods("GET").Path("/v1/query").HandlerFunc(p.Query)
-	r.Methods("GET").Path("/v1/query_range").HandlerFunc(p.QueryRange)
+	r.Methods("GET").Path("/v1/query").HandlerFunc(AuthorizedHandlerFunc(p.Query, p.keystone, "metrics:query"))
+	r.Methods("GET").Path("/v1/query_range").HandlerFunc(AuthorizedHandlerFunc(p.QueryRange, p.keystone, "metrics:query"))
 
-	r.Methods("GET").Path("/v1/label/:name/values").HandlerFunc(p.LabelValues)
+	r.Methods("GET").Path("/v1/label/:name/values").HandlerFunc(AuthorizedHandlerFunc(p.LabelValues, p.keystone, "metrics:list"))
 
-	r.Methods("GET").Path("/v1/series").HandlerFunc(p.ListSeries)
+	r.Methods("GET").Path("/v1/series").HandlerFunc(AuthorizedHandlerFunc(p.ListSeries, p.keystone, "metrics:list"))
 
 	return r, p.versionData
 }
