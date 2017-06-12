@@ -32,9 +32,9 @@ import (
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 
+	"fmt"
 	dto "github.com/prometheus/client_model/go"
 	"io"
-	"fmt"
 )
 
 const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
@@ -98,7 +98,9 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 		ReturnJSON(res, 200, map[string]interface{}{"version": p.versionData})
 	})
 
+	// TODO: what is /metrics? It is not a Prometheus API
 	r.Methods("GET").Path("/v1/metrics").HandlerFunc(p.ListMetrics)
+
 	r.Methods("GET").Path("/v1/query").HandlerFunc(p.Query)
 	r.Methods("GET").Path("/v1/query_range").HandlerFunc(p.QueryRange)
 
@@ -135,7 +137,7 @@ func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
 	body := buf.String()
 	// request to prometheus was successful, but nothing was found
 	if (w.Header().Get("Content-Length") == string(0)) || (len(body) == 0) {
-		fmt.Println("---->",w.Header().Get("Content-Length"))
+		fmt.Println("---->", w.Header().Get("Content-Length"))
 		code = 404
 	}
 	w.WriteHeader(code)
