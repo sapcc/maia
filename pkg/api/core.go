@@ -100,6 +100,12 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 	})
 
 	r.Methods("GET").Path("/v1/metrics").HandlerFunc(p.ListMetrics)
+	r.Methods("GET").Path("/v1/query").HandlerFunc(p.Query)
+	r.Methods("GET").Path("/v1/query_range").HandlerFunc(p.QueryRange)
+
+	r.Methods("GET").Path("/v1/label/:name/values").HandlerFunc(p.LabelValues)
+
+	r.Methods("GET").Path("/v1/series").HandlerFunc(p.ListSeries)
 
 	return r, p.versionData
 }
