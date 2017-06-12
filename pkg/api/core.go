@@ -116,15 +116,13 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 		ReturnJSON(res, 200, map[string]interface{}{"version": p.versionData})
 	})
 
-	// maia's own metrics
-	r.Methods("GET").Path("/federate").HandlerFunc(p.AuthorizedHandlerFunc(p.Federate, "metric:list"))
-	// tenant-aware query
-	r.Methods("GET").Path("/api/v1/query").HandlerFunc(p.AuthorizedHandlerFunc(p.Query, "metric:show"))
-	r.Methods("GET").Path("/api/v1/query_range").HandlerFunc(p.AuthorizedHandlerFunc(p.QueryRange, "metric:show"))
-	// tenant-aware label value lists
-	r.Methods("GET").Path("/api/v1/label/{name}/values").HandlerFunc(p.AuthorizedHandlerFunc(p.LabelValues, "metric:list"))
-	// tenant-aware series metadata
-	r.Methods("GET").Path("/api/v1/series").HandlerFunc(p.AuthorizedHandlerFunc(p.Series, "metric:list"))
+	r.Methods("GET").Path("/v1/metrics").HandlerFunc(p.ListMetrics)
+	r.Methods("GET").Path("/v1/query").HandlerFunc(p.Query)
+	r.Methods("GET").Path("/v1/query_range").HandlerFunc(p.QueryRange)
+
+	r.Methods("GET").Path("/v1/label/:name/values").HandlerFunc(p.LabelValues)
+
+	r.Methods("GET").Path("/v1/series").HandlerFunc(p.ListSeries)
 
 	return r, p.versionData
 }
