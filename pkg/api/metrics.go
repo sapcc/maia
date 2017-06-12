@@ -22,10 +22,9 @@ package api
 import (
 	"net/http"
 
+	"github.com/sapcc/maia/pkg/cmd/auth"
 	"github.com/sapcc/maia/pkg/maia"
 	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/viper"
-	"fmt"
 )
 
 // MetricList is the model for JSON returned by the ListMetrics API call
@@ -36,55 +35,11 @@ type MetricList struct {
 }
 
 //ListMetrics handles GET /v1/metrics.
-func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request) {
+func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request, projectID string) {
 	util.LogDebug("api.ListMetrics")
-
-	auth := p.CheckBasicAuth(req)
-
-	if auth.err != nil {
-		util.LogError(auth.err.Error())
-		ReturnError(w, auth.err, 404)
-		return
-	}
-
-	tenantID := ""
-	if auth != nil {
-		if auth.ProjectID != "" {
-			tenantID = auth.ProjectID
-		} else if auth.DomainID != "" {
-			tenantID = auth.DomainID
-		} else if auth.TokenID != "" {
-			//TODO: get tenantID from token
-			tenantID = ""
-		} else {
-			util.LogError("No project_id or domain_id found. Aborting.")
-			ReturnError(w, auth.err, 404)
-			return
-		}
-	}
-
-	util.LogDebug("Getting metrics for project/domain: %s", tenantID)
-
-	// if [keystone] section in config
-	if viper.IsSet("keystone") {
-		util.LogDebug("Using keystone backend.")
-		token := p.GetTokenFromBasicAuth(auth)
-		if token.err != nil {
-			util.LogError(token.err.Error())
-			return
-		}
-
-		//TODO: cache and check token instead of always sending requests
-		//token := p.CheckToken(req)
-
-		if !token.Require(w, "metric:list") {
-			return
-		}
-	}
-
-	response, err := p.storage.ListMetrics(auth.ProjectID)
+	response, err := p.storage.ListMetrics(projectID)
 	if err != nil {
-		util.LogError("Could not get metrics for project %s", auth.ProjectID)
+		util.LogError("Could not get metrics for project %s", projectID)
 	}
 
 	ReturnResponse(w, 200, response)
