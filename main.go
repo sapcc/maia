@@ -75,7 +75,7 @@ func readConfig(configPath *string) {
 		viper.SetConfigType("toml")
 		err := viper.ReadInConfig()
 		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("Fatal error config file: %s \n ", err))
+			panic(fmt.Errorf("Fatal error config file: %s \n", err))
 		}
 	}
 
@@ -103,17 +103,17 @@ func configuredStorageDriver() storage.Driver {
 	driverName := viper.GetString("maia.storage_driver")
 	switch driverName {
 	case "prometheus":
-		prometheusAPIURL := viper.GetString("maia.prometheus_api_url")
-		if prometheusAPIURL == "" {
+		prometheusApiUrl := viper.GetString("maia.prometheus_api_url")
+		if prometheusApiUrl == "" {
 			util.LogFatal("Invalid endpoint for prometheus.")
 			return nil
 		}
-		driver := storage.Prometheus(prometheusAPIURL)
+		driver := storage.Prometheus(prometheusApiUrl)
 		if driver == nil {
-			util.LogFatal("Couldn't initialize Prometheus storage driver with given endpoint: \"%s\"", prometheusAPIURL)
+			util.LogFatal("Couldn't initialize Prometheus storage driver with given endpoint: \"%s\"", prometheusApiUrl)
 			return nil
 		}
-		util.LogInfo("Using Prometheus storage driver with endpoint: \"%s\"", prometheusAPIURL)
+		util.LogInfo("Using Prometheus storage driver with endpoint: \"%s\"", prometheusApiUrl)
 
 		return driver
 	case "mock":
