@@ -8,10 +8,9 @@ GO_LDFLAGS    := -s -w
 
 # This target uses the incremental rebuild capabilities of the Go compiler to speed things up.
 # If no source files have changed, `go install` exits quickly without doing anything.
-build: FORCE
+build/maia: FORCE
 	glide install -v
-	go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external' -o ./maia
-	go install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
+	$(GO) install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
 
 # which packages to test with static checkers?
 GO_ALLPKGS := $(PKG) $(shell go list $(PKG)/pkg/...)
