@@ -26,7 +26,6 @@ import (
 	"log"
 	"os"
 
-	base64 "encoding/base64"
 	"fmt"
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gorilla/mux"
@@ -84,10 +83,11 @@ func (b *BasicAuth) String() string {
 type handlerFunc func(w http.ResponseWriter, req *http.Request)
 
 // Decorate HandlerFunc with authentication and authorization checks
-func AuthorizedHandlerFunc(f func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) handlerFunc {
+func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) handlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		util.LogDebug("authenticate")
 
+		// get basic authentication credentials
 		auth := CheckBasicAuth(req)
 		if auth.err != nil {
 			util.LogError(auth.err.Error())
@@ -121,15 +121,16 @@ func AuthorizedHandlerFunc(f func(w http.ResponseWriter, req *http.Request, proj
 			}
 
 			//TODO: cache and check token instead of always sending requests
-			//token := CheckToken(req, keystone)
+			// token = CheckToken(req, keystone)
 
 			if !token.Require(w, rule) {
+				// Require will already send an HTTP error
 				return
 			}
 		}
 
 		// do it!
-		f(w, req, auth.ProjectId)
+		wrappedHandlerFunc(w, req, auth.ProjectId)
 	}
 }
 
@@ -141,31 +142,19 @@ func CheckBasicAuth(r *http.Request) *BasicAuth {
 	password := ""
 	tokenID := ""
 
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
+	username, password, ok := r.BasicAuth()
+	if ok != true {
 		return &BasicAuth{err: errors.New("Authorization header missing")}
 	}
-	// example authHeader: Basic base64enc(user@project:password) or base64enc(token:<token>)
-	basicAuthHeader, _ := base64.StdEncoding.DecodeString(strings.Fields(authHeader)[1])
+	usernameParts := strings.Split(username, "@")
 
-	basicAuth := strings.Split(string(basicAuthHeader), ":")
-
-	if len(basicAuth) != 2 {
-		util.LogError("Insufficient parameters for basic authentication. Provide user@project and password or token@tokenID")
-		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user@project and password or token@tokenID")}
+	if len(usernameParts) != 2 {
+		util.LogError("Insufficient parameters for basic authentication. Provide user-id@project-id and password")
+		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user-id@project-id and password")}
 	}
 
-	username = basicAuth[0]
-
-	// authentication using token
-	if username == "token" {
-		util.LogDebug("Authenticate using token")
-		tokenID = basicAuth[1]
-		if tokenID == "" {
-			return &BasicAuth{err: errors.New("Tried token based authentication with empty tokenID.")}
-		}
-		return &BasicAuth{TokenID: tokenID}
-	}
+	username = usernameParts[0]
+	scopeId = usernameParts[1]
 
 	util.LogDebug("Authenticate using credentials")
 

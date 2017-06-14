@@ -32,7 +32,6 @@ import (
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 
-	"fmt"
 	dto "github.com/prometheus/client_model/go"
 	"io"
 )
@@ -57,10 +56,39 @@ type versionLinkData struct {
 	Type     string `json:"type,omitempty"`
 }
 
+// class for Prometheus v1 API provider implementation
 type v1Provider struct {
 	keystone    keystone.Driver
 	storage     storage.Driver
 	versionData versionData
+}
+
+// Prometheus status strings
+type status string
+
+const (
+	statusSuccess status = "success"
+	statusError          = "error"
+)
+
+// Prometheus error types
+type errorType string
+
+const (
+	errorNone     errorType = ""
+	errorTimeout            = "timeout"
+	errorCanceled           = "canceled"
+	errorExec               = "execution"
+	errorBadData            = "bad_data"
+	errorInternal           = "internal"
+)
+
+// Prometheus response object (JSON)
+type response struct {
+	Status    status      `json:"status"`
+	Data      interface{} `json:"data,omitempty"`
+	ErrorType errorType   `json:"errorType,omitempty"`
+	Error     string      `json:"error,omitempty"`
 }
 
 func initCoreHeaders() {
@@ -95,19 +123,19 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 		},
 	}
 
-	r.Methods("GET").Path("/v1/").HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
+	r.Methods("GET").Path("/api/v1/").HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
 		ReturnJSON(res, 200, map[string]interface{}{"version": p.versionData})
 	})
 
-	// TODO: what is /metrics? It is not a Prometheus API
-	r.Methods("GET").Path("/v1/metrics").HandlerFunc(AuthorizedHandlerFunc(p.ListMetrics, p.keystone, "metrics:list"))
-
-	r.Methods("GET").Path("/v1/query").HandlerFunc(AuthorizedHandlerFunc(p.Query, p.keystone, "metrics:query"))
-	r.Methods("GET").Path("/v1/query_range").HandlerFunc(AuthorizedHandlerFunc(p.QueryRange, p.keystone, "metrics:query"))
-
-	r.Methods("GET").Path("/v1/label/:name/values").HandlerFunc(AuthorizedHandlerFunc(p.LabelValues, p.keystone, "metrics:list"))
-
-	r.Methods("GET").Path("/v1/series").HandlerFunc(AuthorizedHandlerFunc(p.ListSeries, p.keystone, "metrics:list"))
+	// maia's own metrics
+	r.Methods("GET").Path("/metrics").HandlerFunc(AuthorizedHandlerFunc(p.ListMetrics, p.keystone, "metrics:list"))
+	// tenant-aware query
+	r.Methods("GET").Path("/api/v1/query").HandlerFunc(AuthorizedHandlerFunc(p.Query, p.keystone, "metrics:query"))
+	r.Methods("GET").Path("/api/v1/query_range").HandlerFunc(AuthorizedHandlerFunc(p.QueryRange, p.keystone, "metrics:query"))
+	// tenant-aware label value lists
+	r.Methods("GET").Path("/api/v1/label/{name}/values").HandlerFunc(AuthorizedHandlerFunc(p.LabelValues, p.keystone, "metrics:list"))
+	// tenant-aware series metadata
+	r.Methods("GET").Path("/api/v1/series").HandlerFunc(AuthorizedHandlerFunc(p.Series, p.keystone, "metrics:list"))
 
 	return r, p.versionData
 }
@@ -127,48 +155,62 @@ func ReturnMetrics(w http.ResponseWriter, format expfmt.Format, code int, data *
 }
 
 //ReturnResponse basically forwards a received response.
-//Returns 404 if no metrics where found
-func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
-
+func ReturnResponse(w http.ResponseWriter, response *http.Response) {
+	// allow cross domain AJAX requests
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// copy headers
 	for k, v := range response.Header {
 		w.Header().Set(k, strings.Join(v, ";"))
 	}
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(response.Body)
 	body := buf.String()
-	// request to prometheus was successful, but nothing was found
-	if (w.Header().Get("Content-Length") == string(0)) || (len(body) == 0) {
-		fmt.Println("---->", w.Header().Get("Content-Length"))
-		code = 404
-	}
-	w.WriteHeader(code)
+	w.WriteHeader(response.StatusCode)
 
 	io.WriteString(w, body)
-
 }
 
 //ReturnJSON is a convenience function for HTTP handlers returning JSON data.
 //The `code` argument specifies the HTTP response code, usually 200.
 func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 	escapedJSON, err := json.MarshalIndent(&data, "", "  ")
-	jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)
 	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(code)
+		// TODO: comment
+		jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)
 		w.Write(jsonData)
 	} else {
 		http.Error(w, err.Error(), 500)
 	}
 }
 
-//ReturnError produces an error response with HTTP status code if the given
+//ReturnError produces a Prometheus error response with HTTP status code if the given
 //error is non-nil. Otherwise, nothing is done and false is returned.
 func ReturnError(w http.ResponseWriter, err error, code int) bool {
 	if err == nil {
 		return false
 	}
 
-	http.Error(w, err.Error(), code)
+	var errorType = errorNone
+	switch code {
+	case 400:
+		errorType = errorBadData
+	case 422:
+		errorType = errorExec
+	case 500:
+		errorType = errorInternal
+	case 503:
+		errorType = errorTimeout
+	default:
+		http.Error(w, err.Error(), code)
+		return true
+	}
+
+	jsonErr := response{Status: statusError, ErrorType: errorType, Error: err.Error()}
+	ReturnJSON(w, code, jsonErr)
+
 	return true
 }
 
@@ -183,6 +225,7 @@ func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool 
 	return true
 }
 
+// TODO what is this?
 //Path constructs a full URL for a given URL path below the /v1/ endpoint.
 func (p *v1Provider) Path(elements ...string) string {
 	parts := []string{
