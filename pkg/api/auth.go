@@ -26,7 +26,6 @@ import (
 	"log"
 	"os"
 
-	base64 "encoding/base64"
 	"fmt"
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gorilla/mux"
@@ -77,10 +76,11 @@ func (b *BasicAuth) String() string {
 type handlerFunc func(w http.ResponseWriter, req *http.Request)
 
 // Decorate HandlerFunc with authentication and authorization checks
-func AuthorizedHandlerFunc(f func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) handlerFunc {
+func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) handlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		util.LogDebug("authenticate")
 
+		// get basic authentication credentials
 		auth := CheckBasicAuth(req)
 		if auth.err != nil {
 			util.LogError(auth.err.Error())
@@ -114,15 +114,16 @@ func AuthorizedHandlerFunc(f func(w http.ResponseWriter, req *http.Request, proj
 			}
 
 			//TODO: cache and check token instead of always sending requests
-			//token := CheckToken(req, keystone)
+			// token = CheckToken(req, keystone)
 
 			if !token.Require(w, rule) {
+				// Require will already send an HTTP error
 				return
 			}
 		}
 
 		// do it!
-		f(w, req, auth.ProjectId)
+		wrappedHandlerFunc(w, req, auth.ProjectId)
 	}
 }
 
@@ -133,32 +134,19 @@ func CheckBasicAuth(r *http.Request) *BasicAuth {
 	scopeId := ""
 	password := ""
 
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
+	username, password, ok := r.BasicAuth()
+	if ok != true {
 		return &BasicAuth{err: errors.New("Authorization header missing")}
 	}
-	// example authHeader: Basic base64enc(user@project:password)
-	basicAuthHeader, _ := base64.StdEncoding.DecodeString(strings.Fields(authHeader)[1])
+	usernameParts := strings.Split(username, "@")
 
-	basicAuth := strings.Split(string(basicAuthHeader), ":")
-
-	if len(basicAuth) != 2 {
-		util.LogError("Insufficient parameters for basic authentication. Provide user@project and password")
-		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user@project and password")}
+	if len(usernameParts) != 2 {
+		util.LogError("Insufficient parameters for basic authentication. Provide user-id@project-id and password")
+		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user-id@project-id and password")}
 	}
 
-	password = basicAuth[1]
-
-	a := strings.Split(basicAuth[0], "@")
-
-	if len(a) == 2 {
-		if a[0] != "" {
-			username = a[0]
-		}
-		if a[1] != "" {
-			scopeId = a[1]
-		}
-	}
+	username = usernameParts[0]
+	scopeId = usernameParts[1]
 
 	//TODO: only project for now. ask keystone, wether it's a project or domain
 	return &BasicAuth{Username: username, ProjectId: scopeId, Password: password}

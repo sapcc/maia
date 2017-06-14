@@ -22,7 +22,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/sapcc/maia/pkg/cmd/auth"
+	"errors"
+	"github.com/gorilla/mux"
 	"github.com/sapcc/maia/pkg/maia"
 	"github.com/sapcc/maia/pkg/util"
 )
@@ -40,7 +41,83 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request, proje
 	response, err := p.storage.ListMetrics(projectID)
 	if err != nil {
 		util.LogError("Could not get metrics for project %s", projectID)
+		ReturnError(w, err, 503)
+		return
 	}
 
-	ReturnResponse(w, 200, response)
+	ReturnResponse(w, response)
+}
+
+func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request, projectID string) {
+	queryParams := req.URL.Query()
+	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), "project_id", projectID)
+	if err != nil {
+		ReturnError(w, err, 400)
+		return
+	}
+
+	util.LogInfo(newQuery)
+	resp, err := p.storage.Query(newQuery, queryParams.Get("time"), queryParams.Get("timeout"))
+	if err != nil {
+		ReturnError(w, err, 503)
+		return
+	}
+
+	ReturnResponse(w, resp)
+}
+
+func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request, projectID string) {
+	queryParams := req.URL.Query()
+	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), "project_id", projectID)
+	if err != nil {
+		ReturnError(w, err, 400)
+		return
+	}
+
+	resp, err := p.storage.QueryRange(newQuery, queryParams.Get("start"), queryParams.Get("end"), queryParams.Get("step"), queryParams.Get("timeout"))
+	if err != nil {
+		ReturnError(w, err, 503)
+		return
+	}
+
+	ReturnResponse(w, resp)
+}
+
+func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, projectID string) {
+	// TODO: use series and filter accordingly
+	resp, err := p.storage.LabelValues(mux.Vars(req)["name"])
+	if err != nil {
+		ReturnError(w, err, 503)
+		return
+	}
+
+	ReturnResponse(w, resp)
+}
+
+func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request, projectID string) {
+	queryParams := req.URL.Query()
+	selectors := queryParams["match[]"]
+	if selectors == nil {
+		// behave like Prometheus, but do not proxy through
+		ReturnError(w, errors.New("no match[] parameter provided"), 400)
+		return
+	}
+
+	newSelectors := make([]string, len(selectors))
+	for i, sel := range queryParams["match[]"] {
+		newSel, perr := util.AddLabelConstraintToSelector(sel, "project_id", projectID)
+		newSelectors[i] = newSel
+		if perr != nil {
+			ReturnError(w, perr, 400)
+			return
+		}
+	}
+
+	resp, err := p.storage.Series(newSelectors, queryParams.Get("start"), queryParams.Get("end"))
+	if err != nil {
+		ReturnError(w, err, 503)
+		return
+	}
+
+	ReturnResponse(w, resp)
 }

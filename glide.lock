@@ -1,5 +1,5 @@
-hash: 8a9d93e5d4ec65c520aefc408e25bc54b8b68e190e82cdf79762cf265036d6c3
-updated: 2017-06-09T13:41:28.280830127+02:00
+hash: b90d6fb070cb175a6e3c6aeef888aa65552ef626ecd8335471a95c6301bca9a1
+updated: 2017-06-14T15:48:11.995500633+02:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -80,7 +80,7 @@ imports:
   subpackages:
   - xfs
 - name: github.com/prometheus/prometheus
-  version: bfa37c8ee39d11078662dce16c162a61dccf616c
+  version: 3afb3fffa3a29c3de865e1172fb740442e9d0133
   subpackages:
   - promql
   - storage
@@ -93,6 +93,17 @@ imports:
   - util/stats
   - util/strutil
   - util/testutil
+- name: github.com/sapcc/maia
+  version: 246533fbd5f1c4abd16a009727e3ba893ca28808
+  subpackages:
+  - pkg/api
+  - pkg/cmd
+  - pkg/cmd/auth
+  - pkg/keystone
+  - pkg/maia
+  - pkg/storage
+  - pkg/test
+  - pkg/util
 - name: github.com/Sirupsen/logrus
   version: 85b1699d505667d13f8ac4478c1debbf85d6c5de
 - name: github.com/spf13/afero

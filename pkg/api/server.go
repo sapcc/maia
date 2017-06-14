@@ -26,18 +26,18 @@ import (
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/viper"
 )
 
 // Set up and start the API server, hooking it up to the API router
-func Server(keystone keystone.Driver, storage storage.Driver) error {
+func Server(keystone keystone.Driver, storage storage.Driver, bind_address string) error {
 
 	mainRouter := mux.NewRouter()
 
 	//hook up the v1 API (this code is structured so that a newer API version can
 	//be added easily later)
 	v1Router, v1VersionData := NewV1Router(keystone, storage)
-	mainRouter.PathPrefix("/v1/").Handler(v1Router)
+	// TODO: where is the /api prefix?
+	mainRouter.PathPrefix("/api/v1/").Handler(v1Router)
 
 	//add the version advertisement that lists all available API versions
 	mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +50,6 @@ func Server(keystone keystone.Driver, storage storage.Driver) error {
 	http.Handle("/", mainRouter)
 
 	//start HTTP server
-	util.LogInfo("listening on " + viper.GetString("API.ListenAddress"))
-	return http.ListenAndServe(viper.GetString("API.ListenAddress"), nil)
+	util.LogInfo("listening on %s", bind_address)
+	return http.ListenAndServe(bind_address, nil)
 }

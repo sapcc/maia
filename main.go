@@ -57,7 +57,7 @@ func main() {
 			os.Exit(1)
 		}
 	} else { // otherwise, we are running a Maia API server
-		api.Server(keystoneDriver, storageDriver)
+		api.Server(keystoneDriver, storageDriver, viper.GetString("maia.bind_address"))
 	}
 }
 
@@ -74,8 +74,8 @@ func parseCmdlineFlags() {
 func setDefaultConfig() {
 	viper.SetDefault("maia.keystone_driver", "keystone")
 	viper.SetDefault("maia.storage_driver", "prometheus")
-	viper.SetDefault("API.ListenAddress", "0.0.0.0:8789")
-	viper.SetDefault("prometheus.url", "localhost:9090")
+	viper.SetDefault("maia.bind_address", "0.0.0.0:8789")
+	viper.SetDefault("maia.prometheus_api_url", "localhost:9090")
 }
 
 func readConfig(configPath *string) {
