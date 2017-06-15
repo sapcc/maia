@@ -58,7 +58,6 @@ docker: build/docker.tar
 	$(DOCKER) build -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
 
 vendor: FORCE
-	@# vendoring by https://github.com/holocm/golangvend
-	golangvend
+	glide update -v	
 
 .PHONY: FORCE
