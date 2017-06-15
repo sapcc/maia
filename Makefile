@@ -3,7 +3,6 @@ PREFIX := /usr
 
 all: build/maia
 
-GO            := GOPATH=$(CURDIR)/.gopath GOBIN=$(CURDIR)/build go
 GO_BUILDFLAGS :=
 GO_LDFLAGS    := -s -w
 
@@ -11,7 +10,8 @@ GO_LDFLAGS    := -s -w
 # If no source files have changed, `go install` exits quickly without doing anything.
 build/maia: FORCE
 	glide install -v
-	$(GO) install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
+	go build $(PKG)
+#	go install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
 
 # which packages to test with static checkers?
 GO_ALLPKGS := $(PKG) $(shell go list $(PKG)/pkg/...)
@@ -32,13 +32,13 @@ check: all static-check build/cover.html FORCE
 static-check: FORCE
 	@if s="$$(gofmt -s -l *.go pkg 2>/dev/null)"                            && test -n "$$s"; then printf ' => %s\n%s\n' gofmt  "$$s"; false; fi
 	@if s="$$(golint . && find pkg -type d -exec golint {} \; 2>/dev/null)" && test -n "$$s"; then printf ' => %s\n%s\n' golint "$$s"; false; fi
-	$(GO) vet $(GO_ALLPKGS)
+	go vet $(GO_ALLPKGS)
 build/%.cover.out: prepare-check FORCE
-	$(GO) test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' -coverprofile=$@ -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(subst _,/,$*)
+	go test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' -coverprofile=$@ -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(subst _,/,$*)
 build/cover.out: $(GO_COVERFILES)
 	pkg/test/util/gocovcat.go $(GO_COVERFILES) > $@
 build/cover.html: build/cover.out
-	$(GO) tool cover -html $< -o $@
+	go tool cover -html $< -o $@
 
 install: FORCE all
 	install -D -m 0755 build/maia "$(DESTDIR)$(PREFIX)/bin/maia"
