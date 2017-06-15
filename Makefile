@@ -61,6 +61,6 @@ docker: build/docker.tar
 	$(DOCKER) build -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
 
 vendor: FORCE
-	glide update -v
+	glide update -v	
 
 .PHONY: FORCE
