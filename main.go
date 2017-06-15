@@ -41,7 +41,7 @@ func main() {
 			os.Exit(1)
 		}
 	} else { // otherwise, we are running a Maia API server
-		api.Server(keystoneDriver, storageDriver, viper.GetString("maia.bind_address"))
+		api.Server(keystoneDriver, storageDriver)
 	}
 }
 

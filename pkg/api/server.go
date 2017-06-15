@@ -27,10 +27,11 @@ import (
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
+	"github.com/spf13/viper"
 )
 
 // Set up and start the API server, hooking it up to the API router
-func Server(keystone keystone.Driver, storage storage.Driver, bind_address string) error {
+func Server(keystone keystone.Driver, storage storage.Driver) error {
 
 	mainRouter := mux.NewRouter()
 
@@ -51,6 +52,7 @@ func Server(keystone keystone.Driver, storage storage.Driver, bind_address strin
 	http.Handle("/", mainRouter)
 
 	//start HTTP server
+	bind_address := viper.GetString("maia.bind_address")
 	util.LogInfo("listening on %s", bind_address)
 	return http.ListenAndServe(bind_address, nil)
 }

@@ -166,6 +166,7 @@ func (promCli *prometheusStorageClient) LabelValues(name string) (*http.Response
 
 	res, err := sendToPrometheus("GET", promURL.String(), nil)
 
+	return res, err
 }
 
 // buildURL is used to build the target URL of a Prometheus call
