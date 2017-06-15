@@ -127,14 +127,14 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 	})
 
 	// maia's own metrics
-	r.Methods("GET").Path("/metrics").HandlerFunc(AuthorizedHandlerFunc(p.ListMetrics, p.keystone, "metrics:list"))
+	r.Methods("GET").Path("/metrics").HandlerFunc(AuthorizedHandlerFunc(p.ListMetrics, p.keystone, "metric:list"))
 	// tenant-aware query
-	r.Methods("GET").Path("/api/v1/query").HandlerFunc(AuthorizedHandlerFunc(p.Query, p.keystone, "metrics:query"))
-	r.Methods("GET").Path("/api/v1/query_range").HandlerFunc(AuthorizedHandlerFunc(p.QueryRange, p.keystone, "metrics:query"))
+	r.Methods("GET").Path("/api/v1/query").HandlerFunc(AuthorizedHandlerFunc(p.Query, p.keystone, "metric:show"))
+	r.Methods("GET").Path("/api/v1/query_range").HandlerFunc(AuthorizedHandlerFunc(p.QueryRange, p.keystone, "metric:show"))
 	// tenant-aware label value lists
-	r.Methods("GET").Path("/api/v1/label/{name}/values").HandlerFunc(AuthorizedHandlerFunc(p.LabelValues, p.keystone, "metrics:list"))
+	r.Methods("GET").Path("/api/v1/label/{name}/values").HandlerFunc(AuthorizedHandlerFunc(p.LabelValues, p.keystone, "metric:list"))
 	// tenant-aware series metadata
-	r.Methods("GET").Path("/api/v1/series").HandlerFunc(AuthorizedHandlerFunc(p.Series, p.keystone, "metrics:list"))
+	r.Methods("GET").Path("/api/v1/series").HandlerFunc(AuthorizedHandlerFunc(p.Series, p.keystone, "metric:list"))
 
 	return r, p.versionData
 }
@@ -155,8 +155,8 @@ func ReturnMetrics(w http.ResponseWriter, format expfmt.Format, code int, data *
 
 //ReturnResponse basically forwards a received response.
 func ReturnResponse(w http.ResponseWriter, response *http.Response) {
-	// allow cross domain AJAX requests
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	defer response.Body.Close()
+
 	// copy headers
 	for k, v := range response.Header {
 		w.Header().Set(k, strings.Join(v, ";"))
@@ -175,7 +175,6 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 	escapedJSON, err := json.MarshalIndent(&data, "", "  ")
 	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(code)
 		// TODO: comment
 		jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)

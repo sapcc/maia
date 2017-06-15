@@ -22,10 +22,15 @@ package api
 import (
 	"net/http"
 
+	"encoding/json"
 	"errors"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/common/model"
 	"github.com/sapcc/maia/pkg/maia"
 	"github.com/sapcc/maia/pkg/util"
+	"github.com/spf13/viper"
+	"io/ioutil"
+	"time"
 )
 
 // MetricList is the model for JSON returned by the ListMetrics API call
@@ -83,15 +88,63 @@ func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request, projec
 	ReturnResponse(w, resp)
 }
 
+type seriesResponse struct {
+	Status    status           `json:"status"`
+	Data      []model.LabelSet `json:"data,omitempty"`
+	ErrorType errorType        `json:"errorType,omitempty"`
+	Error     string           `json:"error,omitempty"`
+}
+
+type labelValuesResponse struct {
+	Status status             `json:"status"`
+	Data   []model.LabelValue `json:"data"`
+}
+
 func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, projectID string) {
-	// TODO: use series and filter accordingly
-	resp, err := p.storage.LabelValues(mux.Vars(req)["name"])
+	name := model.LabelName(mux.Vars(req)["name"])
+	// do not list label values from series older than maia.label_value_ttl
+	ttl, err := time.ParseDuration(viper.GetString("maia.label_value_ttl"))
+	if err != nil {
+		ReturnError(w, errors.New("Invalid Maia configuration (maia.label_value_ttl)"), 500)
+		return
+	}
+
+	start := time.Now().Add(-ttl)
+	end := time.Now()
+	resp, err := p.storage.Series([]string{"{project_id=\"" + projectID + "\"," + string(name) + "!=\"\"}"}, start.Format(time.RFC3339), end.Format(time.RFC3339))
 	if err != nil {
 		ReturnError(w, err, 503)
 		return
 	}
 
-	ReturnResponse(w, resp)
+	// extract label values from series
+	defer resp.Body.Close()
+	buf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		ReturnError(w, err, resp.StatusCode)
+		return
+	}
+
+	var sr seriesResponse
+	if err := json.Unmarshal(buf, &sr); err != nil {
+		ReturnError(w, err, 500)
+		return
+	}
+	// collect unique values from 1000x bigger :( series list
+	unique := map[model.LabelValue]bool{}
+	for _, lset := range sr.Data {
+		v := lset[name]
+		unique[v] = true
+	}
+	// transform into expected result type
+	var result labelValuesResponse
+	result.Status = sr.Status
+	result.Data = make([]model.LabelValue, 0)
+	for k, _ := range unique {
+		result.Data = append(result.Data, k)
+	}
+
+	ReturnJSON(w, 200, &result)
 }
 
 func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request, projectID string) {
@@ -102,18 +155,17 @@ func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request, projectID 
 		ReturnError(w, errors.New("no match[] parameter provided"), 400)
 		return
 	}
-
-	newSelectors := make([]string, len(selectors))
-	for i, sel := range queryParams["match[]"] {
-		newSel, perr := util.AddLabelConstraintToSelector(sel, "project_id", projectID)
-		newSelectors[i] = newSel
-		if perr != nil {
-			ReturnError(w, perr, 400)
+	// enrich all match statements
+	for i, sel := range selectors {
+		newSel, err := util.AddLabelConstraintToSelector(sel, "project_id", projectID)
+		if err != nil {
+			ReturnError(w, err, 400)
 			return
 		}
+		selectors[i] = newSel
 	}
 
-	resp, err := p.storage.Series(newSelectors, queryParams.Get("start"), queryParams.Get("end"))
+	resp, err := p.storage.Series(selectors, queryParams.Get("start"), queryParams.Get("end"))
 	if err != nil {
 		ReturnError(w, err, 503)
 		return
