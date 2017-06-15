@@ -85,7 +85,7 @@ type handlerFunc func(w http.ResponseWriter, req *http.Request)
 // Decorate HandlerFunc with authentication and authorization checks
 func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) handlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		util.LogDebug("authenticate")
+		util.LogInfo("authenticate")
 
 		// get basic authentication credentials
 		auth := CheckBasicAuth(req)
@@ -97,6 +97,7 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 
 		tenantId := ""
 		if auth != nil {
+			util.LogInfo(auth.String())
 			if auth.ProjectId != "" {
 				tenantId = auth.ProjectId
 			} else if auth.DomainId != "" {
@@ -108,25 +109,23 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 			}
 		}
 
-		util.LogDebug("authorize for project/domain: %s .", tenantId)
+		util.LogInfo("authorize for project/domain: %s .", tenantId)
 
 		// authorize call
-		// if [keystone] section in config
-		if viper.IsSet("keystone") {
-			util.LogDebug("Using keystone backend.")
-			token := GetTokenFromBasicAuth(auth, keystone)
-			if token.err != nil {
-				util.LogError(token.err.Error())
-				return
-			}
+		token := GetTokenFromBasicAuth(auth, keystone)
+		if token.err != nil {
+			util.LogError(token.err.Error())
+			ReturnError(w, token.err, 403)
+			return
+		}
 
-			//TODO: cache and check token instead of always sending requests
-			// token = CheckToken(req, keystone)
+		//TODO: cache and check token instead of always sending requests
+		// token = CheckToken(req, keystone)
 
-			if !token.Require(w, rule) {
-				// Require will already send an HTTP error
-				return
-			}
+		if err := token.Require(rule); err != nil {
+			util.LogError(err.Error())
+			ReturnError(w, err, 403)
+			return
 		}
 
 		// do it!
@@ -198,18 +197,13 @@ func GetTokenFromBasicAuth(auth *BasicAuth, keystone keystone.Driver) *Token {
 //Require checks if the given token has the given permission according to the
 //policy.json that is in effect. If not, an error response is written and false
 //is returned.
-func (t *Token) Require(w http.ResponseWriter, rule string) bool {
-	if t.err != nil {
-		http.Error(w, t.err.Error(), 401)
-		return false
-	}
-
+func (t *Token) Require(rule string) error {
 	if os.Getenv("MAIA_DEBUG") == "1" {
 		t.context.Logger = log.Printf //or any other function with the same signature
 	}
 	if !t.enforcer.Enforce(rule, t.context) {
-		http.Error(w, "Unauthorized", 403)
-		return false
+		util.LogInfo("User %s does not fulfill authorization rule %s", t.context.Auth, rule)
+		return errors.New("Unauthorized")
 	}
-	return true
+	return nil
 }
