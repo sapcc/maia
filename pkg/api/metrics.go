@@ -25,7 +25,6 @@ import (
 	"github.com/sapcc/maia/pkg/maia"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"fmt"
 )
 
 // MetricList is the model for JSON returned by the ListMetrics API call
