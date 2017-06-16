@@ -30,8 +30,6 @@ import (
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"io/ioutil"
-	"time"
 )
 
 func scopeToLabelConstraint(req *http.Request) (string, string) {

@@ -21,6 +21,10 @@ package main
 
 import (
 	"github.com/sapcc/maia/pkg/cmd"
+	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/storage"
+	"github.com/sapcc/maia/pkg/util"
+	"github.com/spf13/viper"
 )
 
 func main() {

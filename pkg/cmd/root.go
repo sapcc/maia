@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

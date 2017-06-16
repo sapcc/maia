@@ -25,11 +25,14 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/sapcc/maia/pkg/keystone"
+	"github.com/prometheus/common/expfmt"
+	"github.com/sapcc/maia/pkg/auth"
 	"github.com/sapcc/maia/pkg/storage"
 
+	"bytes"
 	dto "github.com/prometheus/client_model/go"
 	"io"
+	"time"
 )
 
 // RFC822 timestamp format
@@ -135,79 +138,6 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 	r.Methods("GET").Path("/api/v1/series").HandlerFunc(AuthorizedHandlerFunc(p.Series, p.keystone, "metric:list"))
 
 	return r, p.versionData
-}
-
-//ReturnMetrics returns metrics in the prometheus text format
-func ReturnMetrics(w http.ResponseWriter, format expfmt.Format, code int, data *dto.MetricFamily) {
-	//headers
-	time := time.Now().UTC().Format(RFC822)
-	w.Header().Set("Date", time)
-	initCoreHeaders()
-	for k, v := range prometheusCoreHeaders {
-		w.Header().Set(k, v)
-	}
-	// body
-	enc := expfmt.NewEncoder(w, format)
-	enc.Encode(data)
-}
-
-//ReturnResponse basically forwards a received response.
-func ReturnResponse(w http.ResponseWriter, response *http.Response) {
-	defer response.Body.Close()
-
-	// copy headers
-	for k, v := range response.Header {
-		w.Header().Set(k, strings.Join(v, ";"))
-	}
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(response.Body)
-	body := buf.String()
-	w.WriteHeader(response.StatusCode)
-
-	io.WriteString(w, body)
-}
-
-//ReturnJSON is a convenience function for HTTP handlers returning JSON data.
-//The `code` argument specifies the HTTP response code, usually 200.
-func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
-	escapedJSON, err := json.MarshalIndent(&data, "", "  ")
-	if err == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		// TODO: comment
-		jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)
-		w.Write(jsonData)
-	} else {
-		http.Error(w, err.Error(), 500)
-	}
-}
-
-//ReturnError produces a Prometheus error response with HTTP status code if the given
-//error is non-nil. Otherwise, nothing is done and false is returned.
-func ReturnError(w http.ResponseWriter, err error, code int) bool {
-	if err == nil {
-		return false
-	}
-
-	var errorType = errorNone
-	switch code {
-	case 400:
-		errorType = errorBadData
-	case 422:
-		errorType = errorExec
-	case 500:
-		errorType = errorInternal
-	case 503:
-		errorType = errorTimeout
-	default:
-		http.Error(w, err.Error(), code)
-		return true
-	}
-
-	jsonErr := response{Status: statusError, ErrorType: errorType, Error: err.Error()}
-	ReturnJSON(w, code, jsonErr)
-
-	return true
 }
 
 //RequireJSON will parse the request body into the given data structure, or
