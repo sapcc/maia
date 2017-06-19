@@ -50,7 +50,7 @@ var projectNameCache *map[string]string
 var userNameCache *map[string]string
 var userIdCache *map[string]string
 
-func (d keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
+func (d keystone) keystoneClient(iServiceUser bool) (*gophercloud.ServiceClient, error) {
 	if d.TokenRenewalMutex == nil {
 		d.TokenRenewalMutex = &sync.Mutex{}
 	}
@@ -72,9 +72,12 @@ func (d keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize OpenStack client: %v", err)
 		}
-		err = d.RefreshToken()
-		if err != nil {
-			return nil, fmt.Errorf("cannot fetch initial Keystone token: %v", err)
+
+		if iServiceUser {
+			err = d.RefreshToken()
+			if err != nil {
+				return nil, fmt.Errorf("cannot fetch initial Keystone token: %v", err)
+			}
 		}
 	}
 
@@ -87,8 +90,7 @@ func (d keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
 		}
 	}
 
-	return openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{}) //gophercloud.EndpointOpts{Availability: gophercloud.AvailabilityPublic},
-
+	return openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})
 }
 
 func (d keystone) Client() *gophercloud.ProviderClient {
@@ -104,7 +106,7 @@ func (d keystone) Client() *gophercloud.ProviderClient {
 
 //ListDomains implements the Driver interface.
 func (d keystone) ListDomains() ([]KeystoneDomain, error) {
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +128,7 @@ func (d keystone) ListDomains() ([]KeystoneDomain, error) {
 
 //ListProjects implements the Driver interface.
 func (d keystone) ListProjects() ([]KeystoneProject, error) {
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +147,7 @@ func (d keystone) ListProjects() ([]KeystoneProject, error) {
 }
 
 func (d keystone) ValidateToken(token string) (policy.Context, error) {
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return policy.Context{}, err
 	}
@@ -166,7 +168,26 @@ func (d keystone) ValidateToken(token string) (policy.Context, error) {
 }
 
 func (d keystone) Authenticate(credentials *gophercloud.AuthOptions) (policy.Context, error) {
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
+	if err != nil {
+		return policy.Context{}, err
+	}
+	response := tokens.Create(client, credentials)
+	if response.Err != nil {
+		//this includes 4xx responses, so after this point, we can be sure that the token is valid
+		return policy.Context{}, response.Err
+	}
+	//use a custom token struct instead of tokens.Token which is way incomplete
+	var tokenData keystoneToken
+	err = response.ExtractInto(&tokenData)
+	if err != nil {
+		return policy.Context{}, err
+	}
+	return tokenData.ToContext(), nil
+}
+
+func (d keystone) AuthenticateUser(credentials *gophercloud.AuthOptions) (policy.Context, error) {
+	client, err := d.keystoneClient(false)
 	if err != nil {
 		return policy.Context{}, err
 	}
@@ -190,7 +211,7 @@ func (d keystone) DomainName(id string) (string, error) {
 		return cachedName, nil
 	}
 
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return "", err
 	}
@@ -218,7 +239,7 @@ func (d keystone) ProjectName(id string) (string, error) {
 		return cachedName, nil
 	}
 
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return "", err
 	}
@@ -246,7 +267,7 @@ func (d keystone) UserName(id string) (string, error) {
 		return cachedName, nil
 	}
 
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return "", err
 	}
@@ -275,7 +296,7 @@ func (d keystone) UserId(name string) (string, error) {
 		return cachedId, nil
 	}
 
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return "", err
 	}
@@ -413,13 +434,13 @@ func (d keystone) AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.Aut
 	}
 }
 
-func (d keystone) AuthOptionsFromBasicAuthCredentials(username string, password string, tenantId string) *gophercloud.AuthOptions {
+func (d keystone) AuthOptionsFromBasicAuthCredentials(userID string, password string, projectId string) *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		UserID:           username,
+		UserID:           userID,
 		Password:         password,
 		// Note: gophercloud only allows for user & project in the same domain
-		TenantID: tenantId,
+		TenantID: projectId,
 	}
 }
 
