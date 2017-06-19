@@ -68,9 +68,9 @@ func (b *BasicAuth) String() string {
 	}
 
 	if b.ProjectID != "" {
-		scope = fmt.Sprintf("projectID: %s", b.ProjectID)
+		scope = fmt.Sprintf("projectId: %s", b.ProjectID)
 	} else if b.DomainID != "" {
-		scope = fmt.Sprintf("domainID: %s", b.DomainID)
+		scope = fmt.Sprintf("domainId: %s", b.DomainID)
 	}
 
 	if b.Password != "" {
@@ -98,10 +98,10 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 		tenantId := ""
 		if auth != nil {
 			util.LogInfo(auth.String())
-			if auth.ProjectId != "" {
-				tenantId = auth.ProjectId
-			} else if auth.DomainId != "" {
-				tenantId = auth.DomainId
+			if auth.ProjectID != "" {
+				tenantId = auth.ProjectID
+			} else if auth.DomainID != "" {
+				tenantId = auth.DomainID
 			} else {
 				util.LogError("No project_id or domain_id found. Aborting.")
 				ReturnError(w, auth.err, 404)
@@ -129,7 +129,7 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 		}
 
 		// do it!
-		wrappedHandlerFunc(w, req, auth.ProjectId)
+		wrappedHandlerFunc(w, req, auth.ProjectID)
 	}
 }
 
@@ -169,7 +169,7 @@ func CheckBasicAuth(r *http.Request) *BasicAuth {
 	password = a[1]
 
 	//TODO: only project for now. ask keystone, wether it's a project or domain
-	return &BasicAuth{Username: username, ProjectID: scopeID, Password: password}
+	return &BasicAuth{Username: username, ProjectID: scopeId, Password: password}
 }
 
 //CheckToken checks the validity of the request's X-Auth-Token in keystone, and
@@ -188,7 +188,7 @@ func CheckToken(r *http.Request, keystone keystone.Driver) *Token {
 }
 
 func GetTokenFromBasicAuth(auth *BasicAuth, keystone keystone.Driver) *Token {
-	authOpts := keystone.AuthOptionsFromBasicAuth(auth.Username, auth.Password, auth.ProjectId)
+	authOpts := keystone.AuthOptionsFromBasicAuth(auth.Username, auth.Password, auth.ProjectID)
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
 	t.context, t.err = keystone.Authenticate(authOpts)
 	return t
