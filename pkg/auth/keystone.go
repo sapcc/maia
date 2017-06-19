@@ -409,7 +409,7 @@ func (d keystone) RefreshToken() error {
 func (d keystone) AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		TokenID: tokenID,
+		TokenID:          tokenID,
 	}
 }
 
