@@ -52,7 +52,7 @@ func setupTest(t *testing.T) http.Handler {
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.Mock()
 	storage := storage.Mock()
-	storage = storage.Prometheus("https://prometheus.staging.cloud.sap")
+	//storage = storage.Prometheus("https://prometheus.staging.cloud.sap")
 	router, _ := NewV1Router(keystone, storage)
 	return router
 }

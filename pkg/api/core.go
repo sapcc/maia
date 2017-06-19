@@ -36,6 +36,7 @@ import (
 	"io"
 )
 
+// RFC822 timestamp format
 const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
 
 var prometheusCoreHeaders = make(map[string]string)
