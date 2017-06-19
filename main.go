@@ -107,17 +107,17 @@ func configuredStorageDriver() storage.Driver {
 	driverName := viper.GetString("maia.storage_driver")
 	switch driverName {
 	case "prometheus":
-		prometheusApiUrl := viper.GetString("maia.prometheus_api_url")
-		if prometheusApiUrl == "" {
+		prometheusAPIURL := viper.GetString("maia.prometheus_api_url")
+		if prometheusAPIURL == "" {
 			util.LogFatal("Invalid endpoint for prometheus.")
 			return nil
 		}
-		driver := storage.Prometheus(prometheusApiUrl)
+		driver := storage.Prometheus(prometheusAPIURL)
 		if driver == nil {
-			util.LogFatal("Couldn't initialize Prometheus storage driver with given endpoint: \"%s\"", prometheusApiUrl)
+			util.LogFatal("Couldn't initialize Prometheus storage driver with given endpoint: \"%s\"", prometheusAPIURL)
 			return nil
 		}
-		util.LogInfo("Using Prometheus storage driver with endpoint: \"%s\"", prometheusApiUrl)
+		util.LogInfo("Using Prometheus storage driver with endpoint: \"%s\"", prometheusAPIURL)
 
 		return driver
 	case "mock":
