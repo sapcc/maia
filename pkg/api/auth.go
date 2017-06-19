@@ -50,7 +50,7 @@ type BasicAuth struct {
 	ProjectID string
 	DomainID  string
 	Password  string
-	TokenID string
+	TokenID   string
 	err       error
 }
 
@@ -62,7 +62,6 @@ func (b *BasicAuth) String() string {
 	if b.TokenID != "" {
 		return fmt.Sprintf("tokenID: %s", b.TokenID)
 	}
-
 	if b.Username != "" {
 		username = b.Username
 	}
