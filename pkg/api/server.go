@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Set up and start the API server, hooking it up to the API router
+// Server initializes and starts the API server, hooking it up to the API router
 func Server(keystone keystone.Driver, storage storage.Driver) error {
 
 	mainRouter := mux.NewRouter()
@@ -52,7 +52,7 @@ func Server(keystone keystone.Driver, storage storage.Driver) error {
 	http.Handle("/", mainRouter)
 
 	//start HTTP server
-	bind_address := viper.GetString("maia.bind_address")
-	util.LogInfo("listening on %s", bind_address)
-	return http.ListenAndServe(bind_address, nil)
+	bindAddress := viper.GetString("maia.bind_address")
+	util.LogInfo("listening on %s", bindAddress)
+	return http.ListenAndServe(bindAddress, nil)
 }

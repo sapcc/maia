@@ -52,23 +52,18 @@ func Execute() {
 	}
 }
 
-func setDefaultConfig() {
-	viper.SetDefault("maia.keystone_driver", "keystone")
-	viper.SetDefault("maia.storage_driver", "prometheus")
+var keystoneDriver keystone.Driver
+var storageDriver storage.Driver
+
+// SetDrivers sets which keystone & storage driver to use
+func SetDrivers(keystoneParam keystone.Driver, storageParam storage.Driver) {
+	keystoneDriver = keystoneParam
+	storageDriver = storageParam
 }
 
-func readConfig(configPath string) {
-	// Read the maia config file (required for server)
-	// That way an OpenStack client environment will not be accidentally used for the "serve" command
-	if _, err := os.Stat(configPath); err == nil {
-		viper.SetConfigFile(configPath)
-		viper.SetConfigType("toml")
-		err := viper.ReadInConfig()
-		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("Fatal error config file: %s", err))
-		}
-	}
-}
+// OSVars lists the OpenStack configuration/environment variables
+// When adding a value here, also add a "RootCmd.PersistentFlags().StringVar" line in cmd/root.go's init()
+var OSVars = []string{"username", "password", "auth_url", "user_domain_name", "project_name", "project_domain_name"}
 
 func init() {
 	cobra.OnInitialize(func() {

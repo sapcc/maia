@@ -39,36 +39,31 @@ type Driver interface {
 	AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.AuthOptions
 	AuthOptionsFromBasicAuthCredentials(userID string, password string, projectID string) *gophercloud.AuthOptions
 	/********** requests to Keystone **********/
-	ListDomains() ([]KeystoneDomain, error)
-	ListProjects() ([]KeystoneProject, error)
+	ListDomains() ([]Domain, error)
+	ListProjects() ([]Project, error)
 	ValidateToken(token string) (policy.Context, error)
 	Authenticate(credentials *gophercloud.AuthOptions) (policy.Context, error)
 	AuthenticateUser(credentials *gophercloud.AuthOptions) (policy.Context, error)
 	DomainName(id string) (string, error)
 	ProjectName(id string) (string, error)
 	UserName(id string) (string, error)
-	UserId(name string) (string, error)
+	UserID(name string) (string, error)
 }
 
-//KeystoneDomain describes just the name and id of a Keystone domain.
-type KeystoneDomain struct {
+//Domain describes just the name and id of a Keystone domain.
+type Domain struct {
 	UUID string `json:"id"`
 	Name string `json:"name"`
 }
 
-	// Authenticate authenticates a user using the provided authOptionsFromRequest
-	Authenticate(options *tokens.AuthOptions, serviceUser bool) (*policy.Context, error)
+//Project describes just the name and id of a Keystone project.
+type Project struct {
+	UUID string `json:"id"`
+	Name string `json:"name"`
 }
 
-// NewKeystoneDriver is a factory method which chooses the right driver implementation based on configuration settings
-func NewKeystoneDriver() Driver {
-	driverName := viper.GetString("maia.keystone_driver")
-	switch driverName {
-	case "keystone":
-		return Keystone()
-	case "mock":
-		return Mock()
-	default:
-		panic(fmt.Errorf("Couldn't match a keystone driver for configured value \"%s\"", driverName))
-	}
+//User describes just the name and id of a Keystone user.
+type User struct {
+	UUID string `json:"id"`
+	Name string `json:"name"`
 }

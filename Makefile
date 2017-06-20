@@ -11,7 +11,7 @@ GO_LDFLAGS    := -s -w
 build/maia: FORCE
 	glide install -v
 	go build $(PKG)
-#	go install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
+	go install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
 
 # which packages to test with static checkers?
 GO_ALLPKGS := $(PKG) $(shell go list $(PKG)/pkg/...)

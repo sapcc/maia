@@ -40,8 +40,8 @@ const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
 
 var prometheusCoreHeaders = make(map[string]string)
 
-//versionData is used by version advertisement handlers.
-type versionData struct {
+//VersionData is used by version advertisement handlers.
+type VersionData struct {
 	Status string            `json:"status"`
 	ID     string            `json:"id"`
 	Links  []versionLinkData `json:"links"`
@@ -101,7 +101,6 @@ func initCoreHeaders() {
 //It also returns the VersionData for this API version which is needed for the
 //version advertisement on "GET /".
 func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler, VersionData) {
-
 	r := mux.NewRouter()
 	p := &v1Provider{
 		keystone: keystone,

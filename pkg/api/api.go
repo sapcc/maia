@@ -42,16 +42,10 @@ func scopeToLabelConstraint(req *http.Request) (string, string) {
 	panic(fmt.Errorf("Missing OpenStack scope attributes in request header"))
 }
 
-// Federate handles GET /federate.
-func (p *v1Provider) Federate(w http.ResponseWriter, req *http.Request) {
-	selectors, err := buildSelectors(req)
-	if err != nil {
-		util.LogInfo("Invalid request params %s", req.URL)
-		ReturnError(w, err, 400)
-		return
-	}
-
-	response, err := p.storage.Federate(*selectors, req.Header.Get("Accept"))
+// ListMetrics handles GET /v1/metrics.
+func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request, projectID string) {
+	util.LogDebug("api.ListMetrics")
+	response, err := p.storage.ListMetrics(projectID)
 	if err != nil {
 		util.LogError("Could not get metrics for %s", selectors)
 		ReturnError(w, err, 503)
@@ -176,12 +170,6 @@ func buildSelectors(req *http.Request) (*[]string, error) {
 
 func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request) {
 	selectors, err := buildSelectors(req)
-	if err != nil {
-		ReturnError(w, err, 400)
-		return
-	}
-	queryParams := req.URL.Query()
-	resp, err := p.storage.Series(*selectors, queryParams.Get("start"), queryParams.Get("end"), req.Header.Get("Accept"))
 	if err != nil {
 		ReturnError(w, err, 502)
 		return

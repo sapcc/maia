@@ -36,7 +36,6 @@ func Mock() Driver {
 }
 
 func (m mock) ListMetrics(tenantID string) (*http.Response, error) {
-	//TODO
 	return nil, nil
 }
 
