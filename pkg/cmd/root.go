@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -71,7 +71,7 @@ func init() {
 	// Cobra supports Persistent Flags, which, if defined here,
 	// will be global for your application.
 
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-auth-url", "", "OpenStack Authentication URL")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-keystone-url", "", "OpenStack Authentication URL")
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-username", "", "OpenStack Username")
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-password", "", "OpenStack Password")
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-user-domain-name", "", "OpenStack User's domain name")

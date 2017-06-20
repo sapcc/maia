@@ -106,7 +106,7 @@ func (d keystone) Client() *gophercloud.ProviderClient {
 
 //ListDomains implements the Driver interface.
 func (d keystone) ListDomains() ([]Domain, error) {
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return nil, err
 	}
@@ -128,13 +128,13 @@ func (d keystone) ListDomains() ([]Domain, error) {
 
 //ListProjects implements the Driver interface.
 func (d keystone) ListProjects() ([]Project, error) {
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(true)
 	if err != nil {
 		return nil, err
 	}
 
 	var result gophercloud.Result
-	_, err = client.Get("/v3/auth/projects", &result.Body, nil)
+	_, err = client.Get("/v3/keystone/projects", &result.Body, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +383,7 @@ func (t *keystoneToken) ToContext() policy.Context {
 	return c
 }
 
-//RefreshToken fetches a new Keystone auth token. It is also used
+//RefreshToken fetches a new Keystone keystone token. It is also used
 //to fetch the initial token on startup.
 func (d keystone) RefreshToken() error {
 	//NOTE: This function is very similar to v3auth() in

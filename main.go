@@ -31,7 +31,7 @@ import (
 	"github.com/databus23/goslo.policy"
 	"github.com/sapcc/maia/pkg/api"
 	"github.com/sapcc/maia/pkg/cmd"
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"

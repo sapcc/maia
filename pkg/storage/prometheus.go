@@ -20,8 +20,6 @@
 package storage
 
 import (
-	"fmt"
-
 	"net/http"
 
 	"net/url"
@@ -45,19 +43,19 @@ var promCli prometheusStorageClient
 var prometheusCoreHeadersJSON = make(map[string]string)
 
 func initPrometheusCoreHeadersJSON() {
-	prometheusCoreHeaders["User-Agent"] = "Prometheus/"
-	prometheusCoreHeaders["Accept"] = "application/json"
-	prometheusCoreHeaders["Connection"] = "close"
+	prometheusCoreHeadersJSON["User-Agent"] = "Prometheus/"
+	prometheusCoreHeadersJSON["Accept"] = "application/json"
+	prometheusCoreHeadersJSON["Connection"] = "close"
 
 }
 
 var prometheusCoreHeadersPBUF = make(map[string]string)
 
 func initPrometheusCoreHeadersPBUF() {
-	prometheusCoreHeaders["User-Agent"] = "Prometheus/"
-	prometheusCoreHeaders["Accept"] = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
-	prometheusCoreHeaders["Accept-Encoding"] = "gzip"
-	prometheusCoreHeaders["Connection"] = "close"
+	prometheusCoreHeadersPBUF["User-Agent"] = "Prometheus/"
+	prometheusCoreHeadersPBUF["Accept"] = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
+	prometheusCoreHeadersPBUF["Accept-Encoding"] = "gzip"
+	prometheusCoreHeadersPBUF["Connection"] = "close"
 
 }
 
