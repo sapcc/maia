@@ -21,7 +21,7 @@ package auth
 
 import (
 	policy "github.com/databus23/goslo.policy"
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/spf13/viper"
 	"log"
 	"os"

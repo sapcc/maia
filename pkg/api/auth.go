@@ -137,22 +137,22 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 // user/project can either be a unique OpenStack ID or a qualified name with domain information, e.g. username"@"domain
 func CheckBasicAuth(r *http.Request) *BasicAuth {
 
-	username := ""
+	userID := ""
 	scopeID := ""
 	password := ""
 	tokenID := ""
 
-	username, password, ok := r.BasicAuth()
+	userID, password, ok := r.BasicAuth()
 	if ok != true {
 		return &BasicAuth{err: errors.New("Authorization header missing")}
 	}
-	usernameParts := strings.Split(username, "|")
+	usernameParts := strings.Split(userID, "|")
 
 	if len(basicAuth) != 2 {
 		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user_id@project_id and password or token@tokenID")}
 	}
 
-	username = usernameParts[0]
+	userID = usernameParts[0]
 	scopeID = usernameParts[1]
 
 	//TODO: only project for now. ask keystone, wether it's a project or domain

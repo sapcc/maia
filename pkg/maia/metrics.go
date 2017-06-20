@@ -22,7 +22,7 @@ package maia
 import (
 	"log"
 
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 )
