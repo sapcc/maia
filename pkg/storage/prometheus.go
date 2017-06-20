@@ -53,7 +53,7 @@ func initPrometheusCoreHeaders() {
 
 }
 
-// Prometheus initialises and returns the Prometheus driver
+// Prometheus creates a storage driver for Prometheus
 func Prometheus(prometheusAPIURL string) Driver {
 	if promCli.client == nil {
 		promCli.init(prometheusAPIURL)
@@ -167,9 +167,9 @@ func sendToPrometheus(method string, promURL string, body io.Reader) (*http.Resp
 	return resp, nil
 }
 
-func (promCli *prometheusStorageClient) ListMetrics(tenantId string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) ListMetrics(tenantID string) (*http.Response, error) {
 
-	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantId)
+	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantID)
 	prometheusAPIURL := promCli.config.Address
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s%s", prometheusAPIURL, prometheusFederateURL, projectQuery), nil)

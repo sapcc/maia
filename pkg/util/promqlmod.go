@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/prometheus/storage/metric"
 )
 
+// AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label
 func AddLabelConstraintToExpression(expression string, key string, value string) (string, error) {
 	exprNode, err := promql.ParseExpr(expression)
 	if err != nil {
@@ -22,6 +23,7 @@ func AddLabelConstraintToExpression(expression string, key string, value string)
 	return exprNode.String(), nil
 }
 
+// AddLabelConstraintToSelector enhances a PromQL selector with an additional label selector
 func AddLabelConstraintToSelector(metricSelector string, key string, value string) (string, error) {
 	matcher, err := metric.NewLabelMatcher(metric.Equal, model.LabelName(key), model.LabelValue(value))
 	if err != nil {
@@ -35,13 +37,14 @@ func AddLabelConstraintToSelector(metricSelector string, key string, value strin
 	return "{" + metric.LabelMatchers(append(labelMatchers, matcher)).String() + "}", nil
 }
 
-// restricts every reference to a metric (vector-selector) with an additional label-constraint
-// we use this to restrict a query to metrics belonging to a single OpenStack tenants stored in label 'project_id'
+// labelInjector enhances every reference to a metric (vector-selector) with an additional label-constraint
+// We use this to restrict a query to metrics belonging to a single OpenStack tenants stored in label 'project_id'
 type labelInjector struct {
 	promql.Visitor
 	matcher *metric.LabelMatcher
 }
 
+// Visit does the actual modifications to PromQL expression nodes
 func (v labelInjector) Visit(node promql.Node) (w promql.Visitor) {
 	switch node.(type) {
 	case *promql.MatrixSelector:

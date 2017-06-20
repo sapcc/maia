@@ -38,7 +38,7 @@ type MetricList struct {
 	Metrics []*maia.Metric `json:"metrics"`
 }
 
-//ListMetrics handles GET /v1/metrics.
+// ListMetrics handles GET /v1/metrics.
 func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request, projectID string) {
 	util.LogDebug("api.ListMetrics")
 	response, err := p.storage.ListMetrics(projectID)
@@ -111,7 +111,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, proje
 	end := time.Now()
 	resp, err := p.storage.Series([]string{"{project_id=\"" + projectID + "\"," + string(name) + "!=\"\"}"}, start.Format(time.RFC3339), end.Format(time.RFC3339))
 	if err != nil {
-		ReturnError(w, err, 503)
+		ReturnError(w, err, 502)
 		return
 	}
 
@@ -138,7 +138,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, proje
 	var result labelValuesResponse
 	result.Status = sr.Status
 	result.Data = make([]model.LabelValue, 0)
-	for k, _ := range unique {
+	for k := range unique {
 		result.Data = append(result.Data, k)
 	}
 
@@ -165,7 +165,7 @@ func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request, projectID 
 
 	resp, err := p.storage.Series(selectors, queryParams.Get("start"), queryParams.Get("end"))
 	if err != nil {
-		ReturnError(w, err, 503)
+		ReturnError(w, err, 502)
 		return
 	}
 

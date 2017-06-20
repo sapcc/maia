@@ -35,7 +35,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Real keystone implementation
+// Keystone creates a real keystone authentication and authorization driver
 func Keystone() Driver {
 	return keystone{}
 }
@@ -48,7 +48,7 @@ var providerClient *gophercloud.ProviderClient
 var domainNameCache *map[string]string
 var projectNameCache *map[string]string
 var userNameCache *map[string]string
-var userIdCache *map[string]string
+var userIDCache *map[string]string
 
 func (d keystone) keystoneClient(iServiceUser bool) (*gophercloud.ServiceClient, error) {
 	if d.TokenRenewalMutex == nil {
@@ -63,8 +63,8 @@ func (d keystone) keystoneClient(iServiceUser bool) (*gophercloud.ServiceClient,
 	if userNameCache == nil {
 		userNameCache = &map[string]string{}
 	}
-	if userIdCache == nil {
-		userIdCache = &map[string]string{}
+	if userIDCache == nil {
+		userIDCache = &map[string]string{}
 	}
 	if providerClient == nil {
 		var err error
@@ -82,11 +82,11 @@ func (d keystone) keystoneClient(iServiceUser bool) (*gophercloud.ServiceClient,
 	}
 
 	if viper.IsSet("maia.proxy") {
-		proxyUrl, err := url.Parse(viper.GetString("maia.proxy"))
+		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
 		if err != nil {
-			util.LogError("Could not set proxy for gophercloud client: %s .\n%s", proxyUrl, err.Error())
+			util.LogError("Could not set proxy for gophercloud client: %s .\n%s", proxyURL, err.Error())
 		} else {
-			providerClient.HTTPClient.Transport = &http.Transport{Proxy: http.ProxyURL(proxyUrl)}
+			providerClient.HTTPClient.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
 		}
 	}
 
@@ -105,8 +105,8 @@ func (d keystone) Client() *gophercloud.ProviderClient {
 }
 
 //ListDomains implements the Driver interface.
-func (d keystone) ListDomains() ([]KeystoneDomain, error) {
-	client, err := d.keystoneClient(true)
+func (d keystone) ListDomains() ([]Domain, error) {
+	client, err := d.keystoneClient()
 	if err != nil {
 		return nil, err
 	}
@@ -120,15 +120,15 @@ func (d keystone) ListDomains() ([]KeystoneDomain, error) {
 	}
 
 	var data struct {
-		Domains []KeystoneDomain `json:"domains"`
+		Domains []Domain `json:"domains"`
 	}
 	err = result.ExtractInto(&data)
 	return data.Domains, err
 }
 
 //ListProjects implements the Driver interface.
-func (d keystone) ListProjects() ([]KeystoneProject, error) {
-	client, err := d.keystoneClient(true)
+func (d keystone) ListProjects() ([]Project, error) {
+	client, err := d.keystoneClient()
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (d keystone) ListProjects() ([]KeystoneProject, error) {
 	}
 
 	var data struct {
-		Projects []KeystoneProject `json:"projects"`
+		Projects []Project `json:"projects"`
 	}
 	err = result.ExtractInto(&data)
 	return data.Projects, err
@@ -224,7 +224,7 @@ func (d keystone) DomainName(id string) (string, error) {
 	}
 
 	var data struct {
-		Domain KeystoneDomain `json:"domain"`
+		Domain Domain `json:"domain"`
 	}
 	err = result.ExtractInto(&data)
 	if err == nil {
@@ -252,7 +252,7 @@ func (d keystone) ProjectName(id string) (string, error) {
 	}
 
 	var data struct {
-		Project KeystoneProject `json:"project"`
+		Project Project `json:"project"`
 	}
 	err = result.ExtractInto(&data)
 	if err == nil {
@@ -280,20 +280,20 @@ func (d keystone) UserName(id string) (string, error) {
 	}
 
 	var data struct {
-		User KeystoneUser `json:"user"`
+		User User `json:"user"`
 	}
 	err = result.ExtractInto(&data)
 	if err == nil {
 		(*userNameCache)[id] = data.User.Name
-		(*userIdCache)[data.User.Name] = id
+		(*userIDCache)[data.User.Name] = id
 	}
 	return data.User.Name, err
 }
 
-func (d keystone) UserId(name string) (string, error) {
-	cachedId, hit := (*userIdCache)[name]
+func (d keystone) UserID(name string) (string, error) {
+	cachedID, hit := (*userIDCache)[name]
 	if hit {
-		return cachedId, nil
+		return cachedID, nil
 	}
 
 	client, err := d.keystoneClient(true)
@@ -309,24 +309,24 @@ func (d keystone) UserId(name string) (string, error) {
 	}
 
 	var data struct {
-		User []KeystoneUser `json:"user"`
+		User []User `json:"user"`
 	}
 	err = result.ExtractInto(&data)
-	userId := ""
+	userID := ""
 	if err == nil {
 		switch len(data.User) {
 		case 0:
 			err = errors.Errorf("No user found with name %s", name)
 		case 1:
-			userId = data.User[0].UUID
+			userID = data.User[0].UUID
 		default:
 			util.LogWarning("Multiple users found with name %s - returning the first one", name)
-			userId = data.User[0].UUID
+			userID = data.User[0].UUID
 		}
-		(*userIdCache)[name] = userId
-		(*userNameCache)[userId] = name
+		(*userIDCache)[name] = userID
+		(*userNameCache)[userID] = name
 	}
-	return userId, err
+	return userID, err
 }
 
 type keystoneToken struct {
@@ -434,13 +434,13 @@ func (d keystone) AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.Aut
 	}
 }
 
-func (d keystone) AuthOptionsFromBasicAuthCredentials(userID string, password string, projectId string) *gophercloud.AuthOptions {
+func (d keystone) AuthOptionsFromBasicAuthCredentials(username string, password string, tenantID string) *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		UserID:           userID,
 		Password:         password,
 		// Note: gophercloud only allows for user & project in the same domain
-		TenantID: projectId,
+		TenantID: tenantID,
 	}
 }
 

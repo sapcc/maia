@@ -29,7 +29,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Set up and start the API server, hooking it up to the API router
+// Server initializes and starts the API server, hooking it up to the API router
 func Server(keystone keystone.Driver, storage storage.Driver) error {
 
 	mainRouter := mux.NewRouter()
@@ -43,15 +43,15 @@ func Server(keystone keystone.Driver, storage storage.Driver) error {
 	//add the version advertisement that lists all available API versions
 	mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		allVersions := struct {
-			Versions []versionData `json:"versions"`
-		}{[]versionData{v1VersionData}}
+			Versions []VersionData `json:"versions"`
+		}{[]VersionData{v1VersionData}}
 		ReturnJSON(w, 300, allVersions)
 	})
 
 	http.Handle("/", mainRouter)
 
 	//start HTTP server
-	bind_address := viper.GetString("maia.bind_address")
-	util.LogInfo("listening on %s", bind_address)
-	return http.ListenAndServe(bind_address, nil)
+	bindAddress := viper.GetString("maia.bind_address")
+	util.LogInfo("listening on %s", bindAddress)
+	return http.ListenAndServe(bindAddress, nil)
 }
