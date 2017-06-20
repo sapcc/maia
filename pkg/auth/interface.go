@@ -34,12 +34,13 @@ type Driver interface {
 	Client() *gophercloud.ProviderClient
 	AuthOptionsFromConfig() *gophercloud.AuthOptions
 	AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.AuthOptions
-	AuthOptionsFromBasicAuthCredentials(username string, password string, projectID string) *gophercloud.AuthOptions
+	AuthOptionsFromBasicAuthCredentials(userID string, password string, projectID string) *gophercloud.AuthOptions
 	/********** requests to Keystone **********/
 	ListDomains() ([]Domain, error)
 	ListProjects() ([]Project, error)
 	ValidateToken(token string) (policy.Context, error)
 	Authenticate(credentials *gophercloud.AuthOptions) (policy.Context, error)
+	AuthenticateUser(credentials *gophercloud.AuthOptions) (policy.Context, error)
 	DomainName(id string) (string, error)
 	ProjectName(id string) (string, error)
 	UserName(id string) (string, error)

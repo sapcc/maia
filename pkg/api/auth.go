@@ -28,6 +28,7 @@ import (
 
 	"fmt"
 	policy "github.com/databus23/goslo.policy"
+	"github.com/gophercloud/gophercloud"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/util"
@@ -45,6 +46,7 @@ type Token struct {
 
 // BasicAuth contains credentials coming from username/password login
 type BasicAuth struct {
+	UserID    string
 	Username  string
 	ProjectID string
 	DomainID  string
@@ -154,7 +156,7 @@ func CheckBasicAuth(r *http.Request) *BasicAuth {
 	scopeID = usernameParts[1]
 
 	//TODO: only project for now. ask keystone, wether it's a project or domain
-	return &BasicAuth{Username: username, ProjectID: scopeID, Password: password}
+	return &BasicAuth{UserID: userID, ProjectID: scopeID, Password: password}
 }
 
 //CheckToken checks the validity of the request's X-Auth-Token in keystone, and
@@ -174,9 +176,14 @@ func CheckToken(r *http.Request, keystone keystone.Driver) *Token {
 
 // GetTokenFromBasicAuth creates an OpenStack token from a scoped username / password
 func GetTokenFromBasicAuth(auth *BasicAuth, keystone keystone.Driver) *Token {
-	authOpts := keystone.AuthOptionsFromBasicAuthCredentials(auth.Username, auth.Password, auth.ProjectID)
+	var authOpts *gophercloud.AuthOptions
+	if auth.TokenID != "" {
+		authOpts = keystone.AuthOptionsFromBasicAuthToken(auth.TokenID)
+	} else {
+		authOpts = keystone.AuthOptionsFromBasicAuthCredentials(auth.UserID, auth.Password, auth.ProjectID)
+	}
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
-	t.context, t.err = keystone.Authenticate(authOpts)
+	t.context, t.err = keystone.AuthenticateUser(authOpts)
 	return t
 }
 

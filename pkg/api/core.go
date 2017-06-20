@@ -29,7 +29,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/common/expfmt"
-	"github.com/sapcc/maia/pkg/keystone"
+	"github.com/sapcc/maia/pkg/auth"
 	"github.com/sapcc/maia/pkg/storage"
 
 	dto "github.com/prometheus/client_model/go"

@@ -60,6 +60,10 @@ func (d mock) Authenticate(credentials *gophercloud.AuthOptions) (policy.Context
 	return policy.Context{Auth: map[string]string{"user_id": credentials.UserID, "project_id": credentials.TenantID, "password": credentials.Password}}, nil
 }
 
+func (d mock) AuthenticateUser(credentials *gophercloud.AuthOptions) (policy.Context, error) {
+	return policy.Context{}, nil
+}
+
 func (d mock) DomainName(id string) (string, error) {
 	return "default", nil
 }
@@ -83,10 +87,10 @@ func (d mock) AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.AuthOpt
 	}
 }
 
-func (d mock) AuthOptionsFromBasicAuthCredentials(username string, password string, projectID string) *gophercloud.AuthOptions {
+func (d mock) AuthOptionsFromBasicAuthCredentials(userID string, password string, projectID string) *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		Username:         username,
+		Username:         userID,
 		Password:         password,
 		// Note: gophercloud only allows for user & project in the same domain
 		TenantID: projectID,
