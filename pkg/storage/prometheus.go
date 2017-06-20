@@ -53,7 +53,7 @@ func initPrometheusCoreHeaders() {
 
 }
 
-// Initialise and return the Prometheus driver
+// Prometheus creates a storage driver for Prometheus
 func Prometheus(prometheusAPIURL string) Driver {
 	if promCli.client == nil {
 		promCli.init(prometheusAPIURL)
@@ -81,12 +81,12 @@ func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
 	initPrometheusCoreHeaders()
 
 	if viper.IsSet("maia.proxy") {
-		proxyUrl, err := url.Parse(viper.GetString("maia.proxy"))
+		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
 		if err != nil {
-			util.LogError("Could not set proxy: %s .\n%s", proxyUrl, err.Error())
+			util.LogError("Could not set proxy: %s .\n%s", proxyURL, err.Error())
 			httpCli = http.Client{}
 		} else {
-			httpCli = http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
+			httpCli = http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 		}
 	}
 	promCli.httpClient = httpCli
@@ -167,9 +167,9 @@ func sendToPrometheus(method string, promURL string, body io.Reader) (*http.Resp
 	return resp, nil
 }
 
-func (promCli *prometheusStorageClient) ListMetrics(tenantId string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) ListMetrics(tenantID string) (*http.Response, error) {
 
-	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantId)
+	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantID)
 	prometheusAPIURL := promCli.config.Address
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s%s", prometheusAPIURL, prometheusFederateURL, projectQuery), nil)

@@ -41,15 +41,15 @@ const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
 
 var prometheusCoreHeaders = make(map[string]string)
 
-//versionData is used by version advertisement handlers.
-type versionData struct {
+//VersionData is used by version advertisement handlers.
+type VersionData struct {
 	Status string            `json:"status"`
 	ID     string            `json:"id"`
 	Links  []versionLinkData `json:"links"`
 }
 
 //versionLinkData is used by version advertisement handlers, as part of the
-//versionData struct.
+//VersionData struct.
 type versionLinkData struct {
 	URL      string `json:"href"`
 	Relation string `json:"rel"`
@@ -60,7 +60,7 @@ type versionLinkData struct {
 type v1Provider struct {
 	keystone    keystone.Driver
 	storage     storage.Driver
-	versionData versionData
+	versionData VersionData
 }
 
 // Prometheus status strings
@@ -99,15 +99,15 @@ func initCoreHeaders() {
 }
 
 //NewV1Router creates a http.Handler that serves the Maia v1 API.
-//It also returns the versionData for this API version which is needed for the
+//It also returns the VersionData for this API version which is needed for the
 //version advertisement on "GET /".
-func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler, versionData) {
+func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler, VersionData) {
 	r := mux.NewRouter()
 	p := &v1Provider{
 		keystone: keystone,
 		storage:  storage,
 	}
-	p.versionData = versionData{
+	p.versionData = VersionData{
 		Status: "CURRENT",
 		ID:     "v1",
 		Links: []versionLinkData{

@@ -28,7 +28,7 @@ import (
 type Driver interface {
 
 	/********** requests to Prometheus **********/
-	ListMetrics(tenantId string) (*http.Response, error)
+	ListMetrics(tenantID string) (*http.Response, error)
 
 	Query(query, time, timeout string) (*http.Response, error)
 	QueryRange(query, start, end, step, timeout string) (*http.Response, error)

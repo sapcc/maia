@@ -69,8 +69,8 @@ func (t *Token) Check(rule string) bool {
 	return t.err == nil && t.enforcer.Enforce(rule, t.Context)
 }
 
-// TenantId is the project_id if used, otherwise the domain_id (which may be empty)
-func (t *Token) TenantId() string {
+// TenantID is the project_id if used, otherwise the domain_id (which may be empty)
+func (t *Token) TenantID() string {
 	id, project := t.Context.Auth["project_id"]
 	if project {
 		return id

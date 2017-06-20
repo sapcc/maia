@@ -43,6 +43,7 @@ type Token struct {
 	err      error
 }
 
+// BasicAuth contains credentials coming from username/password login
 type BasicAuth struct {
 	Username  string
 	ProjectID string
@@ -77,10 +78,8 @@ func (b *BasicAuth) String() string {
 	return fmt.Sprintf("username: %s \n%s \npassword: %s", username, scope, password)
 }
 
-type handlerFunc func(w http.ResponseWriter, req *http.Request)
-
-// Decorate HandlerFunc with authentication and authorization checks
-func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) handlerFunc {
+// AuthorizedHandlerFunc decorates a HandlerFunc with authentication and authorization checks
+func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		util.LogInfo("authenticate")
 
@@ -88,25 +87,25 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 		auth := CheckBasicAuth(req)
 		if auth.err != nil {
 			util.LogError(auth.err.Error())
-			ReturnError(w, auth.err, 404)
+			ReturnError(w, auth.err, 401)
 			return
 		}
 
-		tenantId := ""
+		tenantID := ""
 		if auth != nil {
 			util.LogInfo(auth.String())
 			if auth.ProjectID != "" {
-				tenantId = auth.ProjectID
+				tenantID = auth.ProjectID
 			} else if auth.DomainID != "" {
-				tenantId = auth.DomainID
+				tenantID = auth.DomainID
 			} else {
 				util.LogError("No project_id or domain_id found. Aborting.")
-				ReturnError(w, auth.err, 404)
+				ReturnError(w, auth.err, 401)
 				return
 			}
 		}
 
-		util.LogInfo("authorize for project/domain: %s .", tenantId)
+		util.LogInfo("authorize for project/domain: %s .", tenantID)
 
 		// authorize call
 		token := GetTokenFromBasicAuth(auth, keystone)
@@ -130,18 +129,21 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 	}
 }
 
-// Get credentials from Authorization header provided by Prometheus basic_auth
+// CheckBasicAuth performs login using username/password.
+// It requires username to contain a qualified OpenStack username and project/domain scope information
+// Format: <user>"|"<project or domain>
+// user/project can either be a unique OpenStack ID or a qualified name with domain information, e.g. username"@"domain
 func CheckBasicAuth(r *http.Request) *BasicAuth {
 
 	username := ""
-	scopeId := ""
+	scopeID := ""
 	password := ""
 
 	username, password, ok := r.BasicAuth()
 	if ok != true {
 		return &BasicAuth{err: errors.New("Authorization header missing")}
 	}
-	usernameParts := strings.Split(username, "@")
+	usernameParts := strings.Split(username, "|")
 
 	if len(usernameParts) != 2 {
 		util.LogError("Insufficient parameters for basic authentication. Provide user-id@project-id and password")
@@ -149,10 +151,10 @@ func CheckBasicAuth(r *http.Request) *BasicAuth {
 	}
 
 	username = usernameParts[0]
-	scopeId = usernameParts[1]
+	scopeID = usernameParts[1]
 
 	//TODO: only project for now. ask keystone, wether it's a project or domain
-	return &BasicAuth{Username: username, ProjectID: scopeId, Password: password}
+	return &BasicAuth{Username: username, ProjectID: scopeID, Password: password}
 }
 
 //CheckToken checks the validity of the request's X-Auth-Token in keystone, and
@@ -170,6 +172,7 @@ func CheckToken(r *http.Request, keystone keystone.Driver) *Token {
 	return t
 }
 
+// GetTokenFromBasicAuth creates an OpenStack token from a scoped username / password
 func GetTokenFromBasicAuth(auth *BasicAuth, keystone keystone.Driver) *Token {
 	authOpts := keystone.AuthOptionsFromBasicAuthCredentials(auth.Username, auth.Password, auth.ProjectID)
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}

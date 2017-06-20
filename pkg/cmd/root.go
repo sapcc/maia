@@ -54,12 +54,13 @@ func Execute() {
 var keystoneDriver keystone.Driver
 var storageDriver storage.Driver
 
-// Specify which keystone & storage driver to use
+// SetDrivers sets which keystone & storage driver to use
 func SetDrivers(keystoneParam keystone.Driver, storageParam storage.Driver) {
 	keystoneDriver = keystoneParam
 	storageDriver = storageParam
 }
 
+// OSVars lists the OpenStack configuration/environment variables
 // When adding a value here, also add a "RootCmd.PersistentFlags().StringVar" line in cmd/root.go's init()
 var OSVars = []string{"username", "password", "auth_url", "user_domain_name", "project_name", "project_domain_name"}
 

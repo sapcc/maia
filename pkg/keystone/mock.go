@@ -41,12 +41,12 @@ func (d mock) Client() *gophercloud.ProviderClient {
 }
 
 //ListDomains implements the Driver interface.
-func (d mock) ListDomains() ([]KeystoneDomain, error) {
+func (d mock) ListDomains() ([]Domain, error) {
 	return nil, nil
 }
 
 //ListProjects implements the Driver interface.
-func (d mock) ListProjects() ([]KeystoneProject, error) {
+func (d mock) ListProjects() ([]Project, error) {
 	return nil, nil
 }
 
@@ -72,7 +72,7 @@ func (d mock) UserName(id string) (string, error) {
 	return "myuser", nil
 }
 
-func (d mock) UserId(name string) (string, error) {
+func (d mock) UserID(name string) (string, error) {
 	return "eb5cd8f904b06e8b2a6eb86c8b04c08e6efb89b92da77905cc8c475f30b0b812", nil
 }
 
@@ -83,13 +83,13 @@ func (d mock) AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.AuthOpt
 	}
 }
 
-func (d mock) AuthOptionsFromBasicAuthCredentials(username string, password string, projectId string) *gophercloud.AuthOptions {
+func (d mock) AuthOptionsFromBasicAuthCredentials(username string, password string, projectID string) *gophercloud.AuthOptions {
 	return &gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		Username:         username,
 		Password:         password,
 		// Note: gophercloud only allows for user & project in the same domain
-		TenantID: projectId,
+		TenantID: projectID,
 	}
 }
 
