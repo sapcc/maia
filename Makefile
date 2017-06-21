@@ -44,23 +44,22 @@ install: FORCE all
 	install -D -m 0755 ./maia "$(DESTDIR)$(PREFIX)/bin/maia"
 
 clean: FORCE
-	rm -f -- ./maia_*_*
-	rm -rf vendor
+	rm -f -- ./maia
 
 build/docker.tar: clean
 	glide cc
 	glide install -v
-	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.8 env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
+	docker run --rm -v "$$PWD":/go/src/github.com/sapcc/maia -w /go/src/github.com/sapcc/maia -v "$$GOPATH":/work -e "GOPATH=/go" golang:1.8 env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 	tar cf - ./maia_linux_amd64 > build/docker.tar
 
 DOCKER       := docker
-DOCKER_IMAGE := hub.global.cloud.sap/monsoon/maia
+DOCKER_IMAGE := hub.global.sap.corp/monsoon/maia
 DOCKER_TAG   := latest
 
 docker: build/docker.tar
 	$(DOCKER) build -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
 
 vendor: FORCE
-	glide update -v	
+	glide update -v
 
 .PHONY: FORCE
