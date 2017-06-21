@@ -63,7 +63,7 @@ func main() {
 
 func parseCmdlineFlags() {
 	// Get config file location
-	configPath = flag.String("config.file", "maia.conf", "specifies the location of the TOML-format configuration file")
+	configPath = flag.String("config.file", "/etc/maia/maia.conf", "specifies the location of the TOML-format configuration file")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
