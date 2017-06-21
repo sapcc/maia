@@ -53,7 +53,7 @@ build/docker.tar: clean
 	tar cf - ./maia_linux_amd64 > build/docker.tar
 
 DOCKER       := docker
-DOCKER_IMAGE := hub.global.sap.corp/monsoon/maia
+DOCKER_IMAGE := hub.global.cloud.sap/monsoon/maia
 DOCKER_TAG   := latest
 
 docker: build/docker.tar
