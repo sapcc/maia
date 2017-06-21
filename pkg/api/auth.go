@@ -68,9 +68,9 @@ func (b *BasicAuth) String() string {
 	}
 
 	if b.ProjectID != "" {
-		scope = fmt.Sprintf("projectId: %s", b.ProjectID)
+		scope = fmt.Sprintf("projectID: %s", b.ProjectID)
 	} else if b.DomainID != "" {
-		scope = fmt.Sprintf("domainId: %s", b.DomainID)
+		scope = fmt.Sprintf("domainID: %s", b.DomainID)
 	}
 
 	if b.Password != "" {
@@ -148,8 +148,8 @@ func CheckBasicAuth(r *http.Request) *BasicAuth {
 	usernameParts := strings.Split(userID, "|")
 
 	if len(usernameParts) != 2 {
-		util.LogError("Insufficient parameters for basic authentication. Provide user-id@project-id and password")
-		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user-id@project-id and password")}
+		util.LogError("Insufficient parameters for basic authentication. Provide user-id|project-id and password")
+		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user-id|project-id and password")}
 	}
 
 	userID = usernameParts[0]
