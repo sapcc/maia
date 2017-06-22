@@ -85,6 +85,7 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 	return func(w http.ResponseWriter, req *http.Request) {
 		util.LogInfo("authenticate")
 
+		// TODO implement basic auth
 		// get basic authentication credentials
 		auth := CheckBasicAuth(req)
 		if auth.err != nil {
@@ -118,7 +119,7 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 		}
 
 		//TODO: cache and check token instead of always sending requests
-		// token = CheckToken(req, keystone)
+		//token = CheckToken(req, keystone)
 
 		if err := token.Require(rule); err != nil {
 			util.LogError(err.Error())
@@ -191,7 +192,7 @@ func (t *Token) Require(rule string) error {
 		t.context.Logger = log.Printf //or any other function with the same signature
 	}
 	if !t.enforcer.Enforce(rule, t.context) {
-		util.LogInfo("User %s does not fulfill authorization rule %s", t.context.Auth, rule)
+		util.LogInfo("User %s with roles %s on project %s does not fulfill authorization rule %s", t.context.Auth["user_id"], t.context.Roles, t.context.Auth["project_id"], rule)
 		return errors.New("Unauthorized")
 	}
 	return nil

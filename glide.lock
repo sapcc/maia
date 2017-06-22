@@ -1,5 +1,5 @@
 hash: 2dd2a5a0d7b3f265aeffcba29dc66757609fce147ded739d3390815bbb9fef3a
-updated: 2017-06-22T13:16:05.510275352+02:00
+updated: 2017-06-22T16:44:32.333592641+02:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -10,13 +10,13 @@ imports:
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/golang/protobuf
-  version: 5a0f697c9ed9d68fef0116532c6e05cfeae00e55
+  version: 1fb8fd32a09087bcd727225167edd31e1b9ceb24
   subpackages:
   - proto
 - name: github.com/golang/snappy
   version: 553a641470496b2327abcac10b36396bd98e45c9
 - name: github.com/gophercloud/gophercloud
-  version: 36954b3332102baa9d7edd7897a6cdbf5fcb03b8
+  version: 7b20127f5e2d4846512fbd00d790f0e10992df8e
   subpackages:
   - openstack
   - openstack/identity/v2/tenants
@@ -69,14 +69,14 @@ imports:
   subpackages:
   - go
 - name: github.com/prometheus/common
-  version: 13ba4ddd0caa9c28ca7b7bffe1dfa9ed8d5ef207
+  version: 0866df4b85a18d652b6965be022d007cdf076822
   subpackages:
   - expfmt
   - internal/bitbucket.org/ww/goautoneg
   - log
   - model
 - name: github.com/prometheus/procfs
-  version: a66a2f8b6f3fe82a95a1bed0bb3705bac8031717
+  version: 822d4a1f8edcbcbc71e8d1fd6527b12331a6d0ad
   subpackages:
   - xfs
 - name: github.com/prometheus/prometheus
@@ -93,19 +93,8 @@ imports:
   - util/stats
   - util/strutil
   - util/testutil
-- name: github.com/sapcc/maia
-  version: 246533fbd5f1c4abd16a009727e3ba893ca28808
-  subpackages:
-  - pkg/api
-  - pkg/cmd
-  - pkg/cmd/auth
-  - pkg/keystone
-  - pkg/maia
-  - pkg/storage
-  - pkg/test
-  - pkg/util
-- name: github.com/Sirupsen/logrus
-  version: 85b1699d505667d13f8ac4478c1debbf85d6c5de
+- name: github.com/sirupsen/logrus
+  version: 3d4380f53a34dcdc95f0c1db702615992b38d9a4
 - name: github.com/spf13/afero
   version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:
@@ -136,19 +125,19 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: golang.org/x/net
-  version: 59a0b19b5533c7977ddeb86b017bf507ed407b12
+  version: 057a25b06247e0c51ba15d8ae475feb2fcb72164
   subpackages:
   - context
   - context/ctxhttp
 - name: golang.org/x/sys
-  version: 0b25a408a50076fbbcae6b7ac0ea5fbb0b085e79
+  version: fb4cac33e3196ff7f507ab9b2d2a44b0142f5b5a
   subpackages:
   - unix
   - windows
   - windows/registry
   - windows/svc/eventlog
 - name: golang.org/x/text
-  version: 210eee5cf7323015d097341bcf7166130d001cd8
+  version: 4e9ab9ee170f2a39bd66c92b3e0a47ff47a4bc77
   subpackages:
   - transform
   - unicode/norm
