@@ -365,8 +365,12 @@ func (t *keystoneToken) ToContext() policy.Context {
 			"tenant_domain_id":    t.ProjectScope.Domain.ID,
 			"tenant_domain_name":  t.ProjectScope.Domain.Name,
 		},
-		Request: nil,
-		Logger:  util.LogDebug,
+		Request: map[string]string{
+			"user_id":    t.User.ID,
+			"domain_id":  t.DomainScope.ID,
+			"project_id": t.ProjectScope.ID,
+		},
+		Logger: util.LogDebug,
 	}
 	for key, value := range c.Auth {
 		if value == "" {
@@ -375,9 +379,6 @@ func (t *keystoneToken) ToContext() policy.Context {
 	}
 	for _, role := range t.Roles {
 		c.Roles = append(c.Roles, role.Name)
-	}
-	if c.Request == nil {
-		c.Request = map[string]string{}
 	}
 
 	return c
