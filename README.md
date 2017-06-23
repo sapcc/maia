@@ -34,7 +34,7 @@ scrape_configs:
 
   # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
   - job_name: 'maia'
-    metrics_path: "/v1/metrics"
+    metrics_path: "/api/v1/metrics"
     basic_auth:
       # Corresponds to your OpenStack User and Project
       username: <user_id>@<project_id>
