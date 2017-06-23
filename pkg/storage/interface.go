@@ -19,7 +19,9 @@
 
 package storage
 
-import "net/http"
+import (
+	"net/http"
+)
 
 // Driver is an interface that wraps the underlying event storage mechanism.
 // Because it is an interface, the real implementation can be mocked away in unit tests.
@@ -27,4 +29,9 @@ type Driver interface {
 
 	/********** requests to Prometheus **********/
 	ListMetrics(tenantID string) (*http.Response, error)
+
+	Query(query, time, timeout string) (*http.Response, error)
+	QueryRange(query, start, end, step, timeout string) (*http.Response, error)
+	Series(match []string, start, end string) (*http.Response, error)
+	LabelValues(name string) (*http.Response, error)
 }

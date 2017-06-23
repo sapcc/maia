@@ -29,10 +29,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/common/expfmt"
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 
-	"fmt"
 	dto "github.com/prometheus/client_model/go"
 	"io"
 )
@@ -42,25 +41,54 @@ const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
 
 var prometheusCoreHeaders = make(map[string]string)
 
-//versionData is used by version advertisement handlers.
-type versionData struct {
+//VersionData is used by version advertisement handlers.
+type VersionData struct {
 	Status string            `json:"status"`
 	ID     string            `json:"id"`
 	Links  []versionLinkData `json:"links"`
 }
 
 //versionLinkData is used by version advertisement handlers, as part of the
-//versionData struct.
+//VersionData struct.
 type versionLinkData struct {
 	URL      string `json:"href"`
 	Relation string `json:"rel"`
 	Type     string `json:"type,omitempty"`
 }
 
+// class for Prometheus v1 API provider implementation
 type v1Provider struct {
 	keystone    keystone.Driver
 	storage     storage.Driver
-	versionData versionData
+	versionData VersionData
+}
+
+// Prometheus status strings
+type status string
+
+const (
+	statusSuccess status = "success"
+	statusError          = "error"
+)
+
+// Prometheus error types
+type errorType string
+
+const (
+	errorNone     errorType = ""
+	errorTimeout            = "timeout"
+	errorCanceled           = "canceled"
+	errorExec               = "execution"
+	errorBadData            = "bad_data"
+	errorInternal           = "internal"
+)
+
+// Prometheus response object (JSON)
+type response struct {
+	Status    status      `json:"status"`
+	Data      interface{} `json:"data,omitempty"`
+	ErrorType errorType   `json:"errorType,omitempty"`
+	Error     string      `json:"error,omitempty"`
 }
 
 func initCoreHeaders() {
@@ -71,15 +99,15 @@ func initCoreHeaders() {
 }
 
 //NewV1Router creates a http.Handler that serves the Maia v1 API.
-//It also returns the versionData for this API version which is needed for the
+//It also returns the VersionData for this API version which is needed for the
 //version advertisement on "GET /".
-func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler, versionData) {
+func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler, VersionData) {
 	r := mux.NewRouter()
 	p := &v1Provider{
 		keystone: keystone,
 		storage:  storage,
 	}
-	p.versionData = versionData{
+	p.versionData = VersionData{
 		Status: "CURRENT",
 		ID:     "v1",
 		Links: []versionLinkData{
@@ -95,11 +123,19 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 		},
 	}
 
-	r.Methods("GET").Path("/v1/").HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
+	r.Methods("GET").Path("/api/v1/").HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
 		ReturnJSON(res, 200, map[string]interface{}{"version": p.versionData})
 	})
 
-	r.Methods("GET").Path("/v1/metrics").HandlerFunc(p.ListMetrics)
+	// maia's own metrics
+	r.Methods("GET").Path("/metrics").HandlerFunc(AuthorizedHandlerFunc(p.ListMetrics, p.keystone, "metric:list"))
+	// tenant-aware query
+	r.Methods("GET").Path("/api/v1/query").HandlerFunc(AuthorizedHandlerFunc(p.Query, p.keystone, "metric:show"))
+	r.Methods("GET").Path("/api/v1/query_range").HandlerFunc(AuthorizedHandlerFunc(p.QueryRange, p.keystone, "metric:show"))
+	// tenant-aware label value lists
+	r.Methods("GET").Path("/api/v1/label/{name}/values").HandlerFunc(AuthorizedHandlerFunc(p.LabelValues, p.keystone, "metric:list"))
+	// tenant-aware series metadata
+	r.Methods("GET").Path("/api/v1/series").HandlerFunc(AuthorizedHandlerFunc(p.Series, p.keystone, "metric:list"))
 
 	return r, p.versionData
 }
@@ -119,48 +155,61 @@ func ReturnMetrics(w http.ResponseWriter, format expfmt.Format, code int, data *
 }
 
 //ReturnResponse basically forwards a received response.
-//Returns 404 if no metrics where found
-func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
+func ReturnResponse(w http.ResponseWriter, response *http.Response) {
+	defer response.Body.Close()
 
+	// copy headers
 	for k, v := range response.Header {
 		w.Header().Set(k, strings.Join(v, ";"))
 	}
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(response.Body)
 	body := buf.String()
-	// request to prometheus was successful, but nothing was found
-	if (w.Header().Get("Content-Length") == string(0)) || (len(body) == 0) {
-		fmt.Println("---->", w.Header().Get("Content-Length"))
-		code = 404
-	}
-	w.WriteHeader(code)
+	w.WriteHeader(response.StatusCode)
 
 	io.WriteString(w, body)
-
 }
 
 //ReturnJSON is a convenience function for HTTP handlers returning JSON data.
 //The `code` argument specifies the HTTP response code, usually 200.
 func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 	escapedJSON, err := json.MarshalIndent(&data, "", "  ")
-	jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)
 	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
+		// TODO: comment
+		jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)
 		w.Write(jsonData)
 	} else {
 		http.Error(w, err.Error(), 500)
 	}
 }
 
-//ReturnError produces an error response with HTTP status code if the given
+//ReturnError produces a Prometheus error response with HTTP status code if the given
 //error is non-nil. Otherwise, nothing is done and false is returned.
 func ReturnError(w http.ResponseWriter, err error, code int) bool {
 	if err == nil {
 		return false
 	}
 
-	http.Error(w, err.Error(), code)
+	var errorType = errorNone
+	switch code {
+	case 400:
+		errorType = errorBadData
+	case 422:
+		errorType = errorExec
+	case 500:
+		errorType = errorInternal
+	case 503:
+		errorType = errorTimeout
+	default:
+		http.Error(w, err.Error(), code)
+		return true
+	}
+
+	jsonErr := response{Status: statusError, ErrorType: errorType, Error: err.Error()}
+	ReturnJSON(w, code, jsonErr)
+
 	return true
 }
 
@@ -175,6 +224,7 @@ func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool 
 	return true
 }
 
+// TODO what is this?
 //Path constructs a full URL for a given URL path below the /v1/ endpoint.
 func (p *v1Provider) Path(elements ...string) string {
 	parts := []string{

@@ -87,7 +87,6 @@ func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 			t.Logf("Response body: %s", responseBytes)
 			t.Fatal(err)
 		}
-		buf.WriteByte('\n')
 		r.compareBodyToFixture(t, r.ExpectJSON, buf.Bytes())
 	case r.ExpectFile != "":
 		r.compareBodyToFixture(t, r.ExpectFile, responseBytes)

@@ -20,8 +20,6 @@
 package storage
 
 import (
-	"fmt"
-
 	"net/http"
 
 	"net/url"
@@ -29,6 +27,7 @@ import (
 	"github.com/prometheus/client_golang/api/prometheus"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
+	"io"
 )
 
 const prometheusFederateURL = "federate?match[]="
@@ -41,16 +40,26 @@ type prometheusStorageClient struct {
 
 var promCli prometheusStorageClient
 
-var prometheusCoreHeaders = make(map[string]string)
+var prometheusCoreHeadersJSON = make(map[string]string)
 
-func initPrometheusCoreHeaders() {
-	prometheusCoreHeaders["User-Agent"] = "Prometheus/"
-	prometheusCoreHeaders["Accept"] = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
-	prometheusCoreHeaders["Accept-Encoding"] = "gzip"
-	prometheusCoreHeaders["Connection"] = "close"
+func initPrometheusCoreHeadersJSON() {
+	prometheusCoreHeadersJSON["User-Agent"] = "Prometheus/"
+	prometheusCoreHeadersJSON["Accept"] = "application/json"
+	prometheusCoreHeadersJSON["Connection"] = "close"
+
 }
 
-// Prometheus initialises and returns the Prometheus driver
+var prometheusCoreHeadersPBUF = make(map[string]string)
+
+func initPrometheusCoreHeadersPBUF() {
+	prometheusCoreHeadersPBUF["User-Agent"] = "Prometheus/"
+	prometheusCoreHeadersPBUF["Accept"] = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
+	prometheusCoreHeadersPBUF["Accept-Encoding"] = "gzip"
+	prometheusCoreHeadersPBUF["Connection"] = "close"
+
+}
+
+// Prometheus creates a storage driver for Prometheus
 func Prometheus(prometheusAPIURL string) Driver {
 	if promCli.client == nil {
 		promCli.init(prometheusAPIURL)
@@ -75,7 +84,8 @@ func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
 	}
 	promCli.client = prometheus.NewQueryAPI(client)
 
-	initPrometheusCoreHeaders()
+	initPrometheusCoreHeadersJSON()
+	initPrometheusCoreHeadersPBUF()
 
 	if viper.IsSet("maia.proxy") {
 		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
@@ -89,20 +99,72 @@ func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
 	promCli.httpClient = httpCli
 }
 
-func (promCli *prometheusStorageClient) ListMetrics(tenantID string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) Query(query, time, timeout string) (*http.Response, error) {
+	promURL := buildURL("api/v1/query", map[string]interface{}{"query": query, "time": time, "timeout": timeout})
 
-	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantID)
-	prometheusAPIURL := promCli.config.Address
+	return sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersJSON)
+}
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s%s", prometheusAPIURL, prometheusFederateURL, projectQuery), nil)
+func (promCli *prometheusStorageClient) QueryRange(query, start, end, step, timeout string) (*http.Response, error) {
+	promURL := buildURL("api/v1/query_range", map[string]interface{}{"query": query, "start": start, "end": end,
+		"step": step, "timeout": timeout})
+
+	return sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersJSON)
+}
+
+func (promCli *prometheusStorageClient) Series(match []string, start, end string) (*http.Response, error) {
+	promURL := buildURL("api/v1/series", map[string]interface{}{"match[]": match, "start": start, "end": end})
+
+	return sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersJSON)
+}
+
+func (promCli *prometheusStorageClient) LabelValues(name string) (*http.Response, error) {
+	promURL := buildURL("api/v1/series", map[string]interface{}{"match[]": name + "!=\"\""})
+
+	res, err := sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersJSON)
+
+	return res, err
+}
+
+// buildURL is used to build the target URL of a Prometheus call
+func buildURL(path string, params map[string]interface{}) url.URL {
+	promURL, err := url.Parse(promCli.config.Address)
+	if err != nil {
+		panic(err)
+	}
+
+	// change original request to point to our backing Prometheus
+	promURL.Path = path
+	queryParams := url.Values{}
+	for k, v := range params {
+		if s, ok := v.(string); ok {
+			if s != "" {
+				queryParams.Add(k, s)
+			}
+		} else {
+			for _, s := range v.([]string) {
+				queryParams.Add(k, s)
+			}
+		}
+	}
+	promURL.RawQuery = queryParams.Encode()
+
+	return *promURL
+}
+
+// SendToPrometheus takes care of the request wrapping and delivery to Prometheus
+func sendToPrometheus(method string, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
+	req, err := http.NewRequest(method, promURL, body)
 	if err != nil {
 		util.LogError("Could not create request.\n", err.Error())
 		return nil, err
 	}
 
-	for k, v := range prometheusCoreHeaders {
+	for k, v := range headers {
 		req.Header.Add(k, v)
 	}
+
+	util.LogInfo(promURL)
 
 	resp, err := promCli.httpClient.Do(req)
 	if err != nil {
@@ -110,4 +172,12 @@ func (promCli *prometheusStorageClient) ListMetrics(tenantID string) (*http.Resp
 		return nil, err
 	}
 	return resp, nil
+}
+
+func (promCli *prometheusStorageClient) ListMetrics(match string) (*http.Response, error) {
+	promURL := buildURL("federate", map[string]interface{}{"match[]": match})
+
+	res, err := sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersPBUF)
+
+	return res, err
 }

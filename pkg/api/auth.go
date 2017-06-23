@@ -26,11 +26,11 @@ import (
 	"log"
 	"os"
 
-	base64 "encoding/base64"
 	"fmt"
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gorilla/mux"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"strings"
@@ -44,7 +44,7 @@ type Token struct {
 	err      error
 }
 
-//BasicAuth represents a user authorization passed trough by a base64 encoded Authorization header of a request.
+// BasicAuth contains credentials coming from username/password login
 type BasicAuth struct {
 	UserID    string
 	Username  string
@@ -57,13 +57,12 @@ type BasicAuth struct {
 
 func (b *BasicAuth) String() string {
 	username := "None"
-	scope 	 := "None"
+	scope := "None"
 	password := "None"
 
 	if b.TokenID != "" {
 		return fmt.Sprintf("tokenID: %s", b.TokenID)
 	}
-
 	if b.Username != "" {
 		username = b.Username
 	}
@@ -81,52 +80,81 @@ func (b *BasicAuth) String() string {
 	return fmt.Sprintf("username: %s \n%s \npassword: %s", username, scope, password)
 }
 
-// Get credentials from Authorization header provided by Prometheus basic_auth
-func (p *v1Provider) CheckBasicAuth(r *http.Request) *BasicAuth {
+// AuthorizedHandlerFunc decorates a HandlerFunc with authentication and authorization checks
+func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request, projectID string), keystone keystone.Driver, rule string) func(w http.ResponseWriter, req *http.Request) {
+	return func(w http.ResponseWriter, req *http.Request) {
+		util.LogInfo("authenticate")
+
+		// TODO implement basic auth
+		// get basic authentication credentials
+		auth := CheckBasicAuth(req)
+		if auth.err != nil {
+			util.LogError(auth.err.Error())
+			ReturnError(w, auth.err, 401)
+			return
+		}
+
+		tenantID := ""
+		if auth != nil {
+			util.LogInfo(auth.String())
+			if auth.ProjectID != "" {
+				tenantID = auth.ProjectID
+			} else if auth.DomainID != "" {
+				tenantID = auth.DomainID
+			} else {
+				util.LogError("No project_id or domain_id found. Aborting.")
+				ReturnError(w, auth.err, 401)
+				return
+			}
+		}
+
+		util.LogInfo("authorize for project/domain: %s .", tenantID)
+
+		// authorize call
+		token := GetTokenFromBasicAuth(auth, keystone)
+		if token.err != nil {
+			util.LogError(token.err.Error())
+			ReturnError(w, token.err, 403)
+			return
+		}
+
+		//TODO: cache and check token instead of always sending requests
+		//token = CheckToken(req, keystone)
+
+		if err := token.Require(rule); err != nil {
+			util.LogError(err.Error())
+			ReturnError(w, err, 403)
+			return
+		}
+
+		// do it!
+		wrappedHandlerFunc(w, req, auth.ProjectID)
+	}
+}
+
+// CheckBasicAuth performs login using username/password.
+// It requires username to contain a qualified OpenStack username and project/domain scope information
+// Format: <user>"|"<project or domain>
+// user/project can either be a unique OpenStack ID or a qualified name with domain information, e.g. username"@"domain
+func CheckBasicAuth(r *http.Request) *BasicAuth {
 
 	userID := ""
 	scopeID := ""
 	password := ""
-	tokenID := ""
 
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
+	userID, password, ok := r.BasicAuth()
+	if ok != true {
 		return &BasicAuth{err: errors.New("Authorization header missing")}
 	}
-	// example authHeader: Basic base64enc(user@project:password) or base64enc(token:<token>)
-	basicAuthHeader, _ := base64.StdEncoding.DecodeString(strings.Fields(authHeader)[1])
+	usernameParts := strings.Split(userID, "|")
 
-	basicAuth := strings.Split(string(basicAuthHeader), ":")
-
-	if len(basicAuth) != 2 {
-		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user_id@project_id and password or token@tokenID")}
+	if len(usernameParts) != 2 {
+		util.LogError("Insufficient parameters for basic authentication. Provide user-id|project-id and password")
+		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user-id|project-id and password")}
 	}
 
-	password = basicAuth[1]
-
-	user := strings.Split(basicAuth[0], "@")
-
-	if len(user) != 2 {
-		util.LogError("Insufficient parameters for basic authentication. Provide user@project and password")
-		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user@project and password")}
-	}
-
-	userID = user[0]
-	scopeID = user[1]
-
-	// authentication using token
-	if strings.ToLower(userID) == "token" {
-		util.LogDebug("Authenticate using token")
-		tokenID = basicAuth[1]
-		if tokenID == "" {
-			return &BasicAuth{err: errors.New("Tried token based authentication with empty tokenID.")}
-		}
-		return &BasicAuth{TokenID: tokenID}
-	}
-
-	util.LogDebug("Authenticate using credentials")
-
-	// authentication using username,projectid and password
+	userID = usernameParts[0]
+	scopeID = usernameParts[1]
 
 	//TODO: only project for now. ask keystone, wether it's a project or domain
 	return &BasicAuth{UserID: userID, ProjectID: scopeID, Password: password}
@@ -135,45 +163,41 @@ func (p *v1Provider) CheckBasicAuth(r *http.Request) *BasicAuth {
 //CheckToken checks the validity of the request's X-Auth-Token in keystone, and
 //returns a Token instance for checking authorization. Any errors that occur
 //during this function are deferred until Require() is called.
-func (p *v1Provider) CheckToken(r *http.Request) *Token {
+func CheckToken(r *http.Request, keystone keystone.Driver) *Token {
 	str := r.Header.Get("X-Auth-Token")
 	if str == "" {
 		return &Token{err: errors.New("X-Auth-Token header missing")}
 	}
 
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
-	t.context, t.err = p.keystone.ValidateToken(str)
+	t.context, t.err = keystone.ValidateToken(str)
 	t.context.Request = mux.Vars(r)
 	return t
 }
 
-func (p *v1Provider) GetTokenFromBasicAuth(auth *BasicAuth) *Token {
+// GetTokenFromBasicAuth creates an OpenStack token from a scoped username / password
+func GetTokenFromBasicAuth(auth *BasicAuth, keystone keystone.Driver) *Token {
 	var authOpts *gophercloud.AuthOptions
 	if auth.TokenID != "" {
-		authOpts = p.keystone.AuthOptionsFromBasicAuthToken(auth.TokenID)
+		authOpts = keystone.AuthOptionsFromBasicAuthToken(auth.TokenID)
 	} else {
-		authOpts = p.keystone.AuthOptionsFromBasicAuthCredentials(auth.UserID, auth.Password, auth.ProjectID)
+		authOpts = keystone.AuthOptionsFromBasicAuthCredentials(auth.UserID, auth.Password, auth.ProjectID)
 	}
 	t := &Token{enforcer: viper.Get("maia.PolicyEnforcer").(*policy.Enforcer)}
-	t.context, t.err = p.keystone.AuthenticateUser(authOpts)
+	t.context, t.err = keystone.AuthenticateUser(authOpts)
 	return t
 }
 
 //Require checks if the given token has the given permission according to the
 //policy.json that is in effect. If not, an error response is written and false
 //is returned.
-func (t *Token) Require(w http.ResponseWriter, rule string) bool {
-	if t.err != nil {
-		http.Error(w, t.err.Error(), 401)
-		return false
-	}
-
+func (t *Token) Require(rule string) error {
 	if os.Getenv("MAIA_DEBUG") == "1" {
 		t.context.Logger = log.Printf //or any other function with the same signature
 	}
 	if !t.enforcer.Enforce(rule, t.context) {
-		http.Error(w, "Unauthorized", 403)
-		return false
+		util.LogInfo("User %s with roles %s on project %s does not fulfill authorization rule %s", t.context.Auth["user_id"], t.context.Roles, t.context.Auth["project_id"], rule)
+		return errors.New("Unauthorized")
 	}
-	return true
+	return nil
 }

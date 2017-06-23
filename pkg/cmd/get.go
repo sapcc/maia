@@ -38,15 +38,15 @@ var getCmd = &cobra.Command{
 
 		token := auth.GetToken(keystoneDriver)
 		if !token.Require("metrics:show") {
-			return errors.New("You are not authorised to view metrics within the current scope.")
+			return errors.New("you are not authorised to view metrics within the current scope")
 		}
 
-		metric, err := maia.ListMetrics(token.TenantId(), keystoneDriver, storageDriver)
+		metric, err := maia.ListMetrics(token.TenantID(), keystoneDriver, storageDriver)
 		if err != nil {
 			return err
 		}
 		if metric == nil {
-			return fmt.Errorf("Couldn't get metrics for project %s.", token.TenantId())
+			return fmt.Errorf("couldn't get metrics for project %s", token.TenantID())
 		}
 		json, err := json.MarshalIndent(metric, "", "  ")
 		if err != nil {

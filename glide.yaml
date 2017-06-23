@@ -1,0 +1,30 @@
+package: github.com/sapcc/maia
+flatten: true
+import:
+- package: github.com/databus23/goslo.policy
+- package: github.com/gophercloud/gophercloud
+  subpackages:
+  - openstack
+  - openstack/identity/v3/tokens
+- package: github.com/gorilla/mux
+  version: ~1.4.0
+- package: github.com/pkg/errors
+  version: ~0.8.0
+- package: github.com/prometheus/client_golang
+  version: ~0.8.0
+  subpackages:
+  - api/prometheus
+- package: github.com/prometheus/client_model
+  subpackages:
+  - go
+- package: github.com/prometheus/common
+  subpackages:
+  - expfmt
+  - model
+- package: github.com/prometheus/prometheus
+  version: ~1.7.0
+  subpackages:
+  - promql
+  - storage/metric
+- package: github.com/spf13/cobra
+- package: github.com/spf13/viper

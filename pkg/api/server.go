@@ -23,13 +23,13 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 )
 
-// Server sets up and starts the API server, hooking it up to the API router
+// Server initializes and starts the API server, hooking it up to the API router
 func Server(keystone keystone.Driver, storage storage.Driver) error {
 
 	mainRouter := mux.NewRouter()
@@ -37,19 +37,21 @@ func Server(keystone keystone.Driver, storage storage.Driver) error {
 	//hook up the v1 API (this code is structured so that a newer API version can
 	//be added easily later)
 	v1Router, v1VersionData := NewV1Router(keystone, storage)
-	mainRouter.PathPrefix("/v1/").Handler(v1Router)
+	// TODO: where is the /api prefix?
+	mainRouter.PathPrefix("/api/v1/").Handler(v1Router)
 
 	//add the version advertisement that lists all available API versions
 	mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		allVersions := struct {
-			Versions []versionData `json:"versions"`
-		}{[]versionData{v1VersionData}}
+			Versions []VersionData `json:"versions"`
+		}{[]VersionData{v1VersionData}}
 		ReturnJSON(w, 300, allVersions)
 	})
 
 	http.Handle("/", mainRouter)
 
 	//start HTTP server
-	util.LogInfo("listening on " + viper.GetString("API.ListenAddress"))
-	return http.ListenAndServe(viper.GetString("API.ListenAddress"), nil)
+	bindAddress := viper.GetString("maia.bind_address")
+	util.LogInfo("listening on %s", bindAddress)
+	return http.ListenAndServe(bindAddress, nil)
 }

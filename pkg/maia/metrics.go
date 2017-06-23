@@ -22,51 +22,51 @@ package maia
 import (
 	"log"
 
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 )
 
-// ListMetrics contains high-level data about a metric, intended as a list item
+// Metric contains a data point
 type Metric struct {
 	Type  string
 	Value string
 }
 
-// GetMetrics returns a list of matching metrics (with filtering)
-func ListMetrics(tenantId string, keystoneDriver keystone.Driver, metricsStore storage.Driver) ([]*Metric, error) {
+// ListMetrics returns a list of matching metrics (with filtering)
+func ListMetrics(tenantID string, keystoneDriver keystone.Driver, metricsStore storage.Driver) ([]*Metric, error) {
 
-	util.LogDebug("maia.GetMetrics: tenant id is %s", tenantId)
+	util.LogDebug("maia.GetMetrics: tenant id is %s", tenantID)
 
 	// TODO
 
 	return nil, nil
 }
 
-func namesForIds(keystoneDriver keystone.Driver, idMap map[string]string, targetType string) map[string]string {
+func namesForIDs(keystoneDriver keystone.Driver, idMap map[string]string, targetType string) map[string]string {
 	nameMap := map[string]string{}
 	var err error
 
 	// Now add the names for IDs in the metrics
-	domainId := idMap["domain"]
-	if domainId != "" {
-		nameMap["domain"], err = keystoneDriver.DomainName(domainId)
+	domainID := idMap["domain"]
+	if domainID != "" {
+		nameMap["domain"], err = keystoneDriver.DomainName(domainID)
 		if err != nil {
-			log.Printf("Error looking up domain name for domain '%s'", domainId)
+			log.Printf("Error looking up domain name for domain '%s'", domainID)
 		}
 	}
-	projectId := idMap["project"]
-	if projectId != "" {
-		nameMap["project"], err = keystoneDriver.ProjectName(projectId)
+	projectID := idMap["project"]
+	if projectID != "" {
+		nameMap["project"], err = keystoneDriver.ProjectName(projectID)
 		if err != nil {
-			log.Printf("Error looking up project name for project '%s'", projectId)
+			log.Printf("Error looking up project name for project '%s'", projectID)
 		}
 	}
-	userId := idMap["user"]
-	if userId != "" {
-		nameMap["user"], err = keystoneDriver.UserName(userId)
+	userID := idMap["user"]
+	if userID != "" {
+		nameMap["user"], err = keystoneDriver.UserName(userID)
 		if err != nil {
-			log.Printf("Error looking up user name for user '%s'", userId)
+			log.Printf("Error looking up user name for user '%s'", userID)
 		}
 	}
 
@@ -80,7 +80,7 @@ func namesForIds(keystoneDriver keystone.Driver, idMap map[string]string, target
 		log.Printf("Unhandled payload type \"%s\", cannot look up name.", targetType)
 	}
 	if err != nil {
-		log.Printf("Error looking up name for %s '%s'", targetType, userId)
+		log.Printf("Error looking up name for %s '%s'", targetType, userID)
 	}
 
 	return nameMap

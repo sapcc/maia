@@ -31,7 +31,7 @@ import (
 	"github.com/databus23/goslo.policy"
 	"github.com/sapcc/maia/pkg/api"
 	"github.com/sapcc/maia/pkg/cmd"
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
@@ -63,7 +63,7 @@ func main() {
 
 func parseCmdlineFlags() {
 	// Get config file location
-	configPath = flag.String("config.file", "maia.conf", "specifies the location of the TOML-format configuration file")
+	configPath = flag.String("config.file", "/etc/maia/maia.conf", "specifies the location of the TOML-format configuration file")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
@@ -74,8 +74,8 @@ func parseCmdlineFlags() {
 func setDefaultConfig() {
 	viper.SetDefault("maia.keystone_driver", "keystone")
 	viper.SetDefault("maia.storage_driver", "prometheus")
-	viper.SetDefault("API.ListenAddress", "0.0.0.0:8789")
-	viper.SetDefault("prometheus.url", "localhost:9090")
+	viper.SetDefault("maia.bind_address", "0.0.0.0:8789")
+	viper.SetDefault("maia.prometheus_api_url", "localhost:9090")
 }
 
 func readConfig(configPath *string) {
@@ -91,7 +91,7 @@ func readConfig(configPath *string) {
 		viper.SetConfigType("toml")
 		err := viper.ReadInConfig()
 		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("Fatal error config file: %s \n ", err))
+			panic(fmt.Errorf("Fatal error config file: %s", err))
 		}
 	}
 
