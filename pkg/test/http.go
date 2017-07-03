@@ -35,6 +35,7 @@ import (
 
 //APIRequest contains all metadata about a test request.
 type APIRequest struct {
+	Headers          map[string]string
 	Method           string
 	Path             string
 	RequestJSON      interface{} //if non-nil, will be encoded as JSON
@@ -58,6 +59,9 @@ func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 	}
 	request := httptest.NewRequest(r.Method, r.Path, requestBody)
 	request.Header.Set("X-Auth-Token", "something")
+	for k, v := range r.Headers {
+		request.Header.Set(k, v)
+	}
 
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)

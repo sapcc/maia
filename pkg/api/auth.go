@@ -27,13 +27,14 @@ import (
 	"os"
 
 	"fmt"
+	"strings"
+
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"strings"
 )
 
 //Token represents a user's token, as passed through the X-Auth-Token header of
@@ -138,6 +139,8 @@ func AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 // user/project can either be a unique OpenStack ID or a qualified name with domain information, e.g. username"@"domain
 func CheckBasicAuth(r *http.Request) *BasicAuth {
 
+	const prefix = "Basic "
+
 	userID := ""
 	scopeID := ""
 	password := ""
@@ -146,11 +149,16 @@ func CheckBasicAuth(r *http.Request) *BasicAuth {
 	if ok != true {
 		return &BasicAuth{err: errors.New("Authorization header missing")}
 	}
-	usernameParts := strings.Split(userID, "|")
+
+	if strings.HasPrefix(prefix, userID) {
+		userID = strings.TrimPrefix(prefix, userID)
+	}
+
+	usernameParts := strings.Split(userID, "@")
 
 	if len(usernameParts) != 2 {
-		util.LogError("Insufficient parameters for basic authentication. Provide user-id|project-id and password")
-		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user-id|project-id and password")}
+		util.LogError("Insufficient parameters for basic authentication. Provide user-id@project-id and password")
+		return &BasicAuth{err: errors.New("Insufficient parameters for basic authentication. Provide user-id@project-id and password")}
 	}
 
 	userID = usernameParts[0]
