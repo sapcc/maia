@@ -22,6 +22,7 @@ package api
 import (
 	"net/http"
 
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
@@ -30,7 +31,14 @@ import (
 )
 
 // Server initializes and starts the API server, hooking it up to the API router
-func Server(keystone keystone.Driver, storage storage.Driver) error {
+func Server() error {
+
+	prometheusAPIURL := viper.GetString("maia.prometheus_url")
+	if prometheusAPIURL == "" {
+		panic(fmt.Errorf("Prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
+	}
+	storage := storage.NewPrometheusDriver(prometheusAPIURL, map[string]string{})
+	keystone := keystone.NewKeystoneDriver()
 
 	mainRouter := mux.NewRouter()
 
@@ -38,7 +46,7 @@ func Server(keystone keystone.Driver, storage storage.Driver) error {
 	//be added easily later)
 	v1Router, v1VersionData := NewV1Router(keystone, storage)
 	// TODO: where is the /api prefix?
-	mainRouter.PathPrefix("/api/v1/").Handler(v1Router)
+	mainRouter.PathPrefix("/").Handler(v1Router)
 
 	//add the version advertisement that lists all available API versions
 	mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
