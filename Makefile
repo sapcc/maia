@@ -1,16 +1,16 @@
 PKG    = github.com/sapcc/maia
 PREFIX := /usr
 
-all: build/maia
+all: build
 
 GO_BUILDFLAGS :=
 GO_LDFLAGS    := -s -w
 
 # This target uses the incremental rebuild capabilities of the Go compiler to speed things up.
 # If no source files have changed, `go install` exits quickly without doing anything.
-build/maia: FORCE
+build: FORCE
 	glide install -v
-	go build $(PKG)
+	go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external' -o ./maia
 	go install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
 
 # which packages to test with static checkers?
