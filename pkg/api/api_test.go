@@ -77,4 +77,5 @@ func Test_Query(t *testing.T) {
 		ExpectStatusCode: 200,
 		ExpectJSON:       "fixtures/query.json",
 	}.Check(t, router)
+
 }
