@@ -17,6 +17,7 @@ It was originally designed for the SAP Converged Cloud.
 Before reading on and trying, please be aware that the following limitations exist
 * protobuf-protocol is not tested and will probably fail for the label-values API
 * keystone integration is not efficient: tokens are probably not cached
+* the output format is raw, so the output is hard to use in scripts
 
 # Installation
 
@@ -71,7 +72,7 @@ An OpenStack [policy file](https://docs.openstack.org/security-guide/identity/po
 authorization of incoming requests.  
 
 ```
-policy_file = "etc/policy.json"
+policy_file = "/etc/maia/policy.json"
 ```
 
 ### Performance

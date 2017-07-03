@@ -48,7 +48,7 @@ func setupTest(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	viper.Set("maiapolicy_enforcer", policyEnforcer)
+	viper.Set("maia.policy_enforcer", policyEnforcer)
 
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.Mock()
