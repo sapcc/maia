@@ -34,7 +34,20 @@ import (
 
 func setupTest(t *testing.T) http.Handler {
 	//load test policy (where everything is allowed)
-	viper.Set("maia.policy_file", "../test/policy.json")
+	policyBytes, err := ioutil.ReadFile("../test/policy.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyRules := make(map[string]string)
+	err = json.Unmarshal(policyBytes, &policyRules)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyEnforcer, err := policy.NewEnforcer(policyRules)
+	if err != nil {
+		t.Fatal(err)
+	}
+	viper.Set("maiapolicy_enforcer", policyEnforcer)
 
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.Mock()

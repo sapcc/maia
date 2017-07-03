@@ -31,39 +31,24 @@ import (
 // token checking of API users. Because it is an interface, the real implementation
 // can be mocked away in unit tests.
 type Driver interface {
-	//Return the main gophercloud client from which the respective service
-	//clients can be derived. For mock drivers, this returns nil, so test code
-	//should be prepared to handle a nil Client() where appropriate.
-	Client() *gophercloud.ProviderClient
-	AuthOptionsFromConfig() *gophercloud.AuthOptions
-	AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.AuthOptions
-	AuthOptionsFromBasicAuthCredentials(userID string, password string, projectID string) *gophercloud.AuthOptions
-	/********** requests to Keystone **********/
-	ListDomains() ([]Domain, error)
-	ListProjects() ([]Project, error)
-	ValidateToken(token string) (policy.Context, error)
-	Authenticate(credentials *gophercloud.AuthOptions) (policy.Context, error)
-	AuthenticateUser(credentials *gophercloud.AuthOptions) (policy.Context, error)
-	DomainName(id string) (string, error)
-	ProjectName(id string) (string, error)
-	UserName(id string) (string, error)
-	UserID(name string) (string, error)
+	// AuthenticateRequest authenticates a user using authOptionsFromRequest passed in the HTTP request header.
+	// After successful authentication, additional context information is added to the request header
+	// In addition a Context object is returned.
+	AuthenticateRequest(req *http.Request) (*policy.Context, error)
+
+	// Authenticate authenticates a user using the provided authOptionsFromRequest
+	Authenticate(options *tokens.AuthOptions, serviceUser bool) (*policy.Context, error)
 }
 
-//Domain describes just the name and id of a Keystone domain.
-type Domain struct {
-	UUID string `json:"id"`
-	Name string `json:"name"`
-}
-
-//Project describes just the name and id of a Keystone project.
-type Project struct {
-	UUID string `json:"id"`
-	Name string `json:"name"`
-}
-
-//User describes just the name and id of a Keystone user.
-type User struct {
-	UUID string `json:"id"`
-	Name string `json:"name"`
+// NewKeystoneDriver is a factory method which chooses the right driver implementation based on configuration settings
+func NewKeystoneDriver() Driver {
+	driverName := viper.GetString("maia.keystone_driver")
+	switch driverName {
+	case "keystone":
+		return Keystone()
+	case "mock":
+		return Mock()
+	default:
+		panic(fmt.Errorf("Couldn't match a keystone driver for configured value \"%s\"", driverName))
+	}
 }

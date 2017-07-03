@@ -46,26 +46,10 @@ type keystone struct {
 }
 
 var providerClient *gophercloud.ProviderClient
-var domainNameCache *map[string]string
-var projectNameCache *map[string]string
-var userNameCache *map[string]string
-var userIDCache *map[string]string
 
 func (d keystone) keystoneClient(iServiceUser bool) (*gophercloud.ServiceClient, error) {
 	if d.TokenRenewalMutex == nil {
 		d.TokenRenewalMutex = &sync.Mutex{}
-	}
-	if domainNameCache == nil {
-		domainNameCache = &map[string]string{}
-	}
-	if projectNameCache == nil {
-		projectNameCache = &map[string]string{}
-	}
-	if userNameCache == nil {
-		userNameCache = &map[string]string{}
-	}
-	if userIDCache == nil {
-		userIDCache = &map[string]string{}
 	}
 	if providerClient == nil {
 		var err error
@@ -75,7 +59,7 @@ func (d keystone) keystoneClient(iServiceUser bool) (*gophercloud.ServiceClient,
 		}
 
 		if iServiceUser {
-			err = d.RefreshToken()
+			err = d.refreshToken()
 			if err != nil {
 				return nil, fmt.Errorf("cannot fetch initial Keystone token: %v", err)
 			}
@@ -92,242 +76,6 @@ func (d keystone) keystoneClient(iServiceUser bool) (*gophercloud.ServiceClient,
 	}
 
 	return openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})
-}
-
-func (d keystone) Client() *gophercloud.ProviderClient {
-	var kc keystone
-
-	err := viper.UnmarshalKey("keystone", &kc)
-	if err != nil {
-		util.LogError("unable to decode into struct, %v", err)
-	}
-
-	return nil
-}
-
-//ListDomains implements the Driver interface.
-func (d keystone) ListDomains() ([]Domain, error) {
-	client, err := d.keystoneClient(true)
-	if err != nil {
-		return nil, err
-	}
-
-	//gophercloud does not support domain listing yet - do it manually
-	url := client.ServiceURL("domains")
-	var result gophercloud.Result
-	_, err = client.Get(url, &result.Body, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var data struct {
-		Domains []Domain `json:"domains"`
-	}
-	err = result.ExtractInto(&data)
-	return data.Domains, err
-}
-
-//ListProjects implements the Driver interface.
-func (d keystone) ListProjects() ([]Project, error) {
-	client, err := d.keystoneClient(true)
-	if err != nil {
-		return nil, err
-	}
-
-	var result gophercloud.Result
-	_, err = client.Get("/v3/keystone/projects", &result.Body, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var data struct {
-		Projects []Project `json:"projects"`
-	}
-	err = result.ExtractInto(&data)
-	return data.Projects, err
-}
-
-func (d keystone) ValidateToken(token string) (policy.Context, error) {
-	client, err := d.keystoneClient(true)
-	if err != nil {
-		return policy.Context{}, err
-	}
-
-	response := tokens.Get(client, token)
-	if response.Err != nil {
-		//this includes 4xx responses, so after this point, we can be sure that the token is valid
-		return policy.Context{}, response.Err
-	}
-
-	//use a custom token struct instead of tokens.Token which is way incomplete
-	var tokenData keystoneToken
-	err = response.ExtractInto(&tokenData)
-	if err != nil {
-		return policy.Context{}, err
-	}
-	return tokenData.ToContext(), nil
-}
-
-func (d keystone) Authenticate(credentials *gophercloud.AuthOptions) (policy.Context, error) {
-	client, err := d.keystoneClient(true)
-	if err != nil {
-		return policy.Context{}, err
-	}
-	response := tokens.Create(client, credentials)
-	if response.Err != nil {
-		//this includes 4xx responses, so after this point, we can be sure that the token is valid
-		return policy.Context{}, response.Err
-	}
-	//use a custom token struct instead of tokens.Token which is way incomplete
-	var tokenData keystoneToken
-	err = response.ExtractInto(&tokenData)
-	if err != nil {
-		return policy.Context{}, err
-	}
-	return tokenData.ToContext(), nil
-}
-
-func (d keystone) AuthenticateUser(credentials *gophercloud.AuthOptions) (policy.Context, error) {
-	client, err := d.keystoneClient(false)
-	if err != nil {
-		return policy.Context{}, err
-	}
-	response := tokens.Create(client, credentials)
-	if response.Err != nil {
-		//this includes 4xx responses, so after this point, we can be sure that the token is valid
-		return policy.Context{}, response.Err
-	}
-	//use a custom token struct instead of tokens.Token which is way incomplete
-	var tokenData keystoneToken
-	err = response.ExtractInto(&tokenData)
-	if err != nil {
-		return policy.Context{}, err
-	}
-	return tokenData.ToContext(), nil
-}
-
-func (d keystone) DomainName(id string) (string, error) {
-	cachedName, hit := (*domainNameCache)[id]
-	if hit {
-		return cachedName, nil
-	}
-
-	client, err := d.keystoneClient(true)
-	if err != nil {
-		return "", err
-	}
-
-	var result gophercloud.Result
-	url := client.ServiceURL(fmt.Sprintf("domains/%s", id))
-	_, err = client.Get(url, &result.Body, nil)
-	if err != nil {
-		return "", err
-	}
-
-	var data struct {
-		Domain Domain `json:"domain"`
-	}
-	err = result.ExtractInto(&data)
-	if err == nil {
-		(*domainNameCache)[id] = data.Domain.Name
-	}
-	return data.Domain.Name, err
-}
-
-func (d keystone) ProjectName(id string) (string, error) {
-	cachedName, hit := (*projectNameCache)[id]
-	if hit {
-		return cachedName, nil
-	}
-
-	client, err := d.keystoneClient(true)
-	if err != nil {
-		return "", err
-	}
-
-	var result gophercloud.Result
-	url := client.ServiceURL(fmt.Sprintf("projects/%s", id))
-	_, err = client.Get(url, &result.Body, nil)
-	if err != nil {
-		return "", err
-	}
-
-	var data struct {
-		Project Project `json:"project"`
-	}
-	err = result.ExtractInto(&data)
-	if err == nil {
-		(*projectNameCache)[id] = data.Project.Name
-	}
-	return data.Project.Name, err
-}
-
-func (d keystone) UserName(id string) (string, error) {
-	cachedName, hit := (*userNameCache)[id]
-	if hit {
-		return cachedName, nil
-	}
-
-	client, err := d.keystoneClient(true)
-	if err != nil {
-		return "", err
-	}
-
-	var result gophercloud.Result
-	url := client.ServiceURL(fmt.Sprintf("users/%s", id))
-	_, err = client.Get(url, &result.Body, nil)
-	if err != nil {
-		return "", err
-	}
-
-	var data struct {
-		User User `json:"user"`
-	}
-	err = result.ExtractInto(&data)
-	if err == nil {
-		(*userNameCache)[id] = data.User.Name
-		(*userIDCache)[data.User.Name] = id
-	}
-	return data.User.Name, err
-}
-
-func (d keystone) UserID(name string) (string, error) {
-	cachedID, hit := (*userIDCache)[name]
-	if hit {
-		return cachedID, nil
-	}
-
-	client, err := d.keystoneClient(true)
-	if err != nil {
-		return "", err
-	}
-
-	var result gophercloud.Result
-	url := client.ServiceURL(fmt.Sprintf("users?name=%s", name))
-	_, err = client.Get(url, &result.Body, nil)
-	if err != nil {
-		return "", err
-	}
-
-	var data struct {
-		User []User `json:"user"`
-	}
-	err = result.ExtractInto(&data)
-	userID := ""
-	if err == nil {
-		switch len(data.User) {
-		case 0:
-			err = errors.Errorf("No user found with name %s", name)
-		case 1:
-			userID = data.User[0].UUID
-		default:
-			util.LogWarning("Multiple users found with name %s - returning the first one", name)
-			userID = data.User[0].UUID
-		}
-		(*userIDCache)[name] = userID
-		(*userNameCache)[userID] = name
-	}
-	return userID, err
 }
 
 type keystoneToken struct {
@@ -383,7 +131,7 @@ func (t *keystoneToken) ToContext() policy.Context {
 	return c
 }
 
-//RefreshToken fetches a new Keystone keystone token. It is also used
+//refreshToken fetches a new Keystone keystone token for the service user. It is also used
 //to fetch the initial token on startup.
 func (d keystone) refreshToken() error {
 	//NOTE: This function is very similar to v3auth() in
@@ -429,20 +177,18 @@ func (d keystone) refreshToken() error {
 	return nil
 }
 
-func (d keystone) AuthOptionsFromBasicAuthToken(tokenID string) *gophercloud.AuthOptions {
-	return &gophercloud.AuthOptions{
+func authOptionsFromConfig() *tokens.AuthOptions {
+	return &tokens.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		TokenID:          tokenID,
-	}
-}
-
-func (d keystone) AuthOptionsFromBasicAuthCredentials(username string, password string, tenantID string) *gophercloud.AuthOptions {
-	return &gophercloud.AuthOptions{
-		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		UserID:           userID,
-		Password:         password,
-		// Note: gophercloud only allows for user & project in the same domain
-		TenantID: tenantID,
+		TokenID:          viper.GetString("keystone.token"),
+		Username:         viper.GetString("keystone.username"),
+		Password:         viper.GetString("keystone.password"),
+		DomainName:       viper.GetString("keystone.user_domain_name"),
+		AllowReauth:      true,
+		Scope: tokens.Scope{
+			ProjectName: viper.GetString("keystone.project_name"),
+			DomainName:  viper.GetString("keystone.project_domain_name"),
+		},
 	}
 }
 

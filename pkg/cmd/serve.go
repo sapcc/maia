@@ -64,10 +64,12 @@ func init() {
 	// is called directly, e.g.:
 	// metricsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	var bindAddr, policyFile string
+	var promUrl, bindAddr, policyFile string
 
-	serveCmd.Flags().StringVar(&bindAddr, "bind-address", "0.0.0.0:9091", "IP-Address and port where Maia is listening for incoming requests (e.g. 0.0.0.0:9091)")
+	serveCmd.Flags().StringVarP(&promUrl, "prometheus-url", "p", "", "URL of the Prometheus server backing Maia")
+	viper.BindPFlag("maia.prometheus_url", serveCmd.Flags().Lookup("prometheus-url"))
+	serveCmd.Flags().StringVarP(&bindAddr, "bind-address", "b", "", "IP-Address and port where Maia is listening for incoming requests (e.g. 0.0.0.0:9091)")
 	viper.BindPFlag("maia.bind_address", serveCmd.Flags().Lookup("bind-address"))
-	serveCmd.Flags().StringVar(&policyFile, "policy-file", "", "Location of the OpenStack policy file")
+	serveCmd.Flags().StringVarP(&policyFile, "policy-file", "r", "", "Location of the OpenStack policy file")
 	viper.BindPFlag("maia.policy_file", serveCmd.Flags().Lookup("policy-file"))
 }

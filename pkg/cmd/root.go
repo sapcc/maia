@@ -23,14 +23,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sapcc/maia/pkg/keystone"
-	"github.com/sapcc/maia/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+var jsonOutput bool
 var configFile string
-var promURL string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -52,18 +50,23 @@ func Execute() {
 	}
 }
 
-var keystoneDriver keystone.Driver
-var storageDriver storage.Driver
-
-// SetDrivers sets which keystone & storage driver to use
-func SetDrivers(keystoneParam keystone.Driver, storageParam storage.Driver) {
-	keystoneDriver = keystoneParam
-	storageDriver = storageParam
+func setDefaultConfig() {
+	viper.SetDefault("maia.keystone_driver", "keystone")
+	viper.SetDefault("maia.storage_driver", "prometheus")
 }
 
-// OSVars lists the OpenStack configuration/environment variables
-// When adding a value here, also add a "RootCmd.PersistentFlags().StringVar" line in cmd/root.go's init()
-var OSVars = []string{"username", "password", "auth_url", "user_domain_name", "project_name", "project_domain_name"}
+func readConfig(configPath string) {
+	// Read the maia config file (required for server)
+	// That way an OpenStack client environment will not be accidentally used for the "serve" command
+	if _, err := os.Stat(configPath); err == nil {
+		viper.SetConfigFile(configPath)
+		viper.SetConfigType("toml")
+		err := viper.ReadInConfig()
+		if err != nil { // Handle errors reading the config file
+			panic(fmt.Errorf("Fatal error config file: %s", err))
+		}
+	}
+}
 
 func init() {
 	cobra.OnInitialize(func() {
@@ -75,12 +78,5 @@ func init() {
 	// Cobra supports Persistent Flags, which, if defined here,
 	// will be global for your application.
 
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-auth-url", "", "OpenStack Authentication URL")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-username", "", "OpenStack Username")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-password", "", "OpenStack Password")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-user-domain-name", "", "OpenStack User's domain name")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-project-name", "", "OpenStack Project name to scope to")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-project-domain-name", "", "OpenStack Project's domain name")
-
-	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "", "/etc/maia/maia.conf", "Configuration file to use")
+	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "c", "/etc/maia/maia.conf", "Configuration file to use")
 }
