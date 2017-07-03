@@ -47,7 +47,7 @@ func setupTest(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	viper.Set("maiapolicy_enforcer", policyEnforcer)
+	viper.Set("maia.policy_enforcer", policyEnforcer)
 
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.Mock()
@@ -62,7 +62,7 @@ func Test_APIMetadata(t *testing.T) {
 
 	test.APIRequest{
 		Method:           "GET",
-		Path:             "/v1/",
+		Path:             "/api/v1/",
 		ExpectStatusCode: 200,
 		ExpectJSON:       "fixtures/api-metadata.json",
 	}.Check(t, router)
@@ -73,7 +73,7 @@ func Test_Query(t *testing.T) {
 
 	test.APIRequest{
 		Method:           "GET",
-		Path:             "/v1/query?query=sum(blackbox_api_status_gauge{check=~%22keystone%22})",
+		Path:             "/api/v1/query?query=sum(blackbox_api_status_gauge{check=~%22keystone%22})",
 		ExpectStatusCode: 200,
 		ExpectJSON:       "fixtures/query.json",
 	}.Check(t, router)
