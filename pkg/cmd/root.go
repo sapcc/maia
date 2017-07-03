@@ -23,20 +23,19 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sapcc/maia/pkg/keystone"
-	"github.com/sapcc/maia/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"strings"
 )
 
-var cfgFile string
+var jsonOutput bool
+var configFile string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "maia",
-	Short: "Command-line client and API server for OpenStack Prometheus service.",
-	Long:  `Command-line client and API server for OpenStack Prometheus service.`,
+	Short: "OpenStack controlled access to Prometheus metrics",
+	Long: `Maia provides multi-tenancy access to Prometheus metrics through an OpenStack service. The maia command
+	can be used both as server and as a client to access a Maia service running elsewhere.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
@@ -51,41 +50,33 @@ func Execute() {
 	}
 }
 
-var keystoneDriver keystone.Driver
-var storageDriver storage.Driver
-
-// SetDrivers sets which keystone & storage driver to use
-func SetDrivers(keystoneParam keystone.Driver, storageParam storage.Driver) {
-	keystoneDriver = keystoneParam
-	storageDriver = storageParam
+func setDefaultConfig() {
+	viper.SetDefault("maia.keystone_driver", "keystone")
+	viper.SetDefault("maia.storage_driver", "prometheus")
 }
 
-// OSVars lists the OpenStack configuration/environment variables
-// When adding a value here, also add a "RootCmd.PersistentFlags().StringVar" line in cmd/root.go's init()
-var OSVars = []string{"username", "password", "auth_url", "user_domain_name", "project_name", "project_domain_name"}
+func readConfig(configPath string) {
+	// Read the maia config file (required for server)
+	// That way an OpenStack client environment will not be accidentally used for the "serve" command
+	if _, err := os.Stat(configPath); err == nil {
+		viper.SetConfigFile(configPath)
+		viper.SetConfigType("toml")
+		err := viper.ReadInConfig()
+		if err != nil { // Handle errors reading the config file
+			panic(fmt.Errorf("Fatal error config file: %s", err))
+		}
+	}
+}
 
 func init() {
-	//cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(func() {
+		setDefaultConfig()
+		readConfig(configFile)
+	})
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports Persistent Flags, which, if defined here,
 	// will be global for your application.
 
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-auth-url", "", "OpenStack Authentication URL")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-username", "", "OpenStack Username")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-password", "", "OpenStack Password")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-user-domain-name", "", "OpenStack User's domain name")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-project-name", "", "OpenStack Project name to scope to")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-project-domain-name", "", "OpenStack Project's domain name")
-
-	// Setup command-line flags for OpenStack authentication
-	for _, val := range OSVars {
-		flags := RootCmd.PersistentFlags()
-		lookup := "os-" + strings.Replace(val, "_", "-", -1)
-		pflag := flags.Lookup(lookup)
-		viper.BindPFlag("keystone."+val, pflag)
-	}
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	//RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "c", "/etc/maia/maia.conf", "Configuration file to use")
 }
