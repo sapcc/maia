@@ -24,26 +24,36 @@ import (
 
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/common/model"
-	"github.com/sapcc/maia/pkg/maia"
+	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 )
 
-// MetricList is the model for JSON returned by the ListMetrics API call
-type MetricList struct {
-	NextURL string         `json:"next,omitempty"`
-	PrevURL string         `json:"previous,omitempty"`
-	Metrics []*maia.Metric `json:"metrics"`
+func scopeToLabelConstraint(req *http.Request) (string, string) {
+	if projectID := req.Header.Get("X-Project-Id"); projectID != "" {
+		return "project_id", projectID
+	} else if domainID := req.Header.Get("X-Domain-Id"); domainID != "" {
+		return "domain_id", domainID
+	}
+
+	panic(fmt.Errorf("Missing OpenStack scope attributes in request header"))
 }
 
-// ListMetrics handles GET /v1/metrics.
-func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request, projectID string) {
-	util.LogDebug("api.ListMetrics")
-	response, err := p.storage.ListMetrics(projectID)
+// Federate handles GET /federate.
+func (p *v1Provider) Federate(w http.ResponseWriter, req *http.Request) {
+	selectors, err := buildSelectors(req)
 	if err != nil {
-		util.LogError("Could not get metrics for project %s", projectID)
+		util.LogInfo("Invalid request params %s", req.URL)
+		ReturnError(w, err, 400)
+		return
+	}
+
+	response, err := p.storage.Federate(*selectors, req.Header.Get("Accept"))
+	if err != nil {
+		util.LogError("Could not get metrics for %s", selectors)
 		ReturnError(w, err, 503)
 		return
 	}
@@ -51,16 +61,18 @@ func (p *v1Provider) ListMetrics(w http.ResponseWriter, req *http.Request, proje
 	ReturnResponse(w, response)
 }
 
-func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request, projectID string) {
+func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request) {
+	labelKey, labelValue := scopeToLabelConstraint(req)
+
 	queryParams := req.URL.Query()
-	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), "project_id", projectID)
+	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), labelKey, labelValue)
 	if err != nil {
 		ReturnError(w, err, 400)
 		return
 	}
 
 	util.LogInfo(newQuery)
-	resp, err := p.storage.Query(newQuery, queryParams.Get("time"), queryParams.Get("timeout"))
+	resp, err := p.storage.Query(newQuery, queryParams.Get("time"), queryParams.Get("timeout"), req.Header.Get("Accept"))
 	if err != nil {
 		ReturnError(w, err, 503)
 		return
@@ -69,15 +81,17 @@ func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request, projectID s
 	ReturnResponse(w, resp)
 }
 
-func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request, projectID string) {
+func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
+	labelKey, labelValue := scopeToLabelConstraint(req)
+
 	queryParams := req.URL.Query()
-	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), "project_id", projectID)
+	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), labelKey, labelValue)
 	if err != nil {
 		ReturnError(w, err, 400)
 		return
 	}
 
-	resp, err := p.storage.QueryRange(newQuery, queryParams.Get("start"), queryParams.Get("end"), queryParams.Get("step"), queryParams.Get("timeout"))
+	resp, err := p.storage.QueryRange(newQuery, queryParams.Get("start"), queryParams.Get("end"), queryParams.Get("step"), queryParams.Get("timeout"), req.Header.Get("Accept"))
 	if err != nil {
 		ReturnError(w, err, 503)
 		return
@@ -86,19 +100,11 @@ func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request, projec
 	ReturnResponse(w, resp)
 }
 
-type seriesResponse struct {
-	Status    status           `json:"status"`
-	Data      []model.LabelSet `json:"data,omitempty"`
-	ErrorType errorType        `json:"errorType,omitempty"`
-	Error     string           `json:"error,omitempty"`
-}
+// LabelValues utilizes the series API in order to implement a tenant-aware list.
+// This is a complex operation.
+func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
+	labelKey, labelValue := scopeToLabelConstraint(req)
 
-type labelValuesResponse struct {
-	Status status             `json:"status"`
-	Data   []model.LabelValue `json:"data"`
-}
-
-func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, projectID string) {
 	name := model.LabelName(mux.Vars(req)["name"])
 	// do not list label values from series older than maia.label_value_ttl
 	ttl, err := time.ParseDuration(viper.GetString("maia.label_value_ttl"))
@@ -109,7 +115,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, proje
 
 	start := time.Now().Add(-ttl)
 	end := time.Now()
-	resp, err := p.storage.Series([]string{"{project_id=\"" + projectID + "\"," + string(name) + "!=\"\"}"}, start.Format(time.RFC3339), end.Format(time.RFC3339))
+	resp, err := p.storage.Series([]string{"{" + labelKey + "=\"" + labelValue + "\"," + string(name) + "!=\"\"}"}, start.Format(time.RFC3339), end.Format(time.RFC3339), req.Header.Get("Accept"))
 	if err != nil {
 		ReturnError(w, err, 502)
 		return
@@ -123,7 +129,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, proje
 		return
 	}
 
-	var sr seriesResponse
+	var sr storage.SeriesResponse
 	if err := json.Unmarshal(buf, &sr); err != nil {
 		ReturnError(w, err, 500)
 		return
@@ -135,7 +141,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, proje
 		unique[v] = true
 	}
 	// transform into expected result type
-	var result labelValuesResponse
+	var result storage.LabelValuesResponse
 	result.Status = sr.Status
 	result.Data = make([]model.LabelValue, 0)
 	for k := range unique {
@@ -145,25 +151,37 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request, proje
 	ReturnJSON(w, 200, &result)
 }
 
-func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request, projectID string) {
+// buildSelectors takes the selectors contained in the "match[]" URL query parameter(s)
+// and extends them with a label-constrained for the project/domain scope
+func buildSelectors(req *http.Request) (*[]string, error) {
+	labelKey, labelValue := scopeToLabelConstraint(req)
+
 	queryParams := req.URL.Query()
 	selectors := queryParams["match[]"]
 	if selectors == nil {
 		// behave like Prometheus, but do not proxy through
-		ReturnError(w, errors.New("no match[] parameter provided"), 400)
-		return
+		return nil, errors.New("no match[] parameter provided")
 	}
 	// enrich all match statements
 	for i, sel := range selectors {
-		newSel, err := util.AddLabelConstraintToSelector(sel, "project_id", projectID)
+		newSel, err := util.AddLabelConstraintToSelector(sel, labelKey, labelValue)
 		if err != nil {
-			ReturnError(w, err, 400)
-			return
+			return nil, err
 		}
 		selectors[i] = newSel
 	}
 
-	resp, err := p.storage.Series(selectors, queryParams.Get("start"), queryParams.Get("end"))
+	return &selectors, nil
+}
+
+func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request) {
+	selectors, err := buildSelectors(req)
+	if err != nil {
+		ReturnError(w, err, 400)
+		return
+	}
+	queryParams := req.URL.Query()
+	resp, err := p.storage.Series(*selectors, queryParams.Get("start"), queryParams.Get("end"), req.Header.Get("Accept"))
 	if err != nil {
 		ReturnError(w, err, 502)
 		return

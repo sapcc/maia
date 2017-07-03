@@ -30,7 +30,12 @@ func AddLabelConstraintToSelector(metricSelector string, key string, value strin
 		return "", err
 	}
 
-	labelMatchers, err := promql.ParseMetricSelector(metricSelector)
+	var labelMatchers metric.LabelMatchers
+	if metricSelector != "{}" {
+		labelMatchers, err = promql.ParseMetricSelector(metricSelector)
+	} else {
+		labelMatchers = make(metric.LabelMatchers, 0)
+	}
 	if err != nil {
 		return "", err
 	}
