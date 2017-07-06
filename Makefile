@@ -1,7 +1,7 @@
 PKG    = github.com/sapcc/maia
 PREFIX := /usr
 
-all: build check
+all: clean build check
 
 GO_BUILDFLAGS :=
 GO_LDFLAGS    := -s -w
@@ -45,6 +45,7 @@ install: FORCE all
 
 clean: FORCE
 	rm -f -- ./maia_*_*
+	rm -rf vendor
 
 build/docker.tar: clean
 	glide cc
