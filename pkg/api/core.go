@@ -52,10 +52,9 @@ type versionLinkData struct {
 
 // class for Prometheus v1 API provider implementation
 type v1Provider struct {
-	keystone       keystone.Driver
-	policyEnforcer *policy.Enforcer
-	storage        storage.Driver
-	versionData    VersionData
+	keystone    keystone.Driver
+	storage     storage.Driver
+	versionData VersionData
 }
 
 var policyEnforcer *policy.Enforcer

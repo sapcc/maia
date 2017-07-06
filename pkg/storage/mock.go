@@ -21,9 +21,15 @@ package storage
 
 import (
 	"net/http"
+	"net/http/httptest"
 )
 
-type mock struct{}
+type mock struct {
+	Driver
+}
+
+// QueryResponse sets the respoonse of the call()
+var QueryResponseVal string
 
 // Mock Prometheus driver with static data
 func Mock() Driver {
@@ -35,10 +41,14 @@ func (m mock) Federate(selectors []string, acceptContentType string) (*http.Resp
 }
 
 func (m mock) Query(query, time, timeout string, acceptContentType string) (*http.Response, error) {
-	return nil, nil
+	responseRec := httptest.NewRecorder()
+	responseRec.WriteString(QueryResponseVal)
+
+	return responseRec.Result(), nil
 }
 
 func (m mock) QueryRange(query, start, end, step, timeout string, acceptContentType string) (*http.Response, error) {
+
 	return nil, nil
 }
 

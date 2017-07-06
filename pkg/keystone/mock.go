@@ -38,5 +38,7 @@ func (d mock) Authenticate(credentials *tokens.AuthOptions, serviceUser bool) (*
 }
 
 func (d mock) AuthenticateRequest(req *http.Request) (*policy.Context, error) {
-	return nil, nil
+	req.Header.Set("X-Project-Id", "12345")
+	return &policy.Context{Request: map[string]string{"user_id": "testuser",
+		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil
 }
