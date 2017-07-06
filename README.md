@@ -5,19 +5,41 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/sapcc/maia)](https://goreportcard.com/report/github.com/sapcc/maia)
 [![GoDoc](https://godoc.org/github.com/sapcc/maia?status.svg)](https://godoc.org/github.com/sapcc/maia)
 
-Maia is an OpenStack-compatible service that allows querying Prometheus metrics per OpenStack project or domain.
+Maia is a multi-tenant OpenStack-service for accessing Prometheus metrics. It offers [Prometheus-compatible](https://prometheus.io/docs/querying/api/) 
+API and supports federation.
+
+## Features
+
+* Supports OpenStack Identity v3 authentication and authorization
+* Multi-tenant design, supports project- and domain-level scoping
+* Grafana support (using Prometheus data source)
+* Prometheus API compatible (read operations)
+* Supports federation with other Prometheus
+* Feature-complete CLI supporting all API operations and custom output leveraging Go-templates
+* CLI can be used with Prometheus as well
+
 It was originally designed for the SAP Converged Cloud.
 
-# Design
+## Concept
 
-![Architecture diagram](./docs/maia-architecture.png)
-
+Maia adds multi-tenant support to Prometheus by using dedicated labels to assign metrics to OpenStack projects and domains.
+ 
+The following labels have a special meaning in Maia. *Only metrics with these labels are visible though the Maia API.*
+ 
+ | Label Key  | Description  |
+ |------------|--------------|
+ | project_id | OpenStack project UUID |
+ | domain_id  | OpenStack domain UUID |
+ 
+Metrics without `domain_id` will not be available when authorized to domain scope. Likewise, metrics without `project_id`
+will be omitted when project scope is used. There is no inheritance of metrics to parent projects. Users authorized
+to a domain will be able to access the metrics of all projects in that domain that have been labelled for the domain.
+ 
 # LIMITATIONS
 
 Before reading on and trying, please be aware that the following limitations exist
 * protobuf-protocol is not tested and will probably fail for the label-values API
 * keystone integration is not efficient: tokens are probably not cached
-* the output format is raw, so the output is hard to use in scripts
 
 # Installation
 
@@ -27,7 +49,6 @@ Via Makefile
 * `make && make install` to install to `/usr`
 * `make && make install PREFIX=/some/path` to install to `/some/path`
 * `make docker` to build the Docker image (set image name and tag with the `DOCKER_IMAGE` and `DOCKER_TAG` variables)
-
 
 # Using Maia as Service
 
@@ -82,11 +103,12 @@ makes the [label-values API](https://prometheus.io/docs/querying/api/#querying-l
 complex operation.
 
 In tenants with a high number of metric series, it is therefore highly recommended to limit the lifetime of label
-values, so that older series with no recent data are not considered. Otherwise you risk timeouts and/or overloading
-of your Prometheus backend.
+values, so that older series with no recent data are not considered by the API. Otherwise you risk timeouts
+and/or overload of your Prometheus backend. As a side-effect users of templated Grafana dashboards will not be
+confronted with stale series in the dropdown boxes.
 
 ```
-# ignore label values from series with no new metrics since more than 2h 
+# ignore label values from series older than 2h 
 label_value_ttl = "2h"
 ```
 
@@ -114,48 +136,134 @@ Once you have finalized the configuration file, you are set to go
 maia serve
 ```
 
+## Notes on Scalability
+
+Currently Maia only supports a single Prometheus backend as data source. Therefore scalability has to happen behind the
+Prometheus that is used by Maia.
+
+Availability can be improved by setting up multiple identical Prometheus instances and using a reverse proxy for failover. Maia itself 
+is stateless, so multiple instances can be spawned without risking collisions.
+
 # Using the Maia Client
 
 The `maia` command can also be used to retrieve metrics from the Maia service. It behaves like any other OpenStack
- CLI, supporting the same command line options and environment variables. You can reuse your existing RC-files
- for authentication.
+ CLI, supporting the same command line options and environment variables for authentication:
+
+| Option | Environment Variable | Description |
+|--------|----------------------|-------------|
+| --os-username | OS_USERNAME | OpenStack username, requires `os-user-domain-name` |
+| --os-user-id | OS_USER_ID | OpenStack user unique ID |
+| --os-password | OS_PASSWORD | Password |
+| --os-user-domain-name | OS_USER_DOMAIN_NAME | domain name, qualifying the username (default: `Default`) |
+| --os-user-domain-id | OS_USER_DOMAIN_ID | domain unique ID, qualifying the username (default: `default`) |
+| --os-project-name | OS_PROJECT_NAME | OpenStack project name for authorization scoping to project, requires `os-project-domain-name` |
+| --os-project-id | OS_PROJECT_ID | OpenStack project unique ID |
+| --os-domain-name | OS_DOMAIN_NAME | OpenStack domain name for authorization scoping to domain |
+| --os-domain-id | OS_DOMAIN_ID | OpenStack domain unique ID for authorization scoping to domain |
+| --os-token | OS_TOKEN | Pregenerated Keystone token with authorization scope |
+| --os-auth-url | OS_AUTH_URL | Endpoint of the Identity v3 service. Needed to authentication and Maia endpoint lookup |
+
+Usually, you can reuse your existing RC-files. For performance reasons, you should consider token-based
+authentication whenever you make several calls to the Maia CLI.
+
+Use `openstack token issue` to generate a token and pass it to the Maia CLI in the `OS_TOKEN` variable.
  
+```
+export OS_TOKEN=$(openstack token issue -c id -f value)
+```
+ 
+If Maia does not have a catalog entry, then you have to specify the Maia endpoint URL manually:
+
+| Option | Environment Variable | Description |
+|--------|----------------------|-------------|
+| --maia-url | MAIA_SERVICE_URL | URL of the Maia service endpoint |
+
 In the examples below we assume that you have initialized the OS_* variables your shell environment properly and that
 your user has the prerequisite roles (e.g. `monitoring_viewer`) on the project in scope.
 
-Type `maia --help` to get a full list of commands and options options.
+Type `maia --help` to get a full list of commands and options options with documentation.
 
 ```
 maia --help
 ```
 
-## Fetch Current Metrics
+## Get Current Metric Values
 
-Use the `metrics` command to get current metric values in textual form. 
+## Query Metrics with PromQL
 
-```
-maia metrics --maia-url http://localhost:9091
-```
-
-The amount of data can be restricted using Prometheus selectors, i.e. constraints on label values:
+Use the `query` command to perform an arbitrary [PromQL-query](https://prometheus.io/docs/querying/basics/) against Maia.
+It returns a single entry for each series.  
 
 ```
-maia metrics --maia-url http://localhost:9091
+maia query 'vcenter_virtualDisk_totalWriteLatency_average{vmware_name:"win_cifs_13"}'
 ```
 
-## Common Options
+Historical values can obtained by defining a start- and/or end-time for the query. In Prometheus terms, this is called a
+*range query*.
 
-### Output Format
+```
+maia query 'vcenter ...' --start 2017-07-01T05:10:51.781Z 
+```
 
-tbd: json, tabular output, csv, single values
+Check `maia query --help` for more options. Timestamps can be specified in Unix or RFC3339 format. Durations are
+specififed as numbers with a unit suffix, such as "30s", "1.5h" or "2h45m". Valid time units are "ns", "us" (or "µs"),
+"ms", "s", "m", "h".
+
+## List Known Metric Names
+
+Use the `metric-names` command to obtain a list of metric names.
+
+```
+maia metric-names
+```
+
+## List Known Label Values
+
+Use the `label-values` command to obtain current values for a given label.
+
+```
+maia label-values "job"
+```
+
+## Output Formatting
+
+By default maia prints results as unformatted text. To enable automation, also JSON, plain values output and Go text-templates
+are supported. 
+
+The output is controlled via the parameters `--format`, `--columns`, `--separator`and `--template`.
+
+| Format   | Description | Additional Options                                                              |
+|----------|-------------|---------------------------------------------------------------------------------|
+| table | text output in tabular form | `--columns`: selects which metric-labels are displayed as columns<br>`--separator`: defines how columns are separated        |
+| value | output of plain values in lists or tables | like `table`                                          |
+| json     | JSON output of Maia/Prometheus server. Contains additional status/error information. See [Prometheus API doc.](https://prometheus.io/docs/querying/api/#expression-query-result-formats) | none |
+| template | Highly configurable output, applying [Go-templates](https://golang.org/pkg/text/template/) to the JSON response (see `json`format) | `--template`: Go-template expression |  
 
 ### Use Maia Client with Prometheus
 
-You can also use the maia client with a plain Prometheus (no authentication)
+You can also use the maia client with a plain Prometheus (no authentication).
 
 ```
 maia metrics --prometheus-url http://localhost:9090
 ```
+
+## Exporting Snapshots
+
+Use the `metrics` command to get the latest values of all series in
+[textual form](https://prometheus.io/docs/instrumenting/exposition_formats/). 
+
+```
+maia metrics --maia-url http://localhost:9091
+```
+
+The amount of data can be restricted using Prometheus label matchers, i.e. constraints on label values:
+
+```
+maia metrics --selector "job=endpoints" ...
+```
+
+If you want to preprocess/filter data further, you can e.g. use the [prom2json](https://github.com/prometheus/prom2json)
+tool together with [jq](https://github.com/stedolan/jq).
 
 # Federating Tenant Metrics from Maia to another Prometheus
 
@@ -182,3 +290,55 @@ scrape_configs:
 Prometheus' targets page ( Status -> Targets ) should the new job and the endpoint with `State UP`. 
 The `Error` column should be empty. 
 It might indicate a failed authorization (`401 Unauthorized`).
+
+# Using the Maia API
+
+The Maia implements the readonly part of the [Prometheus API doc.](https://prometheus.io/docs/querying/api) and adds
+OpenStack authentication and authorization on top.
+
+## OpenStack Authentication and Authorization
+<a name="openstack_auth"></a>
+
+In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order 
+to support existing clients like Grafana and federated Prometheus. 
+
+The problem with basic authentication is that it lacks a standard way to express OpenStack domain information. Also there
+ is no means to express OpenStack authorization scopes. Since neither Prometheus nor Grafana support adding custom
+ header fields to the requests to Prometheus and thus Maia, we have to encode both the domain information and 
+ into the username.
+ 
+ For the domain qualification, we could borrow "@" from e-mail. So when a user or a project is identified by name, you
+  can add the domain in the form `username@domainname`. 
+  
+ The authorization scope is separated from the qualified username with a vertical bar "|", splitting the username
+ into a username and scope part: `user|scope`. Like with usernames, also the scoped project resp. domain can be
+ denoted by name: `projectname@domainname`. To disambiguate scoping by project-id and domain-name, the domain is always prefixed
+ with `@`.
+ 
+## Variants
+ 
+This scheme expands into five variants to express username and authorization scope:
+ 
+Project scoped user:
+* `user_id|project_id`
+* `username@user_domain_name|project_id`
+* `user_id|project_name@project_domain_name`
+* `username@user_domain_name|project_name@project_domain_name`
+* `username@user_domain_name|project_name` (if project_domain_name = user_domain_name)
+
+Domain scoped user:
+* `user_id|@domain_name`
+* `user_name@user_domain_name|@domain_name`
+ 
+# Using the Prometheus Data Source in Grafana with Maia
+ 
+Configure the data source like with a regular Prometheus. Select `Basic Authentication` and enter the extended
+ user credentials following the scheme explained in the [Maia API section](#openstack_auth).
+
+# Contributing
+
+This project is open for external contributions. Pull-requests are welcome. Please include unit-tests and maintain compatiblity.
+
+## Software Design
+
+![Architecture diagram](./docs/maia-architecture.png)

@@ -27,8 +27,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-var jsonOutput bool
 var configFile string
+var promURL string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -78,5 +78,8 @@ func init() {
 	// Cobra supports Persistent Flags, which, if defined here,
 	// will be global for your application.
 
-	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "c", "/etc/maia/maia.conf", "Configuration file to use")
+	RootCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
+	viper.BindPFlag("maia.prometheus_url", RootCmd.PersistentFlags().Lookup("prometheus-url"))
+
+	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "", "/etc/maia/maia.conf", "Configuration file to use")
 }
