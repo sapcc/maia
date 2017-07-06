@@ -20,6 +20,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/prometheus/common/model"
 	"github.com/sapcc/maia/pkg/util"
@@ -28,9 +29,12 @@ import (
 )
 
 const (
-	P8S_ProtoBuf string = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
-	PlainText           = "text/plain"
-	JSON                = "application/json"
+	// P8SProtoBuf is the native protocol (preferred)
+	P8SProtoBuf string = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
+	// PlainText is used for readable federate output
+	PlainText = "text/plain"
+	// JSON is used to obtain output in JSON (--format json)
+	JSON = "application/json"
 )
 
 // Status contains Prometheus status strings
@@ -63,10 +67,10 @@ const (
 
 // Response encapsulates a generic response of a Prometheus API
 type Response struct {
-	Status    Status      `json:"Status"`
-	Data      interface{} `json:"data,omitempty"`
-	ErrorType ErrorType   `json:"ErrorType,omitempty"`
-	Error     string      `json:"error,omitempty"`
+	Status    Status        `json:"Status"`
+	Data      []interface{} `json:"data,omitempty"`
+	ErrorType ErrorType     `json:"ErrorType,omitempty"`
+	Error     string        `json:"error,omitempty"`
 }
 
 // SeriesResponse encapsulates a response to the /series API of Prometheus
@@ -81,6 +85,54 @@ type SeriesResponse struct {
 type LabelValuesResponse struct {
 	Status Status             `json:"Status"`
 	Data   []model.LabelValue `json:"data"`
+}
+
+type QueryResponse struct {
+	Status    Status      `json:"Status"`
+	Data      QueryResult `json:"data,omitempty"`
+	ErrorType ErrorType   `json:"ErrorType,omitempty"`
+	Error     string      `json:"error,omitempty"`
+}
+
+type QueryResult struct {
+	Type   model.ValueType `json:"resultType"`
+	Result interface{}     `json:"result"`
+
+	// The decoded value.
+	Value model.Value
+}
+
+func (qr *QueryResult) UnmarshalJSON(b []byte) error {
+	v := struct {
+		Type   model.ValueType `json:"resultType"`
+		Result json.RawMessage `json:"result"`
+	}{}
+
+	err := json.Unmarshal(b, &v)
+	if err != nil {
+		return err
+	}
+
+	switch v.Type {
+	case model.ValScalar:
+		var sv model.Scalar
+		err = json.Unmarshal(v.Result, &sv)
+		qr.Value = &sv
+
+	case model.ValVector:
+		var vv model.Vector
+		err = json.Unmarshal(v.Result, &vv)
+		qr.Value = vv
+
+	case model.ValMatrix:
+		var mv model.Matrix
+		err = json.Unmarshal(v.Result, &mv)
+		qr.Value = mv
+
+	default:
+		err = fmt.Errorf("unexpected value type %q", v.Type)
+	}
+	return err
 }
 
 // Driver is an interface that wraps the underlying event storage mechanism.

@@ -23,31 +23,15 @@ import (
 	"net/http"
 	"testing"
 
-	"encoding/json"
-	"github.com/databus23/goslo.policy"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
 	"github.com/spf13/viper"
-	"io/ioutil"
 )
 
 func setupTest(t *testing.T) http.Handler {
 	//load test policy (where everything is allowed)
-	policyBytes, err := ioutil.ReadFile("../test/policy.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	policyRules := make(map[string]string)
-	err = json.Unmarshal(policyBytes, &policyRules)
-	if err != nil {
-		t.Fatal(err)
-	}
-	policyEnforcer, err := policy.NewEnforcer(policyRules)
-	if err != nil {
-		t.Fatal(err)
-	}
-	viper.Set("maia.policy_enforcer", policyEnforcer)
+	viper.Set("maia.policy_file", "../test/policy.json")
 
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.Mock()
