@@ -1,7 +1,7 @@
 PKG    = github.com/sapcc/maia
 PREFIX := /usr
 
-all: build
+all: build check
 
 GO_BUILDFLAGS :=
 GO_LDFLAGS    := -s -w
