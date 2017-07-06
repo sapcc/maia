@@ -52,7 +52,7 @@ var prometheusCoreHeadersText = map[string]string{
 
 var prometheusCoreHeadersPBUF = map[string]string{
 	"User-Agent":      "Prometheus/",
-	"Accept":          P8S_ProtoBuf,
+	"Accept":          P8SProtoBuf,
 	"Accept-Encoding": "gzip",
 	"Connection":      "close",
 }
@@ -103,7 +103,7 @@ func (promCli *prometheusStorageClient) Series(match []string, start, end string
 }
 
 func (promCli *prometheusStorageClient) LabelValues(name string, acceptContentType string) (*http.Response, error) {
-	promURL := promCli.buildURL("api/v1/series", map[string]interface{}{"match[]": name + "!=\"\""})
+	promURL := promCli.buildURL("api/v1/label/"+name+"/values", map[string]interface{}{})
 
 	// TODO: use protobuf with Prometheus client
 	res, err := promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
