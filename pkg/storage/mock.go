@@ -28,7 +28,7 @@ type mock struct {
 	Driver
 }
 
-// QueryResponse sets the respoonse of the call()
+// QueryResponseVal sets the respoonse of the call to Query()
 var QueryResponseVal string
 
 // Mock Prometheus driver with static data
