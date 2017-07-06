@@ -1,7 +1,7 @@
 PKG    = github.com/sapcc/maia
 PREFIX := /usr
 
-all: build
+all: build check
 
 GO_BUILDFLAGS :=
 GO_LDFLAGS    := -s -w
@@ -27,10 +27,10 @@ GO_COVERFILES := $(patsubst %,build/%.cover.out,$(subst /,_,$(GO_TESTPKGS)))
 space := $(null) $(null)
 comma := ,
 
-check: all static-check build/cover.html FORCE
+check: static-check build/cover.html FORCE
 	@echo -e "\e[1;32m>> All tests successful.\e[0m"
 static-check: FORCE
-	@if s="$$(gofmt -s -l *.go pkg 2>/dev/null)"                            && test -n "$$s"; then printf ' => %s\n%s\n' gofmt  "$$s"; false; fi
+	@if s="$$(gofmt -s -l *.go pkg 2>/dev/null)"                            && test -n "$$s"; then printf ' => %s\n%s\n' "gofmt -s -d -e" "$$s"; false; fi
 	@if s="$$(golint . && find pkg -type d -exec golint {} \; 2>/dev/null)" && test -n "$$s"; then printf ' => %s\n%s\n' golint "$$s"; false; fi
 	go vet $(GO_ALLPKGS)
 build/%.cover.out: FORCE
