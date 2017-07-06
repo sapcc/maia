@@ -27,6 +27,7 @@ import (
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
 	"github.com/spf13/viper"
+	"io/ioutil"
 )
 
 func setupTest(t *testing.T) http.Handler {
@@ -47,6 +48,7 @@ func Test_Query(t *testing.T) {
 	fixture, _ := ioutil.ReadFile("fixtures/query.json")
 	storage.QueryResponseVal = string(fixture)
 	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user@project:password"))},
 		Method:           "GET",
 		Path:             "/api/v1/query?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22})",
 		ExpectStatusCode: 200,
@@ -59,22 +61,9 @@ func Test_APIMetadata(t *testing.T) {
 	router := setupTest(t)
 
 	test.APIRequest{
-		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user@project:password"))},
 		Method:           "GET",
 		Path:             "/api/v1/",
 		ExpectStatusCode: 200,
 		ExpectJSON:       "fixtures/api-metadata.json",
 	}.Check(t, router)
-}
-
-func Test_Query(t *testing.T) {
-	router := setupTest(t)
-
-	test.APIRequest{
-		Method:           "GET",
-		Path:             "/api/v1/query?query=sum(blackbox_api_status_gauge{check=~%22keystone%22})",
-		ExpectStatusCode: 200,
-		ExpectJSON:       "fixtures/query.json",
-	}.Check(t, router)
-
 }
