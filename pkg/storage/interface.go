@@ -87,6 +87,7 @@ type LabelValuesResponse struct {
 	Data   []model.LabelValue `json:"data"`
 }
 
+// QueryResponse contains the response from a call to query or query_range
 type QueryResponse struct {
 	Status    Status      `json:"Status"`
 	Data      QueryResult `json:"data,omitempty"`
@@ -94,6 +95,7 @@ type QueryResponse struct {
 	Error     string      `json:"error,omitempty"`
 }
 
+// QueryResult contains the actual result of a query or query_range call
 type QueryResult struct {
 	Type   model.ValueType `json:"resultType"`
 	Result interface{}     `json:"result"`
@@ -102,6 +104,7 @@ type QueryResult struct {
 	Value model.Value
 }
 
+// UnmarshalJSON contains a custom unmarshaller
 func (qr *QueryResult) UnmarshalJSON(b []byte) error {
 	v := struct {
 		Type   model.ValueType `json:"resultType"`
@@ -141,7 +144,6 @@ func (qr *QueryResult) UnmarshalJSON(b []byte) error {
 // on unchanged. For most API operations, Maia does not have to transform the response and that way
 // we can avoid an entire in-memory unmarshal-marshal cycle.
 type Driver interface {
-
 	/********** requests to Prometheus **********/
 	Federate(selectors []string, acceptContentType string) (*http.Response, error)
 	Query(query, time, timeout string, acceptContentType string) (*http.Response, error)

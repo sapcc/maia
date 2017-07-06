@@ -66,11 +66,11 @@ func authenticate() *policy.Context {
 			panic(fmt.Errorf("You must at least specify --os-username and --os-password"))
 		}
 	}
-	if context, err := keystone.NewKeystoneDriver().Authenticate(&auth, false); context != nil {
+	context, err := keystone.NewKeystoneDriver().Authenticate(&auth, false)
+	if err == nil {
 		return context
-	} else {
-		panic(err)
 	}
+	panic(err)
 }
 
 func prometheus(context *policy.Context) storage.Driver {
@@ -93,7 +93,7 @@ func printValues(resp *http.Response) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Print("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
+		fmt.Printf("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
@@ -121,7 +121,7 @@ func printTable(resp *http.Response) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Print("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
+		fmt.Printf("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
@@ -210,7 +210,7 @@ func extractSeriesColumns(table []model.LabelSet) []string {
 
 func collectKeys(collector map[string]bool, input model.LabelSet) {
 	// print all columns
-	for label, _ := range input {
+	for label := range input {
 		collector[string(label)] = true
 	}
 }
@@ -218,7 +218,7 @@ func collectKeys(collector map[string]bool, input model.LabelSet) {
 func makeColumns(collector map[string]bool) []string {
 	// print all columns
 	allColumns := []string{}
-	for k, _ := range collector {
+	for k := range collector {
 		allColumns = append(allColumns, k)
 	}
 	sort.Strings(allColumns)
@@ -268,7 +268,7 @@ func printQueryResultAsTable(body []byte) {
 	switch valueObject.Type() {
 	case model.ValMatrix:
 		matrix := valueObject.(model.Matrix)
-		ts_set := map[string]bool{}
+		tsSet := map[string]bool{}
 		// if no columns have been specified by user then collect them all
 		set := buildColumnSet(matrix)
 		for _, el := range matrix {
@@ -278,12 +278,12 @@ func printQueryResultAsTable(body []byte) {
 			}
 			for _, value := range el.Values {
 				s := timeColumnFromTS(value.Timestamp.Time())
-				ts_set[s] = true
+				tsSet[s] = true
 				columnValues[s] = value.Value.String()
 			}
 			rows = append(rows, columnValues)
 		}
-		allColumns = append(makeColumns(set), makeColumns(ts_set)...)
+		allColumns = append(makeColumns(set), makeColumns(tsSet)...)
 	case model.ValVector:
 		matrix := valueObject.(model.Vector)
 		set := buildColumnSet(matrix)
@@ -298,7 +298,7 @@ func printQueryResultAsTable(body []byte) {
 	case model.ValScalar:
 		scalarValue := valueObject.(*model.Scalar)
 		allColumns = []string{"Timestamp", "Value"}
-		rows = []map[string]string{map[string]string{"Timestamp": scalarValue.Timestamp.Time().Format(time.RFC3339Nano), "Value": scalarValue.String()}}
+		rows = []map[string]string{{"Timestamp": scalarValue.Timestamp.Time().Format(time.RFC3339Nano), "Value": scalarValue.String()}}
 	}
 	printHeader(allColumns)
 	for _, row := range rows {
@@ -311,7 +311,7 @@ func printQueryResponse(resp *http.Response) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Print("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
+		fmt.Printf("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
