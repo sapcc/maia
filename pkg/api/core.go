@@ -37,7 +37,7 @@ import (
 
 //VersionData is used by version advertisement handlers.
 type VersionData struct {
-	Status string            `json:"Status"`
+	Status string            `json:"status"`
 	ID     string            `json:"id"`
 	Links  []versionLinkData `json:"links"`
 }
@@ -60,11 +60,12 @@ type v1Provider struct {
 
 var policyEnforcer *policy.Enforcer
 
-func initPolicyEnforcer() {
+func policyEngine() *policy.Enforcer {
 	if policyEnforcer != nil {
-		return
+		return policyEnforcer
 	}
 
+	// set up policy engine lazily
 	bytes, err := ioutil.ReadFile(viper.GetString("maia.policy_file"))
 	if err != nil {
 		panic(fmt.Errorf("Policy file %s not found: %s", viper.GetString("maia.policy_file"), err))
@@ -78,6 +79,8 @@ func initPolicyEnforcer() {
 	if err != nil {
 		panic(err)
 	}
+
+	return policyEnforcer
 }
 
 //NewV1Router creates a http.Handler that serves the Maia v1 API.
@@ -125,11 +128,9 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 }
 
 func (p *v1Provider) AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), rule string) func(w http.ResponseWriter, req *http.Request) {
-	// make sure policyEnforcer is available
-	initPolicyEnforcer()
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		util.LogInfo("authenticate")
+		util.LogDebug("authenticate")
 
 		// 1. authenticate
 		context, err := p.keystone.AuthenticateRequest(req)
@@ -140,7 +141,9 @@ func (p *v1Provider) AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.Respon
 		}
 
 		// 2. authorize
-		if !policyEnforcer.Enforce(rule, *context) {
+		// make sure policyEnforcer is available
+		pe := policyEngine()
+		if !pe.Enforce(rule, *context) {
 			err := fmt.Errorf("User %s with roles %s does not fulfill authorization rule %s", context.Request["user_id"], context.Roles, rule)
 			util.LogInfo(err.Error())
 			ReturnError(w, err, 401)
