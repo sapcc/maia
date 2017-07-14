@@ -83,7 +83,6 @@ func (promCli *prometheusStorageClient) init() {
 func (promCli *prometheusStorageClient) Query(query, time, timeout string, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("api/v1/query", map[string]interface{}{"query": query, "time": time, "timeout": timeout})
 
-	// TODO: use header from client (not just JSON)
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
@@ -91,21 +90,18 @@ func (promCli *prometheusStorageClient) QueryRange(query, start, end, step, time
 	promURL := promCli.buildURL("api/v1/query_range", map[string]interface{}{"query": query, "start": start, "end": end,
 		"step": step, "timeout": timeout})
 
-	// TODO: use header from client (not just JSON)
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
 func (promCli *prometheusStorageClient) Series(match []string, start, end string, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("api/v1/series", map[string]interface{}{"match[]": match, "start": start, "end": end})
 
-	// TODO: use header from client (not just JSON)
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
 func (promCli *prometheusStorageClient) LabelValues(name string, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("api/v1/label/"+name+"/values", map[string]interface{}{})
 
-	// TODO: use protobuf with Prometheus client
 	res, err := promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 
 	return res, err
@@ -114,7 +110,6 @@ func (promCli *prometheusStorageClient) LabelValues(name string, acceptContentTy
 func (promCli *prometheusStorageClient) Federate(selectors []string, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("federate", map[string]interface{}{"match[]": selectors})
 
-	// TODO: use header from client (not just PBUF)
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
