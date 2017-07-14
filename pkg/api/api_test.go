@@ -20,6 +20,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"net/http"
 	"testing"
 
