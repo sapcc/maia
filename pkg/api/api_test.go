@@ -24,32 +24,38 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
 	"github.com/spf13/viper"
 	"io/ioutil"
+	"net/http/httptest"
 )
 
-func setupTest(t *testing.T) http.Handler {
+func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, keystone.Driver, *storage.MockDriver) {
 	//load test policy (where everything is allowed)
 	viper.Set("maia.policy_file", "../test/policy.json")
 
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.Mock()
-	storage := storage.Mock()
+	storage := storage.NewMockDriver(controller)
 	//storage = storage.Prometheus("https://prometheus.staging.cloud.sap")
 	router, _ := NewV1Router(keystone, storage)
-	return router
+	return router, keystone, storage
 }
 
+// HTTP based tests
 func Test_Query(t *testing.T) {
-	router := setupTest(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	fixture, _ := ioutil.ReadFile("fixtures/query.json")
-	storage.QueryResponseVal = string(fixture)
+	router, _, storageMock := setupTest(t, ctrl)
+
+	storageMock.EXPECT().Query("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "", "", "application/json").Return(httpResponseFromFile("fixtures/query.json"), nil)
+
 	test.APIRequest{
-		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user@project:password"))},
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
 		Method:           "GET",
 		Path:             "/api/v1/query?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22})",
 		ExpectStatusCode: 200,
@@ -57,9 +63,18 @@ func Test_Query(t *testing.T) {
 	}.Check(t, router)
 
 }
+func httpResponseFromFile(filename string) *http.Response {
+	fixture, _ := ioutil.ReadFile(filename)
+	responseRec := httptest.NewRecorder()
+	responseRec.Write(fixture)
+	return responseRec.Result()
+}
 
 func Test_APIMetadata(t *testing.T) {
-	router := setupTest(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, _ := setupTest(t, ctrl)
 
 	test.APIRequest{
 		Method:           "GET",

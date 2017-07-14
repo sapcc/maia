@@ -165,9 +165,6 @@ func NewPrometheusDriver(prometheusAPIURL string, customHeader map[string]string
 		util.LogInfo("Using Prometheus at: \"%s\"", prometheusAPIURL)
 
 		return driver
-	case "mock":
-		util.LogWarning("Using Mock metrics provider.")
-		return Mock()
 	default:
 		panic(fmt.Errorf("Invalid service.storage_driver setting: %s", driverName))
 	}
