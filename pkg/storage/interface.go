@@ -145,30 +145,5 @@ func (qr *QueryResult) UnmarshalJSON(b []byte) error {
 // we can avoid an entire in-memory unmarshal-marshal cycle.
 type Driver interface {
 	/********** requests to Prometheus **********/
-	Federate(selectors []string, acceptContentType string) (*http.Response, error)
-	Query(query, time, timeout string, acceptContentType string) (*http.Response, error)
-	QueryRange(query, start, end, step, timeout string, acceptContentType string) (*http.Response, error)
-	Series(match []string, start, end string, acceptContentType string) (*http.Response, error)
-	LabelValues(name string, acceptContentType string) (*http.Response, error)
-}
-
-// NewPrometheusDriver is a factory method which chooses the right driver implementation based on configuration settings
-func NewPrometheusDriver(prometheusAPIURL string, customHeader map[string]string) Driver {
-	driverName := viper.GetString("maia.storage_driver")
-	switch driverName {
-	case "prometheus":
-		driver := Prometheus(prometheusAPIURL, customHeader)
-		if driver == nil {
-			util.LogFatal("Couldn't initialize Prometheus storage driver with given endpoint: \"%s\"", prometheusAPIURL)
-			return nil
-		}
-		util.LogInfo("Using Prometheus at: \"%s\"", prometheusAPIURL)
-
-		return driver
-	case "mock":
-		util.LogWarning("Using Mock metrics provider.")
-		return Mock()
-	default:
-		panic(fmt.Errorf("Invalid service.storage_driver setting: %s", driverName))
-	}
+	ListMetrics(tenantID string) (*http.Response, error)
 }

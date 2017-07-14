@@ -31,10 +31,28 @@ import (
 // token checking of API users. Because it is an interface, the real implementation
 // can be mocked away in unit tests.
 type Driver interface {
-	// AuthenticateRequest authenticates a user using authOptionsFromRequest passed in the HTTP request header.
-	// After successful authentication, additional context information is added to the request header
-	// In addition a Context object is returned.
-	AuthenticateRequest(req *http.Request) (*policy.Context, error)
+	//Return the main gophercloud client from which the respective service
+	//clients can be derived. For mock drivers, this returns nil, so test code
+	//should be prepared to handle a nil Client() where appropriate.
+	Client() *gophercloud.ProviderClient
+	AuthOptionsFromConfig() *gophercloud.AuthOptions
+	AuthOptionsFromBasicAuth(username string, password string, projectID string) *gophercloud.AuthOptions
+	/********** requests to Keystone **********/
+	ListDomains() ([]KeystoneDomain, error)
+	ListProjects() ([]KeystoneProject, error)
+	ValidateToken(token string) (policy.Context, error)
+	Authenticate(credentials *gophercloud.AuthOptions) (policy.Context, error)
+	DomainName(id string) (string, error)
+	ProjectName(id string) (string, error)
+	UserName(id string) (string, error)
+	UserId(name string) (string, error)
+}
+
+//KeystoneDomain describes just the name and id of a Keystone domain.
+type KeystoneDomain struct {
+	UUID string `json:"id"`
+	Name string `json:"name"`
+}
 
 	// Authenticate authenticates a user using the provided authOptionsFromRequest
 	Authenticate(options *tokens.AuthOptions, serviceUser bool) (*policy.Context, error)

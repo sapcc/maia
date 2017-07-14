@@ -30,15 +30,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Server initializes and starts the API server, hooking it up to the API router
-func Server() error {
-
-	prometheusAPIURL := viper.GetString("maia.prometheus_url")
-	if prometheusAPIURL == "" {
-		panic(fmt.Errorf("Prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
-	}
-	storage := storage.NewPrometheusDriver(prometheusAPIURL, map[string]string{})
-	keystone := keystone.NewKeystoneDriver()
+// Server sets up and starts the API server, hooking it up to the API router
+func Server(keystone keystone.Driver, storage storage.Driver) error {
 
 	mainRouter := mux.NewRouter()
 

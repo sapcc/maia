@@ -30,6 +30,8 @@ import (
 	"io"
 )
 
+const prometheusFederateURL = "federate?match[]="
+
 type prometheusStorageClient struct {
 	httpClient    *http.Client
 	url           string
@@ -57,11 +59,10 @@ var prometheusCoreHeadersPBUF = map[string]string{
 	"Connection":      "close",
 }
 
-// Prometheus creates a storage driver for Prometheus/Maia
-func Prometheus(prometheusAPIURL string, customHeaders map[string]string) Driver {
-	result := prometheusStorageClient{
-		url:           prometheusAPIURL,
-		customHeaders: customHeaders,
+// Prometheus initialises and returns the Prometheus driver
+func Prometheus(prometheusAPIURL string) Driver {
+	if promCli.client == nil {
+		promCli.init(prometheusAPIURL)
 	}
 	result.init()
 	return &result
@@ -125,28 +126,26 @@ func (promCli *prometheusStorageClient) buildURL(path string, params map[string]
 		panic(err)
 	}
 
-	// change original request to point to our backing Prometheus
-	promURL.Path = path
-	queryParams := url.Values{}
-	for k, v := range params {
-		if s, ok := v.(string); ok {
-			if s != "" {
-				queryParams.Add(k, s)
-			}
+	initPrometheusCoreHeaders()
+
+	if viper.IsSet("maia.proxy") {
+		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
+		if err != nil {
+			util.LogError("Could not set proxy: %s .\n%s", proxyURL, err.Error())
+			httpCli = http.Client{}
 		} else {
-			for _, s := range v.([]string) {
-				queryParams.Add(k, s)
-			}
+			httpCli = http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 		}
 	}
-	promURL.RawQuery = queryParams.Encode()
-
-	return *promURL
+	promCli.httpClient = httpCli
 }
 
-// SendToPrometheus takes care of the request wrapping and delivery to Prometheus
-func (promCli *prometheusStorageClient) sendToPrometheus(method string, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
-	req, err := http.NewRequest(method, promURL, body)
+func (promCli *prometheusStorageClient) ListMetrics(tenantID string) (*http.Response, error) {
+
+	projectQuery := fmt.Sprintf("{project_id='%s'}", tenantID)
+	prometheusAPIURL := promCli.config.Address
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s%s", prometheusAPIURL, prometheusFederateURL, projectQuery), nil)
 	if err != nil {
 		util.LogError("Could not create request.\n", err.Error())
 		return nil, err

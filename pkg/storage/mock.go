@@ -36,26 +36,7 @@ func Mock() Driver {
 	return mock{}
 }
 
-func (m mock) Federate(selectors []string, acceptContentType string) (*http.Response, error) {
-	return nil, nil
-}
-
-func (m mock) Query(query, time, timeout string, acceptContentType string) (*http.Response, error) {
-	responseRec := httptest.NewRecorder()
-	responseRec.WriteString(QueryResponseVal)
-
-	return responseRec.Result(), nil
-}
-
-func (m mock) QueryRange(query, start, end, step, timeout string, acceptContentType string) (*http.Response, error) {
-
-	return nil, nil
-}
-
-func (m mock) Series(match []string, start, end string, acceptContentType string) (*http.Response, error) {
-	return nil, nil
-}
-
-func (m mock) LabelValues(name string, acceptContentType string) (*http.Response, error) {
+func (m mock) ListMetrics(tenantID string) (*http.Response, error) {
+	//TODO
 	return nil, nil
 }

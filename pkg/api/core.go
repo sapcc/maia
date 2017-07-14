@@ -29,14 +29,17 @@ import (
 	"github.com/sapcc/maia/pkg/storage"
 
 	"fmt"
-	"github.com/databus23/goslo.policy"
-	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/viper"
-	"io/ioutil"
+	dto "github.com/prometheus/client_model/go"
+	"io"
 )
 
-//VersionData is used by version advertisement handlers.
-type VersionData struct {
+// RFC822 timestamp format
+const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
+
+var prometheusCoreHeaders = make(map[string]string)
+
+//versionData is used by version advertisement handlers.
+type versionData struct {
 	Status string            `json:"status"`
 	ID     string            `json:"id"`
 	Links  []versionLinkData `json:"links"`
@@ -126,31 +129,73 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 	return r, p.versionData
 }
 
-func (p *v1Provider) AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), rule string) func(w http.ResponseWriter, req *http.Request) {
+//ReturnMetrics returns metrics in the prometheus text format
+func ReturnMetrics(w http.ResponseWriter, format expfmt.Format, code int, data *dto.MetricFamily) {
+	//headers
+	time := time.Now().UTC().Format(RFC822)
+	w.Header().Set("Date", time)
+	initCoreHeaders()
+	for k, v := range prometheusCoreHeaders {
+		w.Header().Set(k, v)
+	}
+	// body
+	enc := expfmt.NewEncoder(w, format)
+	enc.Encode(data)
+}
 
-	return func(w http.ResponseWriter, req *http.Request) {
-		util.LogDebug("authenticate")
+//ReturnResponse basically forwards a received response.
+//Returns 404 if no metrics where found
+func ReturnResponse(w http.ResponseWriter, code int, response *http.Response) {
 
-		// 1. authenticate
-		context, err := p.keystone.AuthenticateRequest(req)
-		if err != nil {
-			util.LogInfo(err.Error())
-			ReturnError(w, err, 401)
-			return
-		}
+	for k, v := range response.Header {
+		w.Header().Set(k, strings.Join(v, ";"))
+	}
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(response.Body)
+	body := buf.String()
+	// request to prometheus was successful, but nothing was found
+	if (w.Header().Get("Content-Length") == string(0)) || (len(body) == 0) {
+		fmt.Println("---->", w.Header().Get("Content-Length"))
+		code = 404
+	}
+	w.WriteHeader(code)
 
-		// 2. authorize
-		// make sure policyEnforcer is available
-		pe := policyEngine()
-		if !pe.Enforce(rule, *context) {
-			err := fmt.Errorf("User %s with roles %s does not fulfill authorization rule %s", context.Request["user_id"], context.Roles, rule)
-			util.LogInfo(err.Error())
-			ReturnError(w, err, 401)
-			return
-		}
+	io.WriteString(w, body)
 
-		// call
-		wrappedHandlerFunc(w, req)
+}
+
+//ReturnJSON is a convenience function for HTTP handlers returning JSON data.
+//The `code` argument specifies the HTTP response code, usually 200.
+func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
+	escapedJSON, err := json.MarshalIndent(&data, "", "  ")
+	jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)
+	if err == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		w.Write(jsonData)
+	} else {
+		http.Error(w, err.Error(), 500)
+	}
+}
+
+//ReturnError produces an error response with HTTP status code if the given
+//error is non-nil. Otherwise, nothing is done and false is returned.
+func ReturnError(w http.ResponseWriter, err error, code int) bool {
+	if err == nil {
+		return false
+	}
+
+	http.Error(w, err.Error(), code)
+	return true
+}
+
+//RequireJSON will parse the request body into the given data structure, or
+//write an error response if that fails.
+func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool {
+	err := json.NewDecoder(r.Body).Decode(data)
+	if err != nil {
+		http.Error(w, "request body is not valid JSON: "+err.Error(), 400)
+		return false
 	}
 }
 
