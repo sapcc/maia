@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sapcc/maia/pkg/auth"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -75,8 +75,12 @@ func init() {
 	// Cobra supports Persistent Flags, which, if defined here,
 	// will be global for your application.
 
-	RootCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
-	viper.BindPFlag("maia.prometheus_url", RootCmd.PersistentFlags().Lookup("prometheus-url"))
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-keystone-url", "", "OpenStack Authentication URL")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-username", "", "OpenStack Username")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-password", "", "OpenStack Password")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-user-domain-name", "", "OpenStack User's domain name")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-project-name", "", "OpenStack Project name to scope to")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "os-project-domain-name", "", "OpenStack Project's domain name")
 
 	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "", "/etc/maia/maia.conf", "Configuration file to use")
 }
