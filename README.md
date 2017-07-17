@@ -38,7 +38,6 @@ to a domain will be able to access the metrics of all projects in that domain th
 # LIMITATIONS
 
 Before reading on and trying, please be aware that the following limitations exist
-* protobuf-protocol is not tested and will probably fail for the label-values API
 * keystone integration is not efficient: tokens are probably not cached
 
 # Installation
