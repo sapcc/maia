@@ -31,6 +31,7 @@ import (
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"io/ioutil"
+	"sort"
 	"time"
 )
 
@@ -145,10 +146,11 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	// transform into expected result type
 	var result storage.LabelValuesResponse
 	result.Status = sr.Status
-	result.Data = make([]model.LabelValue, 0)
+	result.Data = model.LabelValues{}
 	for k := range unique {
 		result.Data = append(result.Data, k)
 	}
+	sort.Sort(result.Data)
 
 	ReturnJSON(w, 200, &result)
 }

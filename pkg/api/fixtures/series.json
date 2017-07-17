@@ -1,0 +1,187 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "__name__": "up",
+      "component": "objectstore",
+      "instance": "100.64.1.159:9102",
+      "job": "endpoints",
+      "kubernetes_name": "swift-proxy-cluster-3",
+      "kubernetes_namespace": "swift",
+      "os_cluster": "cluster-3",
+      "region": "staging",
+      "system": "openstack"
+    },
+    {
+      "__name__": "up",
+      "component": "objectstore",
+      "instance": "100.64.1.158:9150",
+      "job": "endpoints",
+      "kubernetes_name": "memcached",
+      "kubernetes_namespace": "swift",
+      "region": "staging",
+      "system": "openstack"
+    },
+    {
+      "__name__": "up",
+      "component": "glance",
+      "instance": "100.66.0.91:9187",
+      "job": "endpoints",
+      "kubernetes_name": "postgres-glance",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "database"
+    },
+    {
+      "__name__": "up",
+      "component": "neutron",
+      "instance": "100.68.0.131:9102",
+      "job": "endpoints",
+      "kubernetes_name": "neutron-server",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "api"
+    },
+    {
+      "__name__": "up",
+      "component": "keystone",
+      "instance": "100.66.0.126:9102",
+      "job": "endpoints",
+      "kubernetes_name": "keystone",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "api"
+    },
+    {
+      "__name__": "up",
+      "component": "neutron",
+      "instance": "100.65.0.224:9102",
+      "job": "endpoints",
+      "kubernetes_name": "neutron-server",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "api"
+    },
+    {
+      "__name__": "up",
+      "component": "objectstore",
+      "instance": "100.65.0.72:9102",
+      "job": "endpoints",
+      "kubernetes_name": "swift-proxy-cluster-3",
+      "kubernetes_namespace": "swift",
+      "os_cluster": "cluster-3",
+      "region": "staging",
+      "system": "openstack"
+    },
+    {
+      "__name__": "up",
+      "component": "keystone",
+      "instance": "100.64.1.40:9187",
+      "job": "endpoints",
+      "kubernetes_name": "postgres-keystone",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "database"
+    },
+    {
+      "__name__": "up",
+      "component": "objectstore",
+      "instance": "100.66.0.158:9102",
+      "job": "endpoints",
+      "kubernetes_name": "swift-proxy-cluster-4",
+      "kubernetes_namespace": "swift",
+      "os_cluster": "cluster-4",
+      "region": "staging",
+      "system": "openstack"
+    },
+    {
+      "__name__": "up",
+      "component": "barbican",
+      "instance": "100.64.1.148:9187",
+      "job": "endpoints",
+      "kubernetes_name": "postgres-barbican",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "database"
+    },
+    {
+      "__name__": "up",
+      "component": "keystone",
+      "instance": "100.65.0.187:9101",
+      "job": "endpoints",
+      "kubernetes_name": "ad-healthcheck",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "healthcheck"
+    },
+    {
+      "__name__": "up",
+      "component": "objectstore",
+      "instance": "100.64.1.68:9102",
+      "job": "endpoints",
+      "kubernetes_name": "swift-proxy-cluster-2",
+      "kubernetes_namespace": "swift",
+      "os_cluster": "cluster-2",
+      "region": "staging",
+      "system": "openstack"
+    },
+    {
+      "__name__": "up",
+      "component": "neutron",
+      "instance": "100.68.0.134:9102",
+      "job": "endpoints",
+      "kubernetes_name": "neutron-server",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "api"
+    },
+    {
+      "__name__": "up",
+      "component": "glance",
+      "instance": "100.68.0.95:9102",
+      "job": "endpoints",
+      "kubernetes_name": "glance",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "api"
+    },
+    {
+      "__name__": "up",
+      "component": "dns",
+      "instance": "master0.cc.staging.cloud.sap",
+      "job": "kube-system/dns",
+      "region": "staging"
+    },
+    {
+      "__name__": "up",
+      "component": "nova",
+      "instance": "100.65.1.197:9102",
+      "job": "endpoints",
+      "kubernetes_name": "nova-api",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "api"
+    },
+    {
+      "__name__": "up",
+      "component": "neutron",
+      "instance": "100.68.0.140:9102",
+      "job": "endpoints",
+      "kubernetes_name": "neutron-server",
+      "kubernetes_namespace": "monsoon3",
+      "region": "staging",
+      "system": "openstack",
+      "type": "api"
+    }
+  ]
+}

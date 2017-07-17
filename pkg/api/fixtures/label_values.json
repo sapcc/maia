@@ -1,0 +1,12 @@
+{
+  "Status": "success",
+  "data": [
+    "barbican",
+    "dns",
+    "glance",
+    "keystone",
+    "neutron",
+    "nova",
+    "objectstore"
+  ]
+}

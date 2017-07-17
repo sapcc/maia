@@ -36,6 +36,7 @@ import (
 func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, keystone.Driver, *storage.MockDriver) {
 	//load test policy (where everything is allowed)
 	viper.Set("maia.policy_file", "../test/policy.json")
+	viper.Set("maia.label_value_ttl", "72h")
 
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.Mock()
@@ -46,23 +47,92 @@ func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, keyst
 }
 
 // HTTP based tests
+
+func Test_Federate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, storageMock := setupTest(t, ctrl)
+
+	storageMock.EXPECT().Federate([]string{"{vmware_name=\"win_cifs_13\",project_id=\"12345\"}"}, "text/plain").Return(httpResponseFromFile("fixtures/federate.txt"), nil)
+
+	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "text/plain"},
+		Method:           "GET",
+		Path:             "/federate?match[]={vmware_name=%22win_cifs_13%22}",
+		ExpectStatusCode: 200,
+		ExpectFile:       "fixtures/federate.txt",
+	}.Check(t, router)
+}
+
+func Test_Series(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, storageMock := setupTest(t, ctrl)
+
+	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=\"12345\"}"}, "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "application/json").Return(httpResponseFromFile("fixtures/series.json"), nil)
+
+	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
+		Method:           "GET",
+		Path:             "/api/v1/series?match[]={component!=%22%22}&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z",
+		ExpectStatusCode: 200,
+		ExpectJSON:       "fixtures/series.json",
+	}.Check(t, router)
+}
+
+func Test_LabelValues(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, storageMock := setupTest(t, ctrl)
+
+	storageMock.EXPECT().Series([]string{"{project_id=\"12345\",component!=\"\"}"}, gomock.Any(), gomock.Any(), "application/json").Return(httpResponseFromFile("fixtures/series.json"), nil)
+
+	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
+		Method:           "GET",
+		Path:             "/api/v1/label/component/values",
+		ExpectStatusCode: 200,
+		ExpectJSON:       "fixtures/label_values.json",
+	}.Check(t, router)
+}
+
 func Test_Query(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	router, _, storageMock := setupTest(t, ctrl)
 
-	storageMock.EXPECT().Query("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "", "", "application/json").Return(httpResponseFromFile("fixtures/query.json"), nil)
+	storageMock.EXPECT().Query("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "24m", "application/json").Return(httpResponseFromFile("fixtures/query.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
 		Method:           "GET",
-		Path:             "/api/v1/query?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22})",
+		Path:             "/api/v1/query?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22})&time=2017-07-01T20:10:30.781Z&timeout=24m",
 		ExpectStatusCode: 200,
 		ExpectJSON:       "fixtures/query.json",
 	}.Check(t, router)
-
 }
+
+func Test_QueryRange(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, storageMock := setupTest(t, ctrl)
+
+	storageMock.EXPECT().QueryRange("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "5m", "90s", "application/json").Return(httpResponseFromFile("fixtures/query_range.json"), nil)
+
+	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
+		Method:           "GET",
+		Path:             "/api/v1/query_range?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22})&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z&step=5m&timeout=90s",
+		ExpectStatusCode: 200,
+		ExpectJSON:       "fixtures/query_range.json",
+	}.Check(t, router)
+}
+
 func httpResponseFromFile(filename string) *http.Response {
 	fixture, _ := ioutil.ReadFile(filename)
 	responseRec := httptest.NewRecorder()

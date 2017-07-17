@@ -83,8 +83,8 @@ type SeriesResponse struct {
 
 // LabelValuesResponse encapsulates a response to the /label/values API of Prometheus
 type LabelValuesResponse struct {
-	Status Status             `json:"Status"`
-	Data   []model.LabelValue `json:"data"`
+	Status Status            `json:"Status"`
+	Data   model.LabelValues `json:"data"`
 }
 
 // QueryResponse contains the response from a call to query or query_range

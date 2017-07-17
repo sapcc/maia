@@ -49,11 +49,11 @@ func ReturnResponse(w http.ResponseWriter, response *http.Response) {
 //ReturnJSON is a convenience function for HTTP handlers returning JSON data.
 //The `code` argument specifies the HTTP Response code, usually 200.
 func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
-	escapedJSON, err := json.MarshalIndent(&data, "", "  ")
+	escapedJSON, err := json.Marshal(&data)
 	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
-		// TODO: comment
+		// TODO: @Arno, what is this good for?
 		jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)
 		w.Write(jsonData)
 	} else {
