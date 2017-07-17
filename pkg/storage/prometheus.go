@@ -24,111 +24,98 @@ import (
 
 	"net/url"
 
-	"github.com/prometheus/client_golang/api/prometheus"
+	"fmt"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"io"
 )
 
-const prometheusFederateURL = "federate?match[]="
-
 type prometheusStorageClient struct {
-	client     prometheus.QueryAPI
-	config     prometheus.Config
-	httpClient http.Client
+	httpClient    *http.Client
+	url           string
+	customHeaders map[string]string
 }
 
-var promCli prometheusStorageClient
-
-var prometheusCoreHeadersJSON = make(map[string]string)
-
-func initPrometheusCoreHeadersJSON() {
-	prometheusCoreHeadersJSON["User-Agent"] = "Prometheus/"
-	prometheusCoreHeadersJSON["Accept"] = "application/json"
-	prometheusCoreHeadersJSON["Connection"] = "close"
-
+var prometheusCoreHeadersJSON = map[string]string{
+	"User-Agent":      "Prometheus/",
+	"Accept":          JSON,
+	"Accept-Encoding": "gzip",
+	"Connection":      "close",
 }
 
-var prometheusCoreHeadersPBUF = make(map[string]string)
-
-func initPrometheusCoreHeadersPBUF() {
-	prometheusCoreHeadersPBUF["User-Agent"] = "Prometheus/"
-	prometheusCoreHeadersPBUF["Accept"] = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
-	prometheusCoreHeadersPBUF["Accept-Encoding"] = "gzip"
-	prometheusCoreHeadersPBUF["Connection"] = "close"
-
+var prometheusCoreHeadersText = map[string]string{
+	"User-Agent":      "Prometheus/",
+	"Accept":          PlainText,
+	"Accept-Encoding": "gzip",
+	"Connection":      "close",
 }
 
-// Prometheus creates a storage driver for Prometheus
-func Prometheus(prometheusAPIURL string) Driver {
-	if promCli.client == nil {
-		promCli.init(prometheusAPIURL)
+var prometheusCoreHeadersPBUF = map[string]string{
+	"User-Agent":      "Prometheus/",
+	"Accept":          P8SProtoBuf,
+	"Accept-Encoding": "gzip",
+	"Connection":      "close",
+}
+
+// Prometheus creates a storage driver for Prometheus/Maia
+func Prometheus(prometheusAPIURL string, customHeaders map[string]string) Driver {
+	result := prometheusStorageClient{
+		url:           prometheusAPIURL,
+		customHeaders: customHeaders,
 	}
-	return &promCli
+	result.init()
+	return &result
 }
 
-func (promCli *prometheusStorageClient) init(prometheusAPIURL string) {
-	var httpCli http.Client
-
-	util.LogDebug("Initializing Client for Prometheus %s .", prometheusAPIURL)
-
-	config := prometheus.Config{
-		Address:   prometheusAPIURL,
-		Transport: prometheus.DefaultTransport,
-	}
-	promCli.config = config
-	client, err := prometheus.New(config)
-	if err != nil {
-		util.LogError("Failed to initialize. Prometheus is not reachable: %s.", prometheusAPIURL)
-		panic(err.Error())
-	}
-	promCli.client = prometheus.NewQueryAPI(client)
-
-	initPrometheusCoreHeadersJSON()
-	initPrometheusCoreHeadersPBUF()
-
+func (promCli *prometheusStorageClient) init() {
 	if viper.IsSet("maia.proxy") {
 		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
 		if err != nil {
-			util.LogError("Could not set proxy: %s .\n%s", proxyURL, err.Error())
-			httpCli = http.Client{}
+			panic(fmt.Errorf("Could not set proxy: %s .\n%s", proxyURL, err.Error()))
 		} else {
-			httpCli = http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+			promCli.httpClient = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+			return
 		}
 	}
-	promCli.httpClient = httpCli
+	promCli.httpClient = &http.Client{}
 }
 
-func (promCli *prometheusStorageClient) Query(query, time, timeout string) (*http.Response, error) {
-	promURL := buildURL("api/v1/query", map[string]interface{}{"query": query, "time": time, "timeout": timeout})
+func (promCli *prometheusStorageClient) Query(query, time, timeout string, acceptContentType string) (*http.Response, error) {
+	promURL := promCli.buildURL("api/v1/query", map[string]interface{}{"query": query, "time": time, "timeout": timeout})
 
-	return sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersJSON)
+	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
-func (promCli *prometheusStorageClient) QueryRange(query, start, end, step, timeout string) (*http.Response, error) {
-	promURL := buildURL("api/v1/query_range", map[string]interface{}{"query": query, "start": start, "end": end,
+func (promCli *prometheusStorageClient) QueryRange(query, start, end, step, timeout string, acceptContentType string) (*http.Response, error) {
+	promURL := promCli.buildURL("api/v1/query_range", map[string]interface{}{"query": query, "start": start, "end": end,
 		"step": step, "timeout": timeout})
 
-	return sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersJSON)
+	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
-func (promCli *prometheusStorageClient) Series(match []string, start, end string) (*http.Response, error) {
-	promURL := buildURL("api/v1/series", map[string]interface{}{"match[]": match, "start": start, "end": end})
+func (promCli *prometheusStorageClient) Series(match []string, start, end string, acceptContentType string) (*http.Response, error) {
+	promURL := promCli.buildURL("api/v1/series", map[string]interface{}{"match[]": match, "start": start, "end": end})
 
-	return sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersJSON)
+	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
-func (promCli *prometheusStorageClient) LabelValues(name string) (*http.Response, error) {
-	promURL := buildURL("api/v1/series", map[string]interface{}{"match[]": name + "!=\"\""})
+func (promCli *prometheusStorageClient) LabelValues(name string, acceptContentType string) (*http.Response, error) {
+	promURL := promCli.buildURL("api/v1/label/"+name+"/values", map[string]interface{}{})
 
-	res, err := sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersJSON)
+	res, err := promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 
 	return res, err
 }
 
+func (promCli *prometheusStorageClient) Federate(selectors []string, acceptContentType string) (*http.Response, error) {
+	promURL := promCli.buildURL("federate", map[string]interface{}{"match[]": selectors})
+
+	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
+}
+
 // buildURL is used to build the target URL of a Prometheus call
-func buildURL(path string, params map[string]interface{}) url.URL {
-	promURL, err := url.Parse(promCli.config.Address)
+func (promCli *prometheusStorageClient) buildURL(path string, params map[string]interface{}) url.URL {
+	promURL, err := url.Parse(promCli.url)
 	if err != nil {
 		panic(err)
 	}
@@ -153,13 +140,16 @@ func buildURL(path string, params map[string]interface{}) url.URL {
 }
 
 // SendToPrometheus takes care of the request wrapping and delivery to Prometheus
-func sendToPrometheus(method string, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) sendToPrometheus(method string, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
 	req, err := http.NewRequest(method, promURL, body)
 	if err != nil {
 		util.LogError("Could not create request.\n", err.Error())
 		return nil, err
 	}
 
+	for k, v := range promCli.customHeaders {
+		req.Header.Add(k, v)
+	}
 	for k, v := range headers {
 		req.Header.Add(k, v)
 	}
@@ -172,12 +162,4 @@ func sendToPrometheus(method string, promURL string, body io.Reader, headers map
 		return nil, err
 	}
 	return resp, nil
-}
-
-func (promCli *prometheusStorageClient) ListMetrics(match string) (*http.Response, error) {
-	promURL := buildURL("federate", map[string]interface{}{"match[]": match})
-
-	res, err := sendToPrometheus("GET", promURL.String(), nil, prometheusCoreHeadersPBUF)
-
-	return res, err
 }

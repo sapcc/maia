@@ -1,16 +1,20 @@
 PKG    = github.com/sapcc/maia
 PREFIX := /usr
 
-all: build/maia
+all: clean build check
 
 GO_BUILDFLAGS :=
 GO_LDFLAGS    := -s -w
 
 # This target uses the incremental rebuild capabilities of the Go compiler to speed things up.
 # If no source files have changed, `go install` exits quickly without doing anything.
-build/maia: FORCE
+build: FORCE
+	# provide dependencies
 	glide install -v
-	go build $(PKG)
+	# generate mocks
+	mockgen --source pkg/storage/interface.go --destination pkg/storage/prometheus_mock.go --package storage
+	# build maia
+	go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external' -o ./maia
 	go install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
 
 # which packages to test with static checkers?
@@ -27,10 +31,10 @@ GO_COVERFILES := $(patsubst %,build/%.cover.out,$(subst /,_,$(GO_TESTPKGS)))
 space := $(null) $(null)
 comma := ,
 
-check: all static-check build/cover.html FORCE
+check: static-check build/cover.html FORCE
 	@echo -e "\e[1;32m>> All tests successful.\e[0m"
 static-check: FORCE
-	@if s="$$(gofmt -s -l *.go pkg 2>/dev/null)"                            && test -n "$$s"; then printf ' => %s\n%s\n' gofmt  "$$s"; false; fi
+	@if s="$$(gofmt -s -l *.go pkg 2>/dev/null)"                            && test -n "$$s"; then printf ' => %s\n%s\n' "gofmt -s -d -e" "$$s"; false; fi
 	@if s="$$(golint . && find pkg -type d -exec golint {} \; 2>/dev/null)" && test -n "$$s"; then printf ' => %s\n%s\n' golint "$$s"; false; fi
 	go vet $(GO_ALLPKGS)
 build/%.cover.out: FORCE
@@ -45,6 +49,7 @@ install: FORCE all
 
 clean: FORCE
 	rm -f -- ./maia_*_*
+	rm -rf vendor
 
 build/docker.tar: clean
 	glide cc
