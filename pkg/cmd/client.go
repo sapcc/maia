@@ -191,11 +191,11 @@ func printHeader(allColumns []string) {
 	if outputFormat != "value" {
 		for i, field := range allColumns {
 			if i > 0 {
-				print(separator)
+				fmt.Print(separator)
 			}
-			print(field)
+			fmt.Print(field)
 		}
-		println()
+		fmt.Println()
 	}
 }
 
@@ -228,13 +228,13 @@ func makeColumns(collector map[string]bool) []string {
 func printRow(allColumns []string, rec map[string]string) {
 	for i, field := range allColumns {
 		if i > 0 {
-			print(separator)
+			fmt.Print(separator)
 		}
 		if v, ok := rec[field]; ok {
-			print(v)
+			fmt.Print(v)
 		}
 	}
-	println()
+	fmt.Println()
 }
 
 func printTemplate(body []byte, tpl string) {
