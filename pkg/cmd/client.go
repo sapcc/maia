@@ -98,17 +98,24 @@ func printValues(resp *http.Response) {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
 			if outputFormat == "json" && columns == "" {
-				print(string(body))
-			}
-			var jsonResponse struct {
-				Value []string `json:"data,omitempty"`
-			}
-			if err := json.Unmarshal([]byte(body), &jsonResponse); err != nil {
-				panic(err)
-			}
+				fmt.Print(string(body))
+			} else {
+				var jsonResponse struct {
+					Value []string `json:"data,omitempty"`
+				}
+				if err := json.Unmarshal([]byte(body), &jsonResponse); err != nil {
+					panic(err)
+				}
 
-			for _, value := range jsonResponse.Value {
-				println(value)
+				for _, value := range jsonResponse.Value {
+					fmt.Println(value)
+				}
+			}
+		} else if strings.HasPrefix(contentType, "text/plain") {
+			if outputFormat == "" || outputFormat == "values" {
+				fmt.Print(string(body))
+			} else {
+				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
 			}
 		} else {
 			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
@@ -127,7 +134,7 @@ func printTable(resp *http.Response) {
 		if contentType == storage.JSON {
 			// JSON is not preprocessed
 			if outputFormat == "json" {
-				print(string(body))
+				fmt.Print(string(body))
 				return
 			} else if outputFormat == "table" || outputFormat == "value" || outputFormat == "" {
 
@@ -162,7 +169,7 @@ func printTable(resp *http.Response) {
 			}
 		} else if contentType == storage.PlainText {
 			// This affects /federate aka. metrics only. There is no point in filtering this output
-			print(string(body))
+			fmt.Print(string(body))
 		} else {
 			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
 		}
@@ -311,12 +318,12 @@ func printQueryResponse(resp *http.Response) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
+		fmt.Fprintf(os.Stderr, "Server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
 			if outputFormat == "json" || outputFormat == "" {
-				print(string(body))
+				fmt.Print(string(body))
 			} else if outputFormat == "template" {
 				if jsonTemplate == "" {
 					panic(fmt.Errorf("Missing --template parameter"))
