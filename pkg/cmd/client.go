@@ -79,7 +79,7 @@ func prometheus(context *policy.Context) storage.Driver {
 	} else if promURL != "" {
 		return storage.NewPrometheusDriver(promURL, map[string]string{"X-Auth-Token": context.Auth["token"]})
 	} else {
-		panic(fmt.Errorf("Either --maia-url or --prometheus-url need to be specified (or MAIA_SERVER_URL resp. MAIA_PROMETHEUS_URL)"))
+		panic(fmt.Errorf("Either --maia-url or --prometheus-url need to be specified (or MAIA_SERVICE_URL resp. MAIA_PROMETHEUS_URL)"))
 	}
 }
 
@@ -93,7 +93,7 @@ func printValues(resp *http.Response) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
+		panic(fmt.Errorf("Server responsed with error code %d: %s", resp.StatusCode, err.Error()))
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
@@ -299,6 +299,9 @@ func printQueryResultAsTable(body []byte) {
 			columnValues := map[string]string{}
 			columnValues["Timestamp"] = el.Timestamp.Time().Format(time.RFC3339Nano)
 			columnValues["Value"] = el.Value.String()
+			for labelKey, labelValue := range el.Metric {
+				columnValues[string(labelKey)] = string(labelValue)
+			}
 			rows = append(rows, columnValues)
 		}
 		allColumns = append(makeColumns(set), []string{"Timestamp", "Value"}...)
