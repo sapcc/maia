@@ -1,9 +1,13 @@
 # Maia
 
-Maia is a multi-tenant OpenStack-service for accessing Prometheus metrics. It offers [Prometheus-compatible](https://prometheus.io/docs/querying/api/) 
-API and supports federation. It was originally designed for the SAP Converged Cloud.
+Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers a [Prometheus-compatible](https://prometheus.io/docs/querying/api/) 
+API and supports federation.
 
-If you don't use OpenStack, you can still use it as a feature-complete CLI for Prometheus. 
+At SAP we use it to share tenant-specific metrics from our Converged Cloud platform
+with our users. For their convenience we included a CLI, so that metrics can be discovered and
+retrieved from shell scripts.
+
+If you don't use OpenStack, you can still use Maia CLI as a feature-complete shell client for Prometheus. 
 
 ## Features
 
