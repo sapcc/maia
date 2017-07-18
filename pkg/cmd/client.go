@@ -340,10 +340,10 @@ func printQueryResponse(resp *http.Response) {
 	}
 }
 
-var metricsCmd = &cobra.Command{
-	Use:   "metrics [ --selector <vector-selector> ]",
-	Short: "Get actual metric values for project/domain.",
-	Long:  "Lists all metric series and their current values. The series can filtered using vector-selectors (label constraints).",
+var snapshotCmd = &cobra.Command{
+	Use:   "snapshot [ --selector <vector-selector> ]",
+	Short: "Get a snapshot of the actual metric values for a project/domain.",
+	Long:  "Displays the current values of all metric series. The series can filtered using vector-selectors (label constraints).",
 	RunE: func(cmd *cobra.Command, args []string) (ret error) {
 		// transform panics with error params into errors
 		defer recoverAll()
@@ -487,7 +487,7 @@ var queryCmd = &cobra.Command{
 
 func init() {
 
-	RootCmd.AddCommand(metricsCmd)
+	RootCmd.AddCommand(snapshotCmd)
 	RootCmd.AddCommand(queryCmd)
 	RootCmd.AddCommand(seriesCmd)
 	RootCmd.AddCommand(labelValuesCmd)
@@ -497,10 +497,10 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// metricsCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// snapshotCmd.PersistentFlags().String("foo", "", "A help for foo")
 
-	metricsCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
-	addClientFlags(metricsCmd)
+	snapshotCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
+	addClientFlags(snapshotCmd)
 
 	queryCmd.Flags().StringVar(&starttime, "start", "", "Range query: Start timestamp (RFC3339 or Unix format; default:earliest)")
 	queryCmd.Flags().StringVar(&endtime, "end", "", "Range query: End timestamp (RFC3339 or Unix format; default: latest)")
@@ -541,4 +541,6 @@ func addClientFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&jsonTemplate, "template", "", "Go-template to define a custom output format based on the JSON response (only when --format=template)")
 
 	cmd.Flags().StringVar(&maiaURL, "maia-url", os.Getenv("MAIA_SERVICE_URL"), "URL of the target Maia service (override OpenStack service catalog)")
+	cmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
+	viper.BindPFlag("maia.prometheus_url", cmd.PersistentFlags().Lookup("prometheus-url"))
 }

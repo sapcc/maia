@@ -58,14 +58,16 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// metricsCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// snapshotCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// metricsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// snapshotCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
 	var bindAddr, policyFile string
 
+	serveCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
+	viper.BindPFlag("maia.prometheus_url", serveCmd.PersistentFlags().Lookup("prometheus-url"))
 	serveCmd.Flags().StringVar(&bindAddr, "bind-address", "0.0.0.0:9091", "IP-Address and port where Maia is listening for incoming requests (e.g. 0.0.0.0:9091)")
 	viper.BindPFlag("maia.bind_address", serveCmd.Flags().Lookup("bind-address"))
 	serveCmd.Flags().StringVar(&policyFile, "policy-file", "", "Location of the OpenStack policy file")

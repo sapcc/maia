@@ -241,22 +241,22 @@ The output is controlled via the parameters `--format`, `--columns`, `--separato
 You can also use the maia client with a plain Prometheus (no authentication).
 
 ```
-maia metrics --prometheus-url http://localhost:9090
+maia snapshot --prometheus-url http://localhost:9090
 ```
 
 ## Exporting Snapshots
 
-Use the `metrics` command to get the latest values of all series in
+Use the `snapshot` command to get the latest values of all series in
 [textual form](https://prometheus.io/docs/instrumenting/exposition_formats/). 
 
 ```
-maia metrics --maia-url http://localhost:9091
+maia snapshot --maia-url http://localhost:9091
 ```
 
 The amount of data can be restricted using Prometheus label matchers, i.e. constraints on label values:
 
 ```
-maia metrics --selector "job=endpoints" ...
+maia snapshot --selector "job=endpoints" ...
 ```
 
 If you want to preprocess/filter data further, you can e.g. use the [prom2json](https://github.com/prometheus/prom2json)
