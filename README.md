@@ -1,24 +1,27 @@
 # Maia
 
-[![Build Status](https://travis-ci.org/sapcc/maia.svg?branch=master)](https://travis-ci.org/sapcc/maia)
-[![Coverage Status](https://coveralls.io/repos/github/sapcc/maia/badge.svg?branch=master)](https://coveralls.io/github/sapcc/maia?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sapcc/maia)](https://goreportcard.com/report/github.com/sapcc/maia)
-[![GoDoc](https://godoc.org/github.com/sapcc/maia?status.svg)](https://godoc.org/github.com/sapcc/maia)
-
-Maia is a multi-tenant OpenStack-service for accessing Prometheus metrics. It offers [Prometheus-compatible](https://prometheus.io/docs/querying/api/) 
+Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers a [Prometheus-compatible](https://prometheus.io/docs/querying/api/) 
 API and supports federation.
+
+At SAP we use it to share tenant-specific metrics from our Converged Cloud platform
+with our users. For their convenience we included a CLI, so that metrics can be discovered and
+retrieved from shell scripts.
+
+If you don't use OpenStack, you can still use Maia CLI as a feature-complete shell client for Prometheus. 
 
 ## Features
 
-* Supports OpenStack Identity v3 authentication and authorization
-* Multi-tenant design, supports project- and domain-level scoping
-* Grafana support (using Prometheus data source)
-* Prometheus API compatible (read operations)
+Maia Service
+* OpenStack Identity v3 authentication and authorization
+* Project- and domain-level access control (scoping)
+* Compatible to Grafana's Prometheus data source 
+* Compatible to Prometheus API (read-only)
 * Supports federation with other Prometheus
-* Feature-complete CLI supporting all API operations and custom output leveraging Go-templates
-* CLI can be used with Prometheus as well
 
-It was originally designed for the SAP Converged Cloud.
+Maia CLI
+* Feature-complete CLI supporting all API operations
+* JSON and Go-template-based output for reliable automation
+* Works with Prometheus, too (no OpenStack required)
 
 ## Concept
 
@@ -34,11 +37,6 @@ The following labels have a special meaning in Maia. *Only metrics with these la
 Metrics without `domain_id` will not be available when authorized to domain scope. Likewise, metrics without `project_id`
 will be omitted when project scope is used. There is no inheritance of metrics to parent projects. Users authorized
 to a domain will be able to access the metrics of all projects in that domain that have been labelled for the domain.
- 
-# LIMITATIONS
-
-Before reading on and trying, please be aware that the following limitations exist
-* keystone integration is not efficient: tokens are probably not cached
 
 # Installation
 
@@ -336,8 +334,22 @@ Configure the data source like with a regular Prometheus. Select `Basic Authenti
 
 # Contributing
 
-This project is open for external contributions. Pull-requests are welcome. Please include unit-tests and maintain compatiblity.
+This project is open for external contributions. 
+
+Pull-requests are welcome as long as you follow a few rules:
+* Keep the API compatible to Prometheus
+* Do not degrade performance
+* Include unit tests for new or modified code
+* Pass the static code checks
 
 ## Software Design
 
 ![Architecture diagram](./docs/maia-architecture.png)
+
+## Links
+
+[![Build Status](https://travis-ci.org/sapcc/maia.svg?branch=master)](https://travis-ci.org/sapcc/maia)
+[![Coverage Status](https://coveralls.io/repos/github/sapcc/maia/badge.svg?branch=master)](https://coveralls.io/github/sapcc/maia?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sapcc/maia)](https://goreportcard.com/report/github.com/sapcc/maia)
+[![GoDoc](https://godoc.org/github.com/sapcc/maia?status.svg)](https://godoc.org/github.com/sapcc/maia)
+

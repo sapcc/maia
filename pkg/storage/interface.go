@@ -32,7 +32,7 @@ const (
 	// P8SProtoBuf is the native protocol (preferred)
 	P8SProtoBuf string = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3,*/*;q=0.1"
 	// PlainText is used for readable federate output
-	PlainText = "text/plain"
+	PlainText = "text/plain; version=0.0.4"
 	// JSON is used to obtain output in JSON (--format json)
 	JSON = "application/json"
 )

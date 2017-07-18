@@ -36,7 +36,7 @@ var serveCmd = &cobra.Command{
 		// transform panics with error params into errors
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Println(r)
+				fmt.Fprintln(os.Stderr, r)
 			}
 		}()
 

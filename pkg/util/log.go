@@ -27,14 +27,9 @@ import (
 
 var isDebug = os.Getenv("MAIA_DEBUG") == "1"
 
-func init() {
-	log.SetOutput(os.Stdout)
-}
-
 //LogFatal logs a fatal error and terminates the program.
 func LogFatal(msg string, args ...interface{}) {
 	doLog("FATAL: "+msg, args)
-	os.Exit(1)
 }
 
 //LogError logs a non-fatal error.
