@@ -22,11 +22,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/prometheus/common/model"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
+	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io/ioutil"
@@ -57,29 +57,31 @@ func recoverAll() {
 	}
 }
 
-func authenticate() *policy.Context {
+func fetchToken() string {
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
 	}
-	if auth.TokenID == "" && maiaURL != "" {
-		if auth.Username == "" || auth.Password == "" {
-			panic(fmt.Errorf("You must at least specify --os-username and --os-password"))
-		}
+	// authenticate calls to Maia
+	if auth.TokenID != "" {
+		return auth.TokenID
+	}
+	if auth.Username == "" || auth.Password == "" {
+		panic(fmt.Errorf("You must at least specify --os-username and --os-password"))
 	}
 	context, err := keystone.NewKeystoneDriver().Authenticate(&auth, false)
-	if err == nil {
-		return context
+	if err != nil {
+		panic(err)
 	}
-	panic(err)
+	return context.Auth["token"]
 }
 
-func prometheus(context *policy.Context) storage.Driver {
+func prometheus() storage.Driver {
 	if maiaURL != "" {
-		return storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": context.Auth["token"]})
+		return storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": fetchToken()})
 	} else if promURL != "" {
-		return storage.NewPrometheusDriver(promURL, map[string]string{"X-Auth-Token": context.Auth["token"]})
+		return storage.NewPrometheusDriver(promURL, map[string]string{})
 	} else {
-		panic(fmt.Errorf("Either --maia-url or --prometheus-url need to be specified (or MAIA_SERVICE_URL resp. MAIA_PROMETHEUS_URL)"))
+		panic(fmt.Errorf("Either --maia-url or --prometheus-url need to be specified (or MAIA_URL resp. MAIA_PROMETHEUS_URL)"))
 	}
 }
 
@@ -118,6 +120,7 @@ func printValues(resp *http.Response) {
 				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
 			}
 		} else {
+			util.LogWarning("Response body: %s", string(body))
 			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
 		}
 	}
@@ -167,10 +170,11 @@ func printTable(resp *http.Response) {
 			} else {
 				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
 			}
-		} else if contentType == storage.PlainText {
+		} else if strings.HasPrefix(contentType, "text/plain") {
 			// This affects /federate aka. metrics only. There is no point in filtering this output
 			fmt.Print(string(body))
 		} else {
+			util.LogWarning("Response body: %s", string(body))
 			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
 		}
 	}
@@ -338,6 +342,7 @@ func printQueryResponse(resp *http.Response) {
 				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
 			}
 		} else {
+			util.LogWarning("Response body: %s", string(body))
 			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
 		}
 	}
@@ -351,15 +356,11 @@ var snapshotCmd = &cobra.Command{
 		// transform panics with error params into errors
 		defer recoverAll()
 
-		context := authenticate()
-		// pass the keystone token to Maia and ensure that the result is text
-		prometheus := prometheus(context)
+		prometheus := prometheus()
 
 		var resp *http.Response
 		resp, err := prometheus.Federate([]string{"{" + selector + "}"}, storage.PlainText)
-		if err != nil {
-			panic(err)
-		}
+		checkResponse(err, resp)
 
 		printValues(resp)
 
@@ -375,15 +376,12 @@ var seriesCmd = &cobra.Command{
 		// transform panics with error params into errors
 		defer recoverAll()
 
-		context := authenticate()
 		// pass the keystone token to Maia and ensure that the result is text
-		prometheus := prometheus(context)
+		prometheus := prometheus()
 
 		var resp *http.Response
 		resp, err := prometheus.Series([]string{"{" + selector + "}"}, starttime, endtime, storage.PlainText)
-		if err != nil {
-			panic(err)
-		}
+		checkResponse(err, resp)
 
 		printTable(resp)
 
@@ -395,19 +393,24 @@ func labelValues(labelName string) (ret error) {
 	// transform panics with error params into errors
 	defer recoverAll()
 
-	context := authenticate()
-	// pass the keystone token to Maia and ensure that the result is text
-	prometheus := prometheus(context)
+	prometheus := prometheus()
 
 	var resp *http.Response
 	resp, err := prometheus.LabelValues(labelName, storage.JSON)
-	if err != nil {
-		panic(err)
-	}
+	checkResponse(err, resp)
 
 	printValues(resp)
 
 	return nil
+}
+
+// checkHttpStatus checks whether the response is 200 and panics with an appropriate error otherwise
+func checkResponse(err error, resp *http.Response) {
+	if err != nil {
+		panic(err)
+	} else if resp.StatusCode != http.StatusOK {
+		panic(fmt.Errorf("Server failed with status: %s (%d)", string(resp.Status), resp.StatusCode))
+	}
 }
 
 var labelValuesCmd = &cobra.Command{
@@ -465,9 +468,7 @@ var queryCmd = &cobra.Command{
 			stepStr = ""
 		}
 
-		// authenticate and connect
-		context := authenticate()
-		prometheus := prometheus(context)
+		prometheus := prometheus()
 
 		// perform (range-)query
 		var resp *http.Response
@@ -478,9 +479,7 @@ var queryCmd = &cobra.Command{
 			resp, err = prometheus.Query(query, timestamp, timeoutStr, storage.JSON)
 		}
 
-		if err != nil {
-			panic(err)
-		}
+		checkResponse(err, resp)
 
 		printQueryResponse(resp)
 
@@ -543,7 +542,7 @@ func addClientFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&separator, "separator", " ", "Separate different columns with this string (only when --columns value is set; default <space>)")
 	cmd.PersistentFlags().StringVar(&jsonTemplate, "template", "", "Go-template to define a custom output format based on the JSON response (only when --format=template)")
 
-	cmd.Flags().StringVar(&maiaURL, "maia-url", os.Getenv("MAIA_SERVICE_URL"), "URL of the target Maia service (override OpenStack service catalog)")
+	cmd.Flags().StringVar(&maiaURL, "maia-url", os.Getenv("MAIA_URL"), "URL of the target Maia service (override OpenStack service catalog)")
 	cmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
 	viper.BindPFlag("maia.prometheus_url", cmd.PersistentFlags().Lookup("prometheus-url"))
 }
