@@ -66,7 +66,7 @@ DOCKER_IMAGE := hub.global.cloud.sap/monsoon/maia
 DOCKER_TAG   := latest
 
 docker: build/docker.tar
-	$(DOCKER) build --build-arg https_proxy=$HTTP_PROXY --build-arg http_proxy=$HTTP_PROXY --build-arg HTTP_PROXY=$HTTP_PROXY --build-arg HTTPS_PROXY=$HTTP_PROXY -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
+	$(DOCKER) build --build-arg https_proxy=$$(HTTP_PROXY) --build-arg http_proxy=$$(HTTP_PROXY) --build-arg HTTP_PROXY=$$(HTTP_PROXY) --build-arg HTTPS_PROXY=$$(HTTP_PROXY) -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
 
 vendor: FORCE
 	glide update -v
