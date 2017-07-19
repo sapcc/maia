@@ -1,5 +1,5 @@
-hash: 2dd2a5a0d7b3f265aeffcba29dc66757609fce147ded739d3390815bbb9fef3a
-updated: 2017-07-17T13:52:40.815108294+02:00
+hash: 715fcca3635c79b12c44aa65cd941541fb0d2dd4c9f9c3e7c177ad1129661228
+updated: 2017-07-19T10:22:30.886935075+02:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -57,6 +57,8 @@ imports:
   version: eaaf4e1eeb7a5373b38e70901270c83577dc6fb9
   subpackages:
   - log
+- name: github.com/patrickmn/go-cache
+  version: 7ac151875ffb48b9f3ccce9ea20f020b0c1596c8
 - name: github.com/pelletier/go-buffruneio
   version: c37440a7cf42ac63b919c752ca73a85067e05992
 - name: github.com/pelletier/go-toml
