@@ -109,12 +109,19 @@ confronted with stale series in the dropdown boxes.
 label_value_ttl = "2h"
 ```
 
-### OpenStack Service User
+### Keystone Integration
+ 
+The *keystone* section contains configuration settings for OpenStack authentication and authorization.
+
+```
+[keystone]
+```
+
+#### OpenStack Service User
 
 The maia service requires an OpenStack *service* user in order to authenticate and authorize clients.
  
 ```
-[keystone]
 # Identity service used to authenticate user credentials (create/verify tokens etc.)
 auth_url = "https://identity.mydomain.com/v3/"
 # service user credentials
@@ -123,6 +130,18 @@ password = "asafepassword"
 user_domain_name = "Default"
 project_name = "serviceusers"
 project_domain_name = "Default"
+```
+
+#### Token Cache
+
+In order to improve responsiveness and protect Keystone from too much load, Maia will
+re-check authorizations for users only every 15 minutes (900 seconds).
+
+If the token TTL configured at Keystone is shorter or if you want to reduce Keystone load further,
+this amount can be changed:
+
+```
+token_cache_time = "3600s"
 ```
 
 ## Starting the Service
