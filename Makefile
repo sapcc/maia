@@ -57,7 +57,7 @@ build/docker.tar:
 ifeq ($(OS), Darwin)
 	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.8 env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 else
-	golang:1.8 env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
+	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 endif
 	tar cf - ./maia_linux_amd64 > build/docker.tar
 
