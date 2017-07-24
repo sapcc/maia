@@ -279,7 +279,7 @@ func ExampleQuery_rangeValuesTable() {
 	queryCmd.RunE(queryCmd, []string{query})
 
 	// Output:
-	// 2017-07-13T22:10:00+02:00 2017-07-13T22:15:00+02:00
+	// 2017-07-13T22:10:00 2017-07-13T22:15:00
 	// 0 1
 }
 
@@ -305,6 +305,6 @@ func ExampleQuery_rangeSeriesTable() {
 	queryCmd.RunE(queryCmd, []string{query})
 
 	// Output:
-	// check instance region 2017-07-22T22:10:00+02:00 2017-07-22T22:15:00+02:00 2017-07-22T22:20:00+02:00
+	// check instance region 2017-07-22T22:10:00 2017-07-22T22:15:00 2017-07-22T22:20:00
 	// keystone 100.64.0.102:9102 staging 0 1 0
 }
