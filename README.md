@@ -243,8 +243,17 @@ maia label-values "job"
 
 ## Output Formatting
 
-By default maia prints results as unformatted text. Series data is formatted in raw tables without column alignment.
-Labels are used as columns (alphabetical sorting).
+By default maia prints results as unformatted text.
+
+Series data is formatted in raw tables without column alignment.
+Labels are used as columns (alphabetical sorting). There are three additional columns which do not refer
+to labels:
+
+| Column Name | Meaning |
+|-------------|---------|
+| \_\_name\_\_ | the metric name |
+| \_\_timestamp\_\_ |  the timestamp of a measurement |
+| \_\_value\_\_ | the value of a measurement |
 
 To enable automation, also JSON, plain values output and Go text-templates
 are supported. 
