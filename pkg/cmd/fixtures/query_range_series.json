@@ -1,0 +1,33 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {
+          "__name__": "blackbox_api_status_gauge",
+          "check": "keystone",
+          "instance": "100.64.0.102:9102",
+          "job": "endpoints",
+          "kubernetes_name": "blackbox-tests-api",
+          "kubernetes_namespace": "blackbox",
+          "region": "staging"
+        },
+        "values": [
+          [
+            1500754230.781,
+            "0"
+          ],
+          [
+            1500754530.781,
+            "1"
+          ],
+          [
+            1500754830.781,
+            "0"
+          ]
+        ]
+      }
+    ]
+  }
+}

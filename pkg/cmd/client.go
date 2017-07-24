@@ -38,6 +38,11 @@ import (
 	"time"
 )
 
+const (
+	timestampKey = "__timestamp__"
+	valueKey     = "__value__"
+)
+
 var maiaURL string
 var selector string
 var auth tokens.AuthOptions
@@ -48,6 +53,9 @@ var columns string
 var separator string
 var starttime, endtime, timestamp string
 var timeout, stepsize time.Duration
+
+var keystoneDriver keystone.Driver
+var storageDriver storage.Driver
 
 // recoverAll is used to turn panics into error output
 // we use panics here for any errors
@@ -65,29 +73,35 @@ func fetchToken() string {
 	if auth.TokenID != "" {
 		return auth.TokenID
 	}
-	if auth.Username == "" || auth.Password == "" {
-		panic(fmt.Errorf("You must at least specify --os-username and --os-password"))
+	if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
+		panic(fmt.Errorf("You must at least specify --os-username / --os-user-id and --os-password"))
 	}
-	context, err := keystone.NewKeystoneDriver().Authenticate(&auth, false)
+	context, err := keystoneInstance().Authenticate(&auth, false)
 	if err != nil {
 		panic(err)
 	}
 	return context.Auth["token"]
 }
 
-func prometheus() storage.Driver {
-	if maiaURL != "" {
-		return storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": fetchToken()})
-	} else if promURL != "" {
-		return storage.NewPrometheusDriver(promURL, map[string]string{})
-	} else {
-		panic(fmt.Errorf("Either --maia-url or --prometheus-url need to be specified (or MAIA_URL resp. MAIA_PROMETHEUS_URL)"))
+func storageInstance() storage.Driver {
+	if storageDriver == nil {
+		if maiaURL != "" {
+			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": fetchToken()})
+		} else if promURL != "" {
+			storageDriver = storage.NewPrometheusDriver(promURL, map[string]string{})
+		} else {
+			panic(fmt.Errorf("Either --maia-url or --storageInstance-url need to be specified (or MAIA_URL resp. MAIA_PROMETHEUS_URL)"))
+		}
 	}
+
+	return storageDriver
 }
 
-func outputTemplate(columns []string) string {
-	str := "{{ ." + strings.Join(columns, separator+".") + "}}"
-	return str
+func keystoneInstance() keystone.Driver {
+	if keystoneDriver == nil {
+		setKeystoneInstance(keystone.NewKeystoneDriver())
+	}
+	return keystoneDriver
 }
 
 func printValues(resp *http.Response) {
@@ -99,9 +113,9 @@ func printValues(resp *http.Response) {
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
-			if outputFormat == "json" && columns == "" {
+			if strings.EqualFold(outputFormat, "json") {
 				fmt.Print(string(body))
-			} else {
+			} else if strings.EqualFold(outputFormat, "values") {
 				var jsonResponse struct {
 					Value []string `json:"data,omitempty"`
 				}
@@ -112,15 +126,17 @@ func printValues(resp *http.Response) {
 				for _, value := range jsonResponse.Value {
 					fmt.Println(value)
 				}
+			} else {
+				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
 			}
 		} else if strings.HasPrefix(contentType, "text/plain") {
-			if outputFormat == "" || outputFormat == "values" {
+			if strings.EqualFold(outputFormat, "values") {
 				fmt.Print(string(body))
 			} else {
 				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
 			}
 		} else {
-			util.LogWarning("Response body: %s", string(body))
+			util.LogError("Response body: %s", string(body))
 			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
 		}
 	}
@@ -136,10 +152,10 @@ func printTable(resp *http.Response) {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
 			// JSON is not preprocessed
-			if outputFormat == "json" {
+			if strings.EqualFold(outputFormat, "json") {
 				fmt.Print(string(body))
 				return
-			} else if outputFormat == "table" || outputFormat == "value" || outputFormat == "" {
+			} else if strings.EqualFold(outputFormat, "table") || strings.EqualFold(outputFormat, "values") {
 
 				// unmarshal
 				var jsonResponse struct {
@@ -199,7 +215,7 @@ func buildColumnSet(promResult model.Value) map[string]bool {
 }
 
 func printHeader(allColumns []string) {
-	if outputFormat != "value" {
+	if !strings.EqualFold(outputFormat, "values") {
 		for i, field := range allColumns {
 			if i > 0 {
 				fmt.Print(separator)
@@ -301,18 +317,18 @@ func printQueryResultAsTable(body []byte) {
 		for _, el := range matrix {
 			collectKeys(set, model.LabelSet(el.Metric))
 			columnValues := map[string]string{}
-			columnValues["Timestamp"] = el.Timestamp.Time().Format(time.RFC3339Nano)
-			columnValues["Value"] = el.Value.String()
+			columnValues[timestampKey] = el.Timestamp.Time().Format(time.RFC3339Nano)
+			columnValues[valueKey] = el.Value.String()
 			for labelKey, labelValue := range el.Metric {
 				columnValues[string(labelKey)] = string(labelValue)
 			}
 			rows = append(rows, columnValues)
 		}
-		allColumns = append(makeColumns(set), []string{"Timestamp", "Value"}...)
+		allColumns = append(makeColumns(set), []string{timestampKey, valueKey}...)
 	case model.ValScalar:
 		scalarValue := valueObject.(*model.Scalar)
-		allColumns = []string{"Timestamp", "Value"}
-		rows = []map[string]string{{"Timestamp": scalarValue.Timestamp.Time().Format(time.RFC3339Nano), "Value": scalarValue.String()}}
+		allColumns = []string{timestampKey, valueKey}
+		rows = []map[string]string{{timestampKey: scalarValue.Timestamp.Time().Format(time.RFC3339Nano), valueKey: scalarValue.String()}}
 	}
 	printHeader(allColumns)
 	for _, row := range rows {
@@ -329,14 +345,14 @@ func printQueryResponse(resp *http.Response) {
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
-			if outputFormat == "json" || outputFormat == "" {
+			if strings.EqualFold(outputFormat, "json") {
 				fmt.Print(string(body))
-			} else if outputFormat == "template" {
+			} else if strings.EqualFold(outputFormat, "template") {
 				if jsonTemplate == "" {
 					panic(fmt.Errorf("Missing --template parameter"))
 				}
 				printTemplate(body, jsonTemplate)
-			} else if outputFormat == "table" {
+			} else if strings.EqualFold(outputFormat, "table") {
 				printQueryResultAsTable(body)
 			} else {
 				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
@@ -348,58 +364,107 @@ func printQueryResponse(resp *http.Response) {
 	}
 }
 
-var snapshotCmd = &cobra.Command{
-	Use:   "snapshot [ --selector <vector-selector> ]",
-	Short: "Get a snapshot of the actual metric values for a project/domain.",
-	Long:  "Displays the current values of all metric series. The series can filtered using vector-selectors (label constraints).",
-	RunE: func(cmd *cobra.Command, args []string) (ret error) {
-		// transform panics with error params into errors
-		defer recoverAll()
-
-		prometheus := prometheus()
-
-		var resp *http.Response
-		resp, err := prometheus.Federate([]string{"{" + selector + "}"}, storage.PlainText)
-		checkResponse(err, resp)
-
-		printValues(resp)
-
-		return nil
-	},
-}
-
-var seriesCmd = &cobra.Command{
-	Use:   "series [ --selector <vector-selector> ]",
-	Short: "List measurement series for project/domain.",
-	Long:  "Lists all metric series. The series can filtered using vector-selectors (label constraints).",
-	RunE: func(cmd *cobra.Command, args []string) (ret error) {
-		// transform panics with error params into errors
-		defer recoverAll()
-
-		// pass the keystone token to Maia and ensure that the result is text
-		prometheus := prometheus()
-
-		var resp *http.Response
-		resp, err := prometheus.Series([]string{"{" + selector + "}"}, starttime, endtime, storage.PlainText)
-		checkResponse(err, resp)
-
-		printTable(resp)
-
-		return nil
-	},
-}
-
-func labelValues(labelName string) (ret error) {
+// Snapshot is just public because unit testing frameworks complains otherwise
+func Snapshot(cmd *cobra.Command, args []string) (ret error) {
 	// transform panics with error params into errors
 	defer recoverAll()
 
-	prometheus := prometheus()
+	prometheus := storageInstance()
+
+	var resp *http.Response
+	resp, err := prometheus.Federate([]string{"{" + selector + "}"}, storage.PlainText)
+	checkResponse(err, resp)
+
+	printValues(resp)
+
+	return nil
+}
+
+// LabelValues is just public because unit testing frameworks complains otherwise
+func LabelValues(cmd *cobra.Command, args []string) (ret error) {
+	// transform panics with error params into errors
+	defer recoverAll()
+
+	// check parameters
+	if len(args) < 1 {
+		return fmt.Errorf("missing argument: label-name")
+	}
+	labelName := args[0]
+
+	prometheus := storageInstance()
 
 	var resp *http.Response
 	resp, err := prometheus.LabelValues(labelName, storage.JSON)
 	checkResponse(err, resp)
 
 	printValues(resp)
+
+	return nil
+}
+
+// Series is just public because unit testing frameworks complains otherwise
+func Series(cmd *cobra.Command, args []string) (ret error) {
+	// transform panics with error params into errors
+	defer recoverAll()
+
+	// pass the keystone token to Maia and ensure that the result is text
+	prometheus := storageInstance()
+
+	var resp *http.Response
+	resp, err := prometheus.Series([]string{"{" + selector + "}"}, starttime, endtime, storage.JSON)
+	checkResponse(err, resp)
+
+	printTable(resp)
+
+	return nil
+}
+
+// MetricNames is just public because unit testing frameworks complains otherwise
+func MetricNames(cmd *cobra.Command, args []string) (ret error) {
+	// transform panics with error params into errors
+	defer recoverAll()
+
+	return LabelValues(cmd, []string{"__name__"})
+}
+
+// Query is just public because unit testing frameworks complains otherwise
+func Query(cmd *cobra.Command, args []string) (ret error) {
+	// transform panics with error params into errors
+	defer recoverAll()
+
+	// check parameters
+	if len(args) < 1 {
+		return fmt.Errorf("missing argument: PromQL Query")
+	}
+	queryExpr := args[0]
+
+	var timeoutStr, stepStr string
+	if timeout > 0 {
+		// workaround parsing issues
+		timeoutStr = fmt.Sprintf("%ds", int(timeout.Seconds()))
+	} else {
+		timeoutStr = ""
+	}
+	if stepsize > 0 {
+		stepStr = fmt.Sprintf("%ds", int(stepsize.Seconds()))
+	} else {
+		stepStr = ""
+	}
+
+	prometheus := storageInstance()
+
+	// perform (range-)Query
+	var resp *http.Response
+	var err error
+	if starttime != "" && endtime != "" && stepsize != 0 {
+		resp, err = prometheus.QueryRange(queryExpr, starttime, endtime, stepStr, timeoutStr, storage.JSON)
+	} else {
+		resp, err = prometheus.Query(queryExpr, timestamp, timeoutStr, storage.JSON)
+	}
+
+	checkResponse(err, resp)
+
+	printQueryResponse(resp)
 
 	return nil
 }
@@ -413,82 +478,42 @@ func checkResponse(err error, resp *http.Response) {
 	}
 }
 
+var snapshotCmd = &cobra.Command{
+	Use:   "Snapshot [ --selector <vector-selector> ]",
+	Short: "Get a Snapshot of the actual metric values for a project/domain.",
+	Long:  "Displays the current values of all metric Series. The Series can filtered using vector-selectors (label constraints).",
+	RunE:  Snapshot,
+}
+
+var seriesCmd = &cobra.Command{
+	Use:   "Series [ --selector <vector-selector> ] [ --start <starttime> --end <endtime> ]",
+	Short: "List measurement Series for project/domain.",
+	Long:  "Lists all metric Series. The Series can filtered using vector-selectors (label constraints).",
+	RunE:  Series,
+}
+
 var labelValuesCmd = &cobra.Command{
 	Use:   "label-values <label-name>",
 	Short: "Get values for given label name.",
-	Long:  "Obtains the possible values for a given label name (key) taking into account all series that are currently stored.",
-	RunE: func(cmd *cobra.Command, args []string) (ret error) {
-		// transform panics with error params into errors
-		defer recoverAll()
-
-		// check parameters
-		if len(args) < 1 {
-			return fmt.Errorf("missing argument: label-name")
-		}
-		return labelValues(args[0])
-	},
+	Long:  "Obtains the possible values for a given label name (key) taking into account all Series that are currently stored.",
+	RunE:  LabelValues,
 }
 
 var metricNamesCmd = &cobra.Command{
 	Use:   "metric-names",
 	Short: "Get list of metric names.",
-	Long:  "Obtains a list of metric names taking into account all series that are currently stored.",
-	RunE: func(cmd *cobra.Command, args []string) (ret error) {
-		// transform panics with error params into errors
-		defer recoverAll()
-
-		return labelValues("__name__")
-	},
+	Long:  "Obtains a list of metric names taking into account all Series that are currently stored.",
+	RunE:  MetricNames,
 }
 
 var queryCmd = &cobra.Command{
-	Use:   "query <PromQL query> [ --timestamp | --start <starttime> --end <endtime> --step <duration> ] [ --timeout <duration> ]",
-	Short: "Perform a PromQL query",
-	Long:  "Performs a PromQL query against the metrics available for the project/domain in scope",
-	RunE: func(cmd *cobra.Command, args []string) (ret error) {
-		// transform panics with error params into errors
-		defer recoverAll()
-
-		// check parameters
-		if len(args) < 1 {
-			return fmt.Errorf("missing argument: PromQL query")
-		}
-		query := args[0]
-
-		var timeoutStr, stepStr string
-		if timeout > 0 {
-			// workaround parsing issues
-			timeoutStr = fmt.Sprintf("%ds", int(timeout.Seconds()))
-		} else {
-			timeoutStr = ""
-		}
-		if stepsize > 0 {
-			stepStr = fmt.Sprintf("%ds", int(stepsize.Seconds()))
-		} else {
-			stepStr = ""
-		}
-
-		prometheus := prometheus()
-
-		// perform (range-)query
-		var resp *http.Response
-		var err error
-		if starttime != "" && endtime != "" && stepsize != 0 {
-			resp, err = prometheus.QueryRange(query, starttime, endtime, stepStr, timeoutStr, storage.JSON)
-		} else {
-			resp, err = prometheus.Query(query, timestamp, timeoutStr, storage.JSON)
-		}
-
-		checkResponse(err, resp)
-
-		printQueryResponse(resp)
-
-		return nil
-	},
+	Use:   "Query <PromQL Query> [ --timestamp | --start <starttime> --end <endtime> --step <duration> ] [ --timeout <duration> ]",
+	Short: "Perform a PromQL Query",
+	Long:  "Performs a PromQL Query against the metrics available for the project/domain in scope",
+	RunE:  Query,
 }
 
 func init() {
-
 	RootCmd.AddCommand(snapshotCmd)
 	RootCmd.AddCommand(queryCmd)
 	RootCmd.AddCommand(seriesCmd)
@@ -502,32 +527,41 @@ func init() {
 	// snapshotCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	snapshotCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
-	addClientFlags(snapshotCmd)
+	addClientFlags(snapshotCmd, "values")
 
-	queryCmd.Flags().StringVar(&starttime, "start", "", "Range query: Start timestamp (RFC3339 or Unix format; default:earliest)")
-	queryCmd.Flags().StringVar(&endtime, "end", "", "Range query: End timestamp (RFC3339 or Unix format; default: latest)")
+	queryCmd.Flags().StringVar(&starttime, "start", "", "Range Query: Start timestamp (RFC3339 or Unix format; default:earliest)")
+	queryCmd.Flags().StringVar(&endtime, "end", "", "Range Query: End timestamp (RFC3339 or Unix format; default: latest)")
 	queryCmd.Flags().StringVar(&timestamp, "timestamp", "", "Timestamp of measurement (RFC3339 or Unix format; default: latest)")
-	queryCmd.Flags().DurationVarP(&timeout, "timeout", "", 0, "Optional: Timeout for query (e.g. 10m; default: server setting)")
-	queryCmd.Flags().DurationVarP(&stepsize, "step", "", 0, "Optional: Step size for range query (e.g. 30s)")
-	addClientFlags(queryCmd)
+	queryCmd.Flags().DurationVarP(&timeout, "timeout", "", 0, "Optional: Timeout for Query (e.g. 10m; default: server setting)")
+	queryCmd.Flags().DurationVarP(&stepsize, "step", "", 0, "Optional: Step size for range Query (e.g. 30s)")
+	addClientFlags(queryCmd, "json")
 
-	addClientFlags(labelValuesCmd)
+	addClientFlags(labelValuesCmd, "values")
 
-	addClientFlags(metricNamesCmd)
+	addClientFlags(metricNamesCmd, "values")
 
 	seriesCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
 	seriesCmd.Flags().StringVar(&starttime, "start", "", "Start timestamp (RFC3339 or Unix format; default:earliest)")
 	seriesCmd.Flags().StringVar(&endtime, "end", "", "End timestamp (RFC3339 or Unix format; default: latest)")
-	addClientFlags(seriesCmd)
+	addClientFlags(seriesCmd, "table")
 }
 
-func addClientFlags(cmd *cobra.Command) {
+func setKeystoneInstance(keystone keystone.Driver) {
+	keystoneDriver = keystone
+}
+
+func setStorageInstance(storage storage.Driver) {
+	storageDriver = storage
+}
+
+func addClientFlags(cmd *cobra.Command, defaultOutputFormat string) {
 	// pass OpenStack auth. information via global top-level parameters or environment variables
 	// it is used by the "serve" command as service user, otherwise to authenticate the client
 	cmd.PersistentFlags().StringVar(&auth.IdentityEndpoint, "os-auth-url", os.Getenv("OS_AUTH_URL"), "OpenStack Authentication URL")
 	viper.BindPFlag("keystone.auth_url", cmd.PersistentFlags().Lookup("os-auth-url"))
 
 	cmd.PersistentFlags().StringVar(&auth.Username, "os-username", os.Getenv("OS_USERNAME"), "OpenStack Username")
+	cmd.PersistentFlags().StringVar(&auth.Username, "os-user-id", os.Getenv("OS_USER_ID"), "OpenStack Username")
 	cmd.PersistentFlags().StringVar(&auth.Password, "os-password", os.Getenv("OS_PASSWORD"), "OpenStack Password")
 	cmd.PersistentFlags().StringVar(&auth.DomainName, "os-user-domain-name", os.Getenv("OS_USER_DOMAIN_NAME"), "OpenStack User's domain name")
 	cmd.PersistentFlags().StringVar(&auth.DomainID, "os-user-domain-id", os.Getenv("OS_USER_DOMAIN_ID"), "OpenStack User's domain ID")
@@ -537,12 +571,12 @@ func addClientFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&auth.Scope.DomainID, "os-domain-id", os.Getenv("OS_DOMAIN_ID"), "OpenStack domain ID to scope to")
 	cmd.PersistentFlags().StringVar(&auth.TokenID, "os-token", os.Getenv("OS_TOKEN"), "OpenStack keystone token")
 
-	cmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", "", "Specify output format: table, json, template or value")
+	cmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", defaultOutputFormat, "Specify output format: table, json, template or value")
 	cmd.PersistentFlags().StringVarP(&columns, "columns", "c", "", "Specify the columns to print (comma-separated; only when --format value is set)")
 	cmd.PersistentFlags().StringVar(&separator, "separator", " ", "Separate different columns with this string (only when --columns value is set; default <space>)")
 	cmd.PersistentFlags().StringVar(&jsonTemplate, "template", "", "Go-template to define a custom output format based on the JSON response (only when --format=template)")
 
 	cmd.Flags().StringVar(&maiaURL, "maia-url", os.Getenv("MAIA_URL"), "URL of the target Maia service (override OpenStack service catalog)")
-	cmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
-	viper.BindPFlag("maia.prometheus_url", cmd.PersistentFlags().Lookup("prometheus-url"))
+	cmd.PersistentFlags().StringVar(&promURL, "storageInstance-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
+	viper.BindPFlag("maia.prometheus_url", cmd.PersistentFlags().Lookup("storageInstance-url"))
 }
