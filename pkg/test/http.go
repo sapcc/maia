@@ -22,6 +22,7 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/sapcc/maia/pkg/storage"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -30,6 +31,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"testing"
 )
 
@@ -115,4 +117,23 @@ func (r APIRequest) compareBodyToFixture(t *testing.T, fixturePath string, data 
 	if err != nil {
 		t.Fatalf("%s %s: body does not match: %s", r.Method, r.Path, err.Error())
 	}
+}
+
+// HTTPResponseFromFile creates a response object from the contents of a file.
+// It uses to suffix of the filename to determine the content-type
+func HTTPResponseFromFile(filename string) *http.Response {
+	fixture, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	responseRec := httptest.NewRecorder()
+	var contentType string
+	if strings.HasSuffix(filename, ".json") {
+		contentType = storage.JSON
+	} else if strings.HasSuffix(filename, ".txt") {
+		contentType = storage.PlainText
+	}
+	responseRec.Header().Set("Content-Type", contentType)
+	responseRec.Write(fixture)
+	return responseRec.Result()
 }

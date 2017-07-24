@@ -36,27 +36,6 @@ type prometheusStorageClient struct {
 	customHeaders map[string]string
 }
 
-var prometheusCoreHeadersJSON = map[string]string{
-	"User-Agent":      "Prometheus/",
-	"Accept":          JSON,
-	"Accept-Encoding": "gzip",
-	"Connection":      "close",
-}
-
-var prometheusCoreHeadersText = map[string]string{
-	"User-Agent":      "Prometheus/",
-	"Accept":          PlainText,
-	"Accept-Encoding": "gzip",
-	"Connection":      "close",
-}
-
-var prometheusCoreHeadersPBUF = map[string]string{
-	"User-Agent":      "Prometheus/",
-	"Accept":          P8SProtoBuf,
-	"Accept-Encoding": "gzip",
-	"Connection":      "close",
-}
-
 // Prometheus creates a storage driver for Prometheus/Maia
 func Prometheus(prometheusAPIURL string, customHeaders map[string]string) Driver {
 	result := prometheusStorageClient{

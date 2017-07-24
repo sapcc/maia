@@ -1,5 +1,5 @@
 hash: 715fcca3635c79b12c44aa65cd941541fb0d2dd4c9f9c3e7c177ad1129661228
-updated: 2017-07-19T10:22:30.886935075+02:00
+updated: 2017-07-24T14:29:52.667159906+02:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -9,10 +9,6 @@ imports:
   version: 3ae74dd07ebf48d1f2babbd1d2177cd1878a09ee
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
-- name: github.com/golang/mock
-  version: 93f6609a15b7de76bd49259f1f9a6b58df358936
-  subpackages:
-  - gomock
 - name: github.com/golang/protobuf
   version: 1fb8fd32a09087bcd727225167edd31e1b9ceb24
   subpackages:

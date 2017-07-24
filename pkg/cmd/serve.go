@@ -66,8 +66,8 @@ func init() {
 
 	var bindAddr, policyFile string
 
-	serveCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
-	viper.BindPFlag("maia.prometheus_url", serveCmd.PersistentFlags().Lookup("prometheus-url"))
+	serveCmd.PersistentFlags().StringVar(&promURL, "storageInstance-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
+	viper.BindPFlag("maia.prometheus_url", serveCmd.PersistentFlags().Lookup("storageInstance-url"))
 	serveCmd.Flags().StringVar(&bindAddr, "bind-address", "0.0.0.0:9091", "IP-Address and port where Maia is listening for incoming requests (e.g. 0.0.0.0:9091)")
 	viper.BindPFlag("maia.bind_address", serveCmd.Flags().Lookup("bind-address"))
 	serveCmd.Flags().StringVar(&policyFile, "policy-file", "", "Location of the OpenStack policy file")

@@ -29,8 +29,6 @@ import (
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
 	"github.com/spf13/viper"
-	"io/ioutil"
-	"net/http/httptest"
 )
 
 func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, keystone.Driver, *storage.MockDriver) {
@@ -54,10 +52,10 @@ func Test_Federate(t *testing.T) {
 
 	router, _, storageMock := setupTest(t, ctrl)
 
-	storageMock.EXPECT().Federate([]string{"{vmware_name=\"win_cifs_13\",project_id=\"12345\"}"}, "text/plain").Return(httpResponseFromFile("fixtures/federate.txt"), nil)
+	storageMock.EXPECT().Federate([]string{"{vmware_name=\"win_cifs_13\",project_id=\"12345\"}"}, storage.PlainText).Return(test.HTTPResponseFromFile("fixtures/federate.txt"), nil)
 
 	test.APIRequest{
-		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "text/plain"},
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": storage.PlainText},
 		Method:           "GET",
 		Path:             "/federate?match[]={vmware_name=%22win_cifs_13%22}",
 		ExpectStatusCode: 200,
@@ -71,7 +69,7 @@ func Test_Series(t *testing.T) {
 
 	router, _, storageMock := setupTest(t, ctrl)
 
-	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=\"12345\"}"}, "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "application/json").Return(httpResponseFromFile("fixtures/series.json"), nil)
+	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=\"12345\"}"}, "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "application/json").Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
@@ -88,7 +86,7 @@ func Test_LabelValues(t *testing.T) {
 
 	router, _, storageMock := setupTest(t, ctrl)
 
-	storageMock.EXPECT().Series([]string{"{project_id=\"12345\",component!=\"\"}"}, gomock.Any(), gomock.Any(), "application/json").Return(httpResponseFromFile("fixtures/series.json"), nil)
+	storageMock.EXPECT().Series([]string{"{project_id=\"12345\",component!=\"\"}"}, gomock.Any(), gomock.Any(), "application/json").Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
@@ -105,7 +103,7 @@ func Test_Query(t *testing.T) {
 
 	router, _, storageMock := setupTest(t, ctrl)
 
-	storageMock.EXPECT().Query("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "24m", "application/json").Return(httpResponseFromFile("fixtures/query.json"), nil)
+	storageMock.EXPECT().Query("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "24m", "application/json").Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
@@ -122,7 +120,7 @@ func Test_QueryRange(t *testing.T) {
 
 	router, _, storageMock := setupTest(t, ctrl)
 
-	storageMock.EXPECT().QueryRange("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "5m", "90s", "application/json").Return(httpResponseFromFile("fixtures/query_range.json"), nil)
+	storageMock.EXPECT().QueryRange("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "5m", "90s", "application/json").Return(test.HTTPResponseFromFile("fixtures/query_range.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
@@ -131,13 +129,6 @@ func Test_QueryRange(t *testing.T) {
 		ExpectStatusCode: 200,
 		ExpectJSON:       "fixtures/query_range.json",
 	}.Check(t, router)
-}
-
-func httpResponseFromFile(filename string) *http.Response {
-	fixture, _ := ioutil.ReadFile(filename)
-	responseRec := httptest.NewRecorder()
-	responseRec.Write(fixture)
-	return responseRec.Result()
 }
 
 func Test_APIMetadata(t *testing.T) {

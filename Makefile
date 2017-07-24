@@ -34,9 +34,11 @@ static-check: FORCE
 	@if s="$$(gofmt -s -l *.go pkg 2>/dev/null)"                            && test -n "$$s"; then printf ' => %s\n%s\n' "gofmt -s -d -e" "$$s"; false; fi
 	@if s="$$(golint . && find pkg -type d -exec golint {} \; 2>/dev/null)" && test -n "$$s"; then printf ' => %s\n%s\n' golint "$$s"; false; fi
 	go vet $(GO_ALLPKGS)
-build/%.cover.out: FORCE
+build/%.cover.out: FORCE dependencies
+	# echo "testing packages $(GO_COVERPKGS)"
 	go test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' -coverprofile=$@ -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(subst _,/,$*)
 build/cover.out: $(GO_COVERFILES)
+	# echo "merge coverage files for $(GO_COVERFILES)"
 	pkg/test/util/gocovcat.go $(GO_COVERFILES) > $@
 build/cover.html: build/cover.out
 	go tool cover -html $< -o $@
@@ -46,7 +48,7 @@ install: FORCE all
 
 clean: FORCE
 	glide cc
-	rm build/*
+	rm -f build/*
 	rm -f -- ./maia_*_*
 	rm -rf vendor
 	# remove generated mocks
@@ -66,7 +68,7 @@ DOCKER_IMAGE := hub.global.cloud.sap/monsoon/maia
 DOCKER_TAG   := latest
 
 docker: build/docker.tar
-	$(DOCKER) build --build-arg https_proxy=$HTTP_PROXY --build-arg http_proxy=$HTTP_PROXY --build-arg HTTP_PROXY=$HTTP_PROXY --build-arg HTTPS_PROXY=$HTTP_PROXY -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
+	$(DOCKER) build --build-arg https_proxy=$$(HTTP_PROXY) --build-arg http_proxy=$$(HTTP_PROXY) --build-arg HTTP_PROXY=$$(HTTP_PROXY) --build-arg HTTPS_PROXY=$$(HTTP_PROXY) -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
 
 vendor: FORCE
 	glide update -v
