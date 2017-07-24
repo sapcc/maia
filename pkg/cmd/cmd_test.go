@@ -93,7 +93,7 @@ func ExampleSeries() {
 	endtime = "2017-07-02T04:00:00.000Z"
 	outputFormat = "jsoN"
 
-	storageMock.EXPECT().Series([]string{"{" + selector + "}"}, starttime, endtime, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/Series.json"), nil)
+	storageMock.EXPECT().Series([]string{"{" + selector + "}"}, starttime, endtime, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
 	seriesCmd.RunE(seriesCmd, []string{})
 
@@ -170,7 +170,7 @@ func ExampleQuery_json() {
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "jsoN"
 
-	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/Query.json"), nil)
+	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
 	queryCmd.RunE(queryCmd, []string{query})
 
@@ -205,7 +205,7 @@ func ExampleQuery_table() {
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "TaBle"
 
-	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/Query.json"), nil)
+	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
 	queryCmd.RunE(queryCmd, []string{query})
 
