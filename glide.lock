@@ -9,10 +9,6 @@ imports:
   version: 3ae74dd07ebf48d1f2babbd1d2177cd1878a09ee
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
-- name: github.com/golang/mock
-  version: 93f6609a15b7de76bd49259f1f9a6b58df358936
-  subpackages:
-  - gomock
 - name: github.com/golang/protobuf
   version: 1fb8fd32a09087bcd727225167edd31e1b9ceb24
   subpackages:

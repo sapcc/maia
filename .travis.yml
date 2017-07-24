@@ -9,7 +9,7 @@ install:
     - go get -u github.com/golang/lint/golint
     - go get -u github.com/mattn/goveralls
     - go get -u github.com/golang/mock/mockgen
-
+    - go get -u github.com/golang/mock/gomock
 script:
     - make all check
     - $HOME/gopath/bin/goveralls -coverprofile=build/cover.out -service=travis-ci

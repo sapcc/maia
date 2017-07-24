@@ -29,4 +29,3 @@ import:
 - package: github.com/spf13/cobra
 - package: github.com/spf13/viper
 - package: github.com/patrickmn/go-cache
-- package: github.com/golang/mock/gomock
