@@ -46,7 +46,7 @@ install: FORCE all
 
 clean: FORCE
 	glide cc
-	rm build/*
+	rm -f build/*
 	rm -f -- ./maia_*_*
 	rm -rf vendor
 	# remove generated mocks
