@@ -34,9 +34,11 @@ static-check: FORCE
 	@if s="$$(gofmt -s -l *.go pkg 2>/dev/null)"                            && test -n "$$s"; then printf ' => %s\n%s\n' "gofmt -s -d -e" "$$s"; false; fi
 	@if s="$$(golint . && find pkg -type d -exec golint {} \; 2>/dev/null)" && test -n "$$s"; then printf ' => %s\n%s\n' golint "$$s"; false; fi
 	go vet $(GO_ALLPKGS)
-build/%.cover.out: FORCE
+build/%.cover.out: FORCE dependencies
+	# echo "testing packages $(GO_COVERPKGS)"
 	go test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' -coverprofile=$@ -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(subst _,/,$*)
 build/cover.out: $(GO_COVERFILES)
+	# echo "merge coverage files for $(GO_COVERFILES)"
 	pkg/test/util/gocovcat.go $(GO_COVERFILES) > $@
 build/cover.html: build/cover.out
 	go tool cover -html $< -o $@
