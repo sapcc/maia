@@ -243,7 +243,10 @@ maia label-values "job"
 
 ## Output Formatting
 
-By default maia prints results as unformatted text. To enable automation, also JSON, plain values output and Go text-templates
+By default maia prints results as unformatted text. Series data is formatted in raw tables without column alignment.
+Labels are used as columns (alphabetical sorting).
+
+To enable automation, also JSON, plain values output and Go text-templates
 are supported. 
 
 The output is controlled via the parameters `--format`, `--columns`, `--separator`and `--template`.
