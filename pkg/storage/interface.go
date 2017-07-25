@@ -162,7 +162,7 @@ func NewPrometheusDriver(prometheusAPIURL string, customHeader map[string]string
 			util.LogFatal("Couldn't initialize Prometheus storage driver with given endpoint: \"%s\"", prometheusAPIURL)
 			return nil
 		}
-		util.LogInfo("Using Prometheus at: \"%s\"", prometheusAPIURL)
+		util.LogInfo("Using API server at: \"%s\"", prometheusAPIURL)
 
 		return driver
 	default:

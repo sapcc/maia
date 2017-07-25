@@ -73,6 +73,9 @@ func fetchToken() string {
 	if auth.TokenID != "" {
 		return auth.TokenID
 	}
+	if auth.Password == "$OS_PASSWORD" {
+		auth.Password = os.Getenv("OS_PASSWORD")
+	}
 	if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
 		panic(fmt.Errorf("You must at least specify --os-username / --os-user-id and --os-password"))
 	}
@@ -115,7 +118,7 @@ func printValues(resp *http.Response) {
 		if contentType == storage.JSON {
 			if strings.EqualFold(outputFormat, "json") {
 				fmt.Print(string(body))
-			} else if strings.EqualFold(outputFormat, "values") {
+			} else if strings.EqualFold(outputFormat, "value") {
 				var jsonResponse struct {
 					Value []string `json:"data,omitempty"`
 				}
@@ -130,7 +133,7 @@ func printValues(resp *http.Response) {
 				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
 			}
 		} else if strings.HasPrefix(contentType, "text/plain") {
-			if strings.EqualFold(outputFormat, "values") {
+			if strings.EqualFold(outputFormat, "value") {
 				fmt.Print(string(body))
 			} else {
 				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
@@ -155,7 +158,7 @@ func printTable(resp *http.Response) {
 			if strings.EqualFold(outputFormat, "json") {
 				fmt.Print(string(body))
 				return
-			} else if strings.EqualFold(outputFormat, "table") || strings.EqualFold(outputFormat, "values") {
+			} else if strings.EqualFold(outputFormat, "table") || strings.EqualFold(outputFormat, "value") {
 
 				// unmarshal
 				var jsonResponse struct {
@@ -215,7 +218,7 @@ func buildColumnSet(promResult model.Value) map[string]bool {
 }
 
 func printHeader(allColumns []string) {
-	if !strings.EqualFold(outputFormat, "values") {
+	if !strings.EqualFold(outputFormat, "value") {
 		for i, field := range allColumns {
 			if i > 0 {
 				fmt.Print(separator)
@@ -277,7 +280,7 @@ func printTemplate(body []byte, tpl string) {
 
 // timeColumnFromTS creates a table column for a timestamp; it rounds it off to the step-size
 func timeColumnFromTS(ts time.Time) string {
-	return ts.Truncate(stepsize).Format(time.RFC3339)
+	return ts.Truncate(stepsize).Local().Format(time.RFC3339)
 }
 
 func printQueryResultAsTable(body []byte) {
@@ -317,7 +320,7 @@ func printQueryResultAsTable(body []byte) {
 		for _, el := range matrix {
 			collectKeys(set, model.LabelSet(el.Metric))
 			columnValues := map[string]string{}
-			columnValues[timestampKey] = el.Timestamp.Time().Format(time.RFC3339Nano)
+			columnValues[timestampKey] = el.Timestamp.Time().Local().Format(time.RFC3339Nano)
 			columnValues[valueKey] = el.Value.String()
 			for labelKey, labelValue := range el.Metric {
 				columnValues[string(labelKey)] = string(labelValue)
@@ -369,6 +372,8 @@ func Snapshot(cmd *cobra.Command, args []string) (ret error) {
 	// transform panics with error params into errors
 	defer recoverAll()
 
+	setDefaultOutputFormat("value")
+
 	prometheus := storageInstance()
 
 	var resp *http.Response
@@ -384,6 +389,8 @@ func Snapshot(cmd *cobra.Command, args []string) (ret error) {
 func LabelValues(cmd *cobra.Command, args []string) (ret error) {
 	// transform panics with error params into errors
 	defer recoverAll()
+
+	setDefaultOutputFormat("value")
 
 	// check parameters
 	if len(args) < 1 {
@@ -407,6 +414,8 @@ func Series(cmd *cobra.Command, args []string) (ret error) {
 	// transform panics with error params into errors
 	defer recoverAll()
 
+	setDefaultOutputFormat("table")
+
 	// pass the keystone token to Maia and ensure that the result is text
 	prometheus := storageInstance()
 
@@ -424,6 +433,8 @@ func MetricNames(cmd *cobra.Command, args []string) (ret error) {
 	// transform panics with error params into errors
 	defer recoverAll()
 
+	setDefaultOutputFormat("value")
+
 	return LabelValues(cmd, []string{"__name__"})
 }
 
@@ -431,6 +442,8 @@ func MetricNames(cmd *cobra.Command, args []string) (ret error) {
 func Query(cmd *cobra.Command, args []string) (ret error) {
 	// transform panics with error params into errors
 	defer recoverAll()
+
+	setDefaultOutputFormat("json")
 
 	// check parameters
 	if len(args) < 1 {
@@ -469,6 +482,12 @@ func Query(cmd *cobra.Command, args []string) (ret error) {
 	return nil
 }
 
+func setDefaultOutputFormat(format string) {
+	if outputFormat == "" {
+		outputFormat = format
+	}
+}
+
 // checkHttpStatus checks whether the response is 200 and panics with an appropriate error otherwise
 func checkResponse(err error, resp *http.Response) {
 	if err != nil {
@@ -479,14 +498,14 @@ func checkResponse(err error, resp *http.Response) {
 }
 
 var snapshotCmd = &cobra.Command{
-	Use:   "Snapshot [ --selector <vector-selector> ]",
+	Use:   "snapshot [ --selector <vector-selector> ]",
 	Short: "Get a Snapshot of the actual metric values for a project/domain.",
 	Long:  "Displays the current values of all metric Series. The Series can filtered using vector-selectors (label constraints).",
 	RunE:  Snapshot,
 }
 
 var seriesCmd = &cobra.Command{
-	Use:   "Series [ --selector <vector-selector> ] [ --start <starttime> --end <endtime> ]",
+	Use:   "series [ --selector <vector-selector> ] [ --start <starttime> --end <endtime> ]",
 	Short: "List measurement Series for project/domain.",
 	Long:  "Lists all metric Series. The Series can filtered using vector-selectors (label constraints).",
 	RunE:  Series,
@@ -507,7 +526,7 @@ var metricNamesCmd = &cobra.Command{
 }
 
 var queryCmd = &cobra.Command{
-	Use:   "Query <PromQL Query> [ --timestamp | --start <starttime> --end <endtime> --step <duration> ] [ --timeout <duration> ]",
+	Use:   "query <PromQL Query> [ --timestamp | --start <starttime> --end <endtime> --step <duration> ] [ --timeout <duration> ]",
 	Short: "Perform a PromQL Query",
 	Long:  "Performs a PromQL Query against the metrics available for the project/domain in scope",
 	RunE:  Query,
@@ -526,24 +545,42 @@ func init() {
 	// and all subcommands, e.g.:
 	// snapshotCmd.PersistentFlags().String("foo", "", "A help for foo")
 
+	// pass OpenStack auth. information via global top-level parameters or environment variables
+	// it is used by the "serve" command as service user, otherwise to authenticate the client
+	RootCmd.PersistentFlags().StringVar(&auth.IdentityEndpoint, "os-auth-url", os.Getenv("OS_AUTH_URL"), "OpenStack Authentication URL")
+	viper.BindPFlag("keystone.auth_url", RootCmd.PersistentFlags().Lookup("os-auth-url"))
+
+	RootCmd.PersistentFlags().StringVar(&auth.Username, "os-username", os.Getenv("OS_USERNAME"), "OpenStack Username")
+	RootCmd.PersistentFlags().StringVar(&auth.UserID, "os-user-id", os.Getenv("OS_USER_ID"), "OpenStack Username")
+	RootCmd.PersistentFlags().StringVar(&auth.Password, "os-password", "$OS_PASSWORD", "OpenStack Password")
+	RootCmd.PersistentFlags().StringVar(&auth.DomainName, "os-user-domain-name", os.Getenv("OS_USER_DOMAIN_NAME"), "OpenStack User's domain name")
+	RootCmd.PersistentFlags().StringVar(&auth.DomainID, "os-user-domain-id", os.Getenv("OS_USER_DOMAIN_ID"), "OpenStack User's domain ID")
+	RootCmd.PersistentFlags().StringVar(&auth.Scope.ProjectName, "os-project-name", os.Getenv("OS_PROJECT_NAME"), "OpenStack Project name to scope to")
+	RootCmd.PersistentFlags().StringVar(&auth.Scope.DomainName, "os-project-domain-name", os.Getenv("OS_PROJECT_DOMAIN_NAME"), "OpenStack Project's domain name")
+	RootCmd.PersistentFlags().StringVar(&scopedDomain, "os-domain-name", os.Getenv("OS_DOMAIN_NAME"), "OpenStack domain name to scope to")
+	RootCmd.PersistentFlags().StringVar(&auth.Scope.DomainID, "os-domain-id", os.Getenv("OS_DOMAIN_ID"), "OpenStack domain ID to scope to")
+	RootCmd.PersistentFlags().StringVar(&auth.TokenID, "os-token", os.Getenv("OS_TOKEN"), "OpenStack keystone token")
+
+	RootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", "", "Specify output format: table, json, template or value")
+	RootCmd.PersistentFlags().StringVarP(&columns, "columns", "c", "", "Specify the columns to print (comma-separated; only when --format value is set)")
+	RootCmd.PersistentFlags().StringVar(&separator, "separator", " ", "Separate different columns with this string (only when --columns value is set; default <space>)")
+	RootCmd.PersistentFlags().StringVar(&jsonTemplate, "template", "", "Go-template to define a custom output format based on the JSON response (only when --format=template)")
+
+	RootCmd.PersistentFlags().StringVar(&maiaURL, "maia-url", os.Getenv("MAIA_URL"), "URL of the target Maia service (override OpenStack service catalog)")
+	RootCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
+	viper.BindPFlag("maia.prometheus_url", RootCmd.PersistentFlags().Lookup("prometheus-url"))
+
 	snapshotCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
-	addClientFlags(snapshotCmd, "values")
 
 	queryCmd.Flags().StringVar(&starttime, "start", "", "Range Query: Start timestamp (RFC3339 or Unix format; default:earliest)")
 	queryCmd.Flags().StringVar(&endtime, "end", "", "Range Query: End timestamp (RFC3339 or Unix format; default: latest)")
 	queryCmd.Flags().StringVar(&timestamp, "timestamp", "", "Timestamp of measurement (RFC3339 or Unix format; default: latest)")
 	queryCmd.Flags().DurationVarP(&timeout, "timeout", "", 0, "Optional: Timeout for Query (e.g. 10m; default: server setting)")
 	queryCmd.Flags().DurationVarP(&stepsize, "step", "", 0, "Optional: Step size for range Query (e.g. 30s)")
-	addClientFlags(queryCmd, "json")
-
-	addClientFlags(labelValuesCmd, "values")
-
-	addClientFlags(metricNamesCmd, "values")
 
 	seriesCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
 	seriesCmd.Flags().StringVar(&starttime, "start", "", "Start timestamp (RFC3339 or Unix format; default:earliest)")
 	seriesCmd.Flags().StringVar(&endtime, "end", "", "End timestamp (RFC3339 or Unix format; default: latest)")
-	addClientFlags(seriesCmd, "table")
 }
 
 func setKeystoneInstance(keystone keystone.Driver) {
@@ -552,31 +589,4 @@ func setKeystoneInstance(keystone keystone.Driver) {
 
 func setStorageInstance(storage storage.Driver) {
 	storageDriver = storage
-}
-
-func addClientFlags(cmd *cobra.Command, defaultOutputFormat string) {
-	// pass OpenStack auth. information via global top-level parameters or environment variables
-	// it is used by the "serve" command as service user, otherwise to authenticate the client
-	cmd.PersistentFlags().StringVar(&auth.IdentityEndpoint, "os-auth-url", os.Getenv("OS_AUTH_URL"), "OpenStack Authentication URL")
-	viper.BindPFlag("keystone.auth_url", cmd.PersistentFlags().Lookup("os-auth-url"))
-
-	cmd.PersistentFlags().StringVar(&auth.Username, "os-username", os.Getenv("OS_USERNAME"), "OpenStack Username")
-	cmd.PersistentFlags().StringVar(&auth.Username, "os-user-id", os.Getenv("OS_USER_ID"), "OpenStack Username")
-	cmd.PersistentFlags().StringVar(&auth.Password, "os-password", os.Getenv("OS_PASSWORD"), "OpenStack Password")
-	cmd.PersistentFlags().StringVar(&auth.DomainName, "os-user-domain-name", os.Getenv("OS_USER_DOMAIN_NAME"), "OpenStack User's domain name")
-	cmd.PersistentFlags().StringVar(&auth.DomainID, "os-user-domain-id", os.Getenv("OS_USER_DOMAIN_ID"), "OpenStack User's domain ID")
-	cmd.PersistentFlags().StringVar(&auth.Scope.ProjectName, "os-project-name", os.Getenv("OS_PROJECT_NAME"), "OpenStack Project name to scope to")
-	cmd.PersistentFlags().StringVar(&auth.Scope.DomainName, "os-project-domain-name", os.Getenv("OS_PROJECT_DOMAIN_NAME"), "OpenStack Project's domain name")
-	cmd.PersistentFlags().StringVar(&scopedDomain, "os-domain-name", os.Getenv("OS_DOMAIN_NAME"), "OpenStack domain name to scope to")
-	cmd.PersistentFlags().StringVar(&auth.Scope.DomainID, "os-domain-id", os.Getenv("OS_DOMAIN_ID"), "OpenStack domain ID to scope to")
-	cmd.PersistentFlags().StringVar(&auth.TokenID, "os-token", os.Getenv("OS_TOKEN"), "OpenStack keystone token")
-
-	cmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", defaultOutputFormat, "Specify output format: table, json, template or value")
-	cmd.PersistentFlags().StringVarP(&columns, "columns", "c", "", "Specify the columns to print (comma-separated; only when --format value is set)")
-	cmd.PersistentFlags().StringVar(&separator, "separator", " ", "Separate different columns with this string (only when --columns value is set; default <space>)")
-	cmd.PersistentFlags().StringVar(&jsonTemplate, "template", "", "Go-template to define a custom output format based on the JSON response (only when --format=template)")
-
-	cmd.Flags().StringVar(&maiaURL, "maia-url", os.Getenv("MAIA_URL"), "URL of the target Maia service (override OpenStack service catalog)")
-	cmd.PersistentFlags().StringVar(&promURL, "storageInstance-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
-	viper.BindPFlag("maia.prometheus_url", cmd.PersistentFlags().Lookup("storageInstance-url"))
 }
