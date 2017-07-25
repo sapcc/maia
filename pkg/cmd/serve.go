@@ -40,18 +40,38 @@ var serveCmd = &cobra.Command{
 			}
 		}()
 
-		if _, err := os.Stat(configFile); err != nil {
-			panic(fmt.Errorf("No config file found at %s (required for server mode)", configFile))
-		}
-
 		// just run the server
 		api.Server()
 
 		return nil
 	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		if _, err := os.Stat(configFile); err != nil {
+			panic(fmt.Errorf("No config file found at %s (required for server mode)", configFile))
+		}
+
+		readConfig(configFile)
+	},
+}
+
+func readConfig(configPath string) {
+	// Read the maia config file (required for server)
+	// That way an OpenStack client environment will not be accidentally used for the "serve" command
+	if _, err := os.Stat(configPath); err == nil {
+		viper.SetConfigFile(configPath)
+		viper.SetConfigType("toml")
+		err := viper.ReadInConfig()
+		if err != nil { // Handle errors reading the config file
+			panic(fmt.Errorf("Fatal error config file: %s", err))
+		}
+	}
 }
 
 func init() {
+	//	cobra.OnInitialize(func() {
+	//		readConfig(configFile)
+	//	})
+
 	RootCmd.AddCommand(serveCmd)
 
 	// Here you will define your flags and configuration settings.

@@ -55,6 +55,7 @@ func setupTest(controller *gomock.Controller) (keystone.Driver, *storage.MockDri
 	// create dummy keystone and storage mock
 	keystone := keystone.Mock()
 	storage := storage.NewMockDriver(controller)
+	tzLocation = time.UTC
 
 	setKeystoneInstance(keystone)
 	setStorageInstance(storage)
@@ -71,7 +72,7 @@ func ExampleSnapshot() {
 
 	_, storageMock := setupTest(ctrl)
 
-	outputFormat = "vAlues"
+	outputFormat = "vAlue"
 	selector = "vmware_name=\"win_cifs_13\""
 	storageMock.EXPECT().Federate([]string{"{" + selector + "}"}, storage.PlainText).Return(test.HTTPResponseFromFile("fixtures/federate.txt"), nil)
 
@@ -81,7 +82,7 @@ func ExampleSnapshot() {
 	// vcenter_cpu_costop_summation{component="vcenter-exporter-vc-a-0",instance="100.65.0.252:9102",instance_uuid="3b32f415-c953-40b9-883d-51321611a7d4",job="endpoints",kubernetes_name="vcenter-exporter-vc-a-0",kubernetes_namespace="maia",metric_detail="3",project_id="12345",region="staging",service="metrics",system="openstack",vcenter_name="STAGINGA",vcenter_node="10.44.2.40",vmware_name="win_cifs_13"} 0 1500291187275
 }
 
-func ExampleSeries() {
+func ExampleSeries_json() {
 	t := testReporter{}
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -116,6 +117,27 @@ func ExampleSeries() {
 	// }
 }
 
+func ExampleSeries_table() {
+	t := testReporter{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, storageMock := setupTest(ctrl)
+
+	selector = "component!=\"\""
+	starttime = "2017-07-01T20:10:30.781Z"
+	endtime = "2017-07-02T04:00:00.000Z"
+	outputFormat = "table"
+
+	storageMock.EXPECT().Series([]string{"{" + selector + "}"}, starttime, endtime, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
+
+	seriesCmd.RunE(seriesCmd, []string{})
+
+	// Output:
+	// __name__ component instance job kubernetes_name kubernetes_namespace os_cluster region system
+	// up objectstore 100.64.1.159:9102 endpoints swift-proxy-cluster-3 swift cluster-3 staging openstack
+}
+
 func ExampleLabelValues_json() {
 	t := testReporter{}
 	ctrl := gomock.NewController(t)
@@ -147,7 +169,7 @@ func ExampleLabelValues_values() {
 	_, storageMock := setupTest(ctrl)
 
 	labelName := "component"
-	outputFormat = "VaLueS"
+	outputFormat = "VaLue"
 
 	storageMock.EXPECT().LabelValues(labelName, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/label_values.json"), nil)
 
@@ -199,7 +221,7 @@ func ExampleQuery_table() {
 
 	_, storageMock := setupTest(ctrl)
 
-	timestamp = "2017-07-01T20:10:30.781Z"
+	timestamp = "2017-07-03T07:26:23.997Z"
 	timeoutStr := "1440s"
 	timeout, _ = time.ParseDuration(timeoutStr)
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
@@ -221,8 +243,8 @@ func ExampleQuery_rangeJSON() {
 
 	_, storageMock := setupTest(ctrl)
 
-	starttime = "2017-07-01T20:10:30.781Z"
-	endtime = "2017-07-02T04:00:00.000Z"
+	starttime = "2017-07-13T20:10:30.781Z"
+	endtime = "2017-07-13T20:15:00.781Z"
 	stepsizeStr := "300s"
 	stepsize, _ = time.ParseDuration(stepsizeStr)
 	timeoutStr := "90s"
@@ -265,8 +287,8 @@ func ExampleQuery_rangeValuesTable() {
 
 	_, storageMock := setupTest(ctrl)
 
-	starttime = "2017-07-01T20:10:30.781Z"
-	endtime = "2017-07-02T04:00:00.000Z"
+	starttime = "2017-07-13T20:10:30.000Z"
+	endtime = "2017-07-13T20:15:00.000Z"
 	stepsizeStr := "300s"
 	stepsize, _ = time.ParseDuration(stepsizeStr)
 	timeoutStr := "90s"
@@ -290,8 +312,8 @@ func ExampleQuery_rangeSeriesTable() {
 
 	_, storageMock := setupTest(ctrl)
 
-	starttime = "2017-07-22T20:10:00.000+02:00"
-	endtime = "2017-07-22T20:20:00.000+02:00"
+	starttime = "2017-07-22T20:10:00.000Z"
+	endtime = "2017-07-22T20:20:00.000Z"
 	stepsizeStr := "300s"
 	stepsize, _ = time.ParseDuration(stepsizeStr)
 	timeoutStr := "90s"
