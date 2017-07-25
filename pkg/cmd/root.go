@@ -56,23 +56,9 @@ func setDefaultConfig() {
 	viper.SetDefault("keystone.token_cache_time", "900s")
 }
 
-func readConfig(configPath string) {
-	// Read the maia config file (required for server)
-	// That way an OpenStack client environment will not be accidentally used for the "serve" command
-	if _, err := os.Stat(configPath); err == nil {
-		viper.SetConfigFile(configPath)
-		viper.SetConfigType("toml")
-		err := viper.ReadInConfig()
-		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("Fatal error config file: %s", err))
-		}
-	}
-}
-
 func init() {
 	cobra.OnInitialize(func() {
 		setDefaultConfig()
-		readConfig(configFile)
 	})
 
 	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "", "/etc/maia/maia.conf", "Configuration file to use")
