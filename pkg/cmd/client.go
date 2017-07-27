@@ -80,7 +80,7 @@ func fetchToken() string {
 	if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
 		panic(fmt.Errorf("You must at least specify --os-username / --os-user-id and --os-password"))
 	}
-	context, err := keystoneInstance().Authenticate(&auth, false)
+	context, err := keystoneInstance().Authenticate(&auth)
 	if err != nil {
 		panic(err)
 	}

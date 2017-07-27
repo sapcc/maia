@@ -32,7 +32,7 @@ func Mock() Driver {
 	return mock{}
 }
 
-func (d mock) Authenticate(credentials *tokens.AuthOptions, serviceUser bool) (*policy.Context, error) {
+func (d mock) Authenticate(credentials *tokens.AuthOptions) (*policy.Context, error) {
 	return &policy.Context{Request: map[string]string{"user_id": credentials.UserID,
 		"project_id": credentials.Scope.ProjectID, "password": credentials.Password}}, nil
 }

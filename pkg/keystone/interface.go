@@ -37,7 +37,7 @@ type Driver interface {
 	AuthenticateRequest(req *http.Request) (*policy.Context, error)
 
 	// Authenticate authenticates a user using the provided authOptionsFromRequest
-	Authenticate(options *tokens.AuthOptions, serviceUser bool) (*policy.Context, error)
+	Authenticate(options *tokens.AuthOptions) (*policy.Context, error)
 }
 
 // NewKeystoneDriver is a factory method which chooses the right driver implementation based on configuration settings

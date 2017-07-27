@@ -50,38 +50,37 @@ func Keystone() Driver {
 type keystone struct {
 	mutex          *sync.Mutex
 	tokenCache     *cache.Cache
-	providerClient *gophercloud.ProviderClient
+	providerClient *gophercloud.ServiceClient
+	catalog        *tokens.ServiceCatalog
+	seqErrors      int
 }
 
-func (d keystone) keystoneClient(iServiceUser bool) (*gophercloud.ServiceClient, error) {
+func (d *keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	if d.providerClient == nil {
-		var err error
-		d.providerClient, err = openstack.NewClient(viper.GetString("keystone.auth_url"))
+		util.LogInfo("Setting up identity connection to %s", viper.GetString("keystone.auth_url"))
+		provider, err := openstack.NewClient(viper.GetString("keystone.auth_url"))
+		if viper.IsSet("maia.proxy") {
+			proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
+			if err != nil {
+				util.LogError("Could not set proxy for gophercloud client: %s .\n%s", proxyURL, err.Error())
+			} else {
+				provider.HTTPClient.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+			}
+		}
+		client, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{
+			Region: "",
+		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize OpenStack client: %v", err)
 		}
 
-		if iServiceUser {
-			err = d.authenticateServiceUser()
-			if err != nil {
-				return nil, fmt.Errorf("cannot fetch initial Keystone token: %v", err)
-			}
-		}
+		d.providerClient = client
 	}
 
-	if viper.IsSet("maia.proxy") {
-		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
-		if err != nil {
-			util.LogError("Could not set proxy for gophercloud client: %s .\n%s", proxyURL, err.Error())
-		} else {
-			d.providerClient.HTTPClient.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
-		}
-	}
-
-	return openstack.NewIdentityV3(d.providerClient, gophercloud.EndpointOpts{})
+	return d.providerClient, nil
 }
 
 type keystoneToken struct {
@@ -137,34 +136,21 @@ func (t *keystoneToken) ToContext() policy.Context {
 	return c
 }
 
-//authenticateServiceUser fetches a new Keystone keystone token for the service user. It is also used
-//to fetch the initial token on startup.
-func (d keystone) authenticateServiceUser() error {
-	//NOTE: This function is very similar to v3auth() in
-	//gophercloud/openstack/client.go, but with a few differences:
-	//
-	//1. thread-safe token renewal
-	//2. proper support for cross-domain scoping
+// reauthServiceUser refreshes an expired keystone token
+func (d *keystone) reauthServiceUser() error {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
-	util.LogInfo("renewing Keystone token for service user ...")
+	authOpts := authOptionsFromConfig()
+	util.LogInfo("Fetching token for service user %s%s@%s%s", authOpts.UserID, authOpts.Username, authOpts.DomainID, authOpts.DomainName)
 
-	d.providerClient.TokenID = viper.GetString("keystone.token")
-
-	//TODO: crashes with RegionName != ""
-	eo := gophercloud.EndpointOpts{Region: ""}
-	keystone, err := openstack.NewIdentityV3(d.providerClient, eo)
-	if err != nil {
-		return fmt.Errorf("cannot initialize Keystone client: %v", err)
-	}
-
-	util.LogDebug("Keystone URL: %s", keystone.Endpoint)
-
-	result := tokens.Create(keystone, authOptionsFromConfig())
+	result := tokens.Create(d.providerClient, authOpts)
 	token, err := result.ExtractToken()
 	if err != nil {
-		return fmt.Errorf("cannot read token: %v", err)
+		d.seqErrors++
+		return fmt.Errorf("Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
 	}
-	catalog, err := result.ExtractServiceCatalog()
+	d.catalog, err = result.ExtractServiceCatalog()
 	if err != nil {
 		return fmt.Errorf("cannot read service catalog: %v", err)
 	}
@@ -172,9 +158,9 @@ func (d keystone) authenticateServiceUser() error {
 	// store token so that it is considered for next authentication attempt
 	viper.Set("keystone.token", token.ID)
 	d.providerClient.TokenID = token.ID
-	// providerClient.ReauthFunc = d.authenticateServiceUser //TODO: exponential backoff necessary or already provided by gophercloud?
+	d.providerClient.ReauthFunc = d.reauthServiceUser
 	d.providerClient.EndpointLocator = func(opts gophercloud.EndpointOpts) (string, error) {
-		return openstack.V3EndpointURL(catalog, opts)
+		return openstack.V3EndpointURL(d.catalog, opts)
 	}
 
 	return nil
@@ -197,7 +183,8 @@ func authOptionsFromConfig() *tokens.AuthOptions {
 
 func authOpts2StringKey(authOpts *tokens.AuthOptions) string {
 	if authOpts.TokenID != "" {
-		return authOpts.TokenID
+		return authOpts.TokenID + authOpts.Scope.ProjectID + " " + authOpts.Scope.ProjectName + " " +
+			authOpts.Scope.DomainID + " " + authOpts.Scope.DomainName
 	}
 
 	// build unique key by separating fields with blanks. Since blanks are not allowed in several of those
@@ -207,26 +194,37 @@ func authOpts2StringKey(authOpts *tokens.AuthOptions) string {
 		authOpts.Scope.DomainID + " " + authOpts.Scope.DomainName
 }
 
-// Authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
-// It returns a keystoneToken that can be used to extract user and scope information (e.g. names)
-func (d keystone) Authenticate(authOpts *tokens.AuthOptions, serviceUser bool) (*policy.Context, error) {
+// Authenticate authenticates a non-service user using available authOptionsFromRequest (username+password or token)
+// It returns the authorization context
+func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, error) {
+	return d.authenticate(authOpts, false)
+}
+
+// authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
+// It returns the authorization context
+func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool) (*policy.Context, error) {
 	// check cache briefly
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found {
 		util.LogDebug("Token cache hit for %s", authOpts.TokenID)
 		return entry.(*policy.Context), nil
 	}
 
-	// authorize call
-	client, err := d.keystoneClient(serviceUser)
-	if err != nil {
+	// get identity connection
+	client, err := d.keystoneClient()
+	if client == nil || err != nil {
 		util.LogError(err.Error())
 		return nil, err
 	}
 
 	//use a custom token struct instead of tokens.Token which is way incomplete
 	var tokenData keystoneToken
-	if authOpts.TokenID != "" {
+	if authOpts.TokenID != "" && asServiceUser {
 		util.LogInfo("verifying token")
+		// need an authenticated service user to check tokens
+		if client.TokenID == "" {
+			d.reauthServiceUser()
+		}
+		// get token from token-ID which is being verified on that occasion
 		response := tokens.Get(client, authOpts.TokenID)
 		if response.Err != nil {
 			//this includes 4xx responses, so after this point, we can be sure that the token is valid
@@ -238,6 +236,7 @@ func (d keystone) Authenticate(authOpts *tokens.AuthOptions, serviceUser bool) (
 		}
 	} else {
 		util.LogInfo("authenticate %s%s with scope %s.", authOpts.Username, authOpts.UserID, authOpts.Scope)
+		// create new token from basic authentication credentials or token ID
 		response := tokens.Create(client, authOpts)
 		// ugly copy & paste because the base-type of CreateResult and GetResult is private
 		if response.Err != nil {
@@ -262,14 +261,14 @@ func (d keystone) Authenticate(authOpts *tokens.AuthOptions, serviceUser bool) (
 // The resulting policy context can be used to authorize the user
 // If no supported authOptionsFromRequest could be found, the context is nil
 // If the authOptionsFromRequest are invalid or the authentication provider has issues, an error is returned
-func (d keystone) AuthenticateRequest(r *http.Request) (*policy.Context, error) {
+func (d *keystone) AuthenticateRequest(r *http.Request) (*policy.Context, error) {
 	authOpts, err := authOptionsFromRequest(r)
 	if err != nil {
 		util.LogError(err.Error())
 		return nil, err
 	}
 
-	context, err := d.Authenticate(authOpts, true)
+	context, err := d.authenticate(authOpts, true)
 	if err != nil {
 		return nil, err
 	}
