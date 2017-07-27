@@ -34,6 +34,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
+	"math"
+	"math/rand"
 	"strings"
 	"time"
 )
@@ -147,6 +149,9 @@ func (d *keystone) reauthServiceUser() error {
 	result := tokens.Create(d.providerClient, authOpts)
 	token, err := result.ExtractToken()
 	if err != nil {
+		// wait up-to (2^errors)/2, i.e. 0..1, 2, 4, ... increasing with every sequential error
+		r := rand.Intn(int(math.Exp2(float64(d.seqErrors))))
+		time.Sleep(time.Duration(r) * time.Second)
 		d.seqErrors++
 		return fmt.Errorf("Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
 	}
