@@ -74,7 +74,6 @@ func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	util.LogInfo(newQuery)
 	resp, err := p.storage.Query(newQuery, queryParams.Get("time"), queryParams.Get("timeout"), req.Header.Get("Accept"))
 	if err != nil {
 		ReturnError(w, err, 503)

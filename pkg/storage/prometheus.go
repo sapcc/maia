@@ -133,7 +133,7 @@ func (promCli *prometheusStorageClient) sendToPrometheus(method string, promURL 
 		req.Header.Add(k, v)
 	}
 
-	util.LogInfo(promURL)
+	util.LogDebug("Forwarding request to API: %s", promURL)
 
 	resp, err := promCli.httpClient.Do(req)
 	if err != nil {

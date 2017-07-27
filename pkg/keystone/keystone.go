@@ -219,7 +219,7 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 	//use a custom token struct instead of tokens.Token which is way incomplete
 	var tokenData keystoneToken
 	if authOpts.TokenID != "" && asServiceUser {
-		util.LogInfo("verifying token")
+		util.LogDebug("verifying token")
 		// need an authenticated service user to check tokens
 		if client.TokenID == "" {
 			d.reauthServiceUser()
@@ -235,13 +235,17 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 			return nil, err
 		}
 	} else {
-		util.LogInfo("authenticate %s%s with scope %s.", authOpts.Username, authOpts.UserID, authOpts.Scope)
+		util.LogDebug("authenticate %s%s with scope %s.", authOpts.Username, authOpts.UserID, authOpts.Scope)
 		// create new token from basic authentication credentials or token ID
 		response := tokens.Create(client, authOpts)
 		// ugly copy & paste because the base-type of CreateResult and GetResult is private
 		if response.Err != nil {
 			//this includes 4xx responses, so after this point, we can be sure that the token is valid
-			util.LogInfo(response.Err.Error())
+			if authOpts.Username != "" || authOpts.UserID != "" {
+				util.LogInfo("Failed login of user %s%s for scope %s: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, response.Err.Error())
+			} else {
+				util.LogInfo("Failed login of with token %s ... for scope %s: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, response.Err.Error())
+			}
 			return nil, response.Err
 		}
 		err = response.ExtractInto(&tokenData)
