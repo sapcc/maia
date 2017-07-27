@@ -192,7 +192,7 @@ If Maia does not have a catalog entry, then you have to specify the Maia endpoin
 
 | Option | Environment Variable | Description |
 |--------|----------------------|-------------|
-| --maia-url | MAIA_SERVICE_URL | URL of the Maia service endpoint |
+| --maia-url | MAIA_URL | URL of the Maia service endpoint |
 
 In the examples below we assume that you have initialized the OS_* variables your shell environment properly and that
 your user has the prerequisite roles (e.g. `monitoring_viewer`) on the project in scope.
@@ -203,7 +203,37 @@ Type `maia --help` to get a full list of commands and options options with docum
 maia --help
 ```
 
-## Get Current Metric Values
+## Show Known Measurement Series
+ 
+Use the `series` command to get a list of all measurement series. You can restrict the timeframe using
+the parameters `--start` and `--end`. 
+
+```
+maia series --selector "__name__=~'vc.*'" --start '2017-07-26T10:46:25+02:00'
+```
+
+The list of series can be filtered using Prometheus label matchers. Don't forget to put it in quotes.
+```
+maia snapshot --selector 'job="endpoints"' ...
+```
+ 
+## List Known Metric Names
+
+Use the `metric-names` command to obtain a list of metric names.
+
+```
+maia metric-names
+```
+
+## List Known Label Values
+
+Use the `label-values` command to obtain known values for a given label.
+
+```
+maia label-values "job"
+```
+
+Note that stale series which did not receive measurements recently may not be considered for this list.
 
 ## Query Metrics with PromQL
 
@@ -224,22 +254,6 @@ maia query 'vcenter ...' --start 2017-07-01T05:10:51.781Z
 Check `maia query --help` for more options. Timestamps can be specified in Unix or RFC3339 format. Durations are
 specififed as numbers with a unit suffix, such as "30s", "1.5h" or "2h45m". Valid time units are "ns", "us" (or "µs"),
 "ms", "s", "m", "h".
-
-## List Known Metric Names
-
-Use the `metric-names` command to obtain a list of metric names.
-
-```
-maia metric-names
-```
-
-## List Known Label Values
-
-Use the `label-values` command to obtain current values for a given label.
-
-```
-maia label-values "job"
-```
 
 ## Output Formatting
 
@@ -267,14 +281,6 @@ The output is controlled via the parameters `--format`, `--columns`, `--separato
 | json     | JSON output of Maia/Prometheus server. Contains additional status/error information. See [Prometheus API doc.](https://prometheus.io/docs/querying/api/#expression-query-result-formats) | none |
 | template | Highly configurable output, applying [Go-templates](https://golang.org/pkg/text/template/) to the JSON response (see `json`format) | `--template`: Go-template expression |  
 
-### Use Maia Client with Prometheus
-
-You can also use the maia client with a plain Prometheus (no authentication).
-
-```
-maia snapshot --prometheus-url http://localhost:9090
-```
-
 ## Exporting Snapshots
 
 Use the `snapshot` command to get the latest values of all series in
@@ -287,11 +293,19 @@ maia snapshot --maia-url http://localhost:9091
 The amount of data can be restricted using Prometheus label matchers, i.e. constraints on label values:
 
 ```
-maia snapshot --selector "job=endpoints" ...
+maia snapshot --selector 'job="endpoints"' ...
 ```
 
 If you want to preprocess/filter data further, you can e.g. use the [prom2json](https://github.com/prometheus/prom2json)
 tool together with [jq](https://github.com/stedolan/jq).
+
+## Use Maia Client with Prometheus
+
+You can also use the maia client with a plain Prometheus (no authentication).
+
+```
+maia snapshot --prometheus-url http://localhost:9090
+```
 
 # Federating Tenant Metrics from Maia to another Prometheus
 
@@ -365,15 +379,30 @@ Configure the data source like with a regular Prometheus. Select `Basic Authenti
 
 # Contributing
 
-This project is open for external contributions. 
+This project is open for external contributions. The issue list shows what is planned for upcoming releases.
 
 Pull-requests are welcome as long as you follow a few rules:
 * Keep the API compatible to Prometheus
 * Do not degrade performance
 * Include unit tests for new or modified code
 * Pass the static code checks
+* Keep the architecture intact, don't add shortcuts, layers, ...
 
 ## Software Design
+
+Goals of the Maia service:
+* Add a multi-tenant security model to Prometheus non-intrusively
+  - with OpenStack being the first _driver_ in an otherwise pluggable architecture
+* Maintain API compatibility to Prometheus to reuse clients
+
+Components/Packages
+* api: Implementation of the API
+* cmd: Implementation of the CLI
+* keystone: authentication plugin(s)
+* prometheus: glue code to attach to a Prometheus as storage
+
+The latter packages will probably be renamed if we decide to support additional user
+management services or other monitoring backends (e.g. project cortex).
 
 ![Architecture diagram](./docs/maia-architecture.png)
 
