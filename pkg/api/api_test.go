@@ -97,7 +97,7 @@ func Test_LabelValues(t *testing.T) {
 	}.Check(t, router)
 }
 
-func Test_Query(t *testing.T) {
+func TestQuery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -114,7 +114,22 @@ func Test_Query(t *testing.T) {
 	}.Check(t, router)
 }
 
-func Test_QueryRange(t *testing.T) {
+func TestQuery_syntaxError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, _ := setupTest(t, ctrl)
+
+	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
+		Method:           "GET",
+		Path:             "/api/v1/query?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22}&time=2017-07-01T20:10:30.781Z&timeout=24m",
+		ExpectStatusCode: 400,
+		ExpectJSON:       "fixtures/query_syntax_error.json",
+	}.Check(t, router)
+}
+
+func TestQueryRange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -131,7 +146,7 @@ func Test_QueryRange(t *testing.T) {
 	}.Check(t, router)
 }
 
-func Test_APIMetadata(t *testing.T) {
+func TestAPIMetadata(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

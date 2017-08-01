@@ -42,7 +42,6 @@ func (r testReporter) Fatalf(format string, args ...interface{}) {
 
 func setupTest(controller *gomock.Controller) (keystone.Driver, *storage.MockDriver) {
 	// set mandatory parameters
-	maiaURL = "dummy"
 	auth.UserID = "user_id"
 	auth.Password = "password"
 	auth.Scope.ProjectID = "12345"
@@ -177,6 +176,27 @@ func ExampleLabelValues_values() {
 
 	// Output:
 	// objectstore
+}
+
+func ExampleMetricNames_values() {
+	t := testReporter{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	maiaURL = "http://localhost:9091"
+	_, storageMock := setupTest(ctrl)
+
+	outputFormat = "valuE"
+
+	storageMock.EXPECT().LabelValues("__name__", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/metric_names.json"), nil)
+
+	metricNamesCmd.RunE(metricNamesCmd, []string{})
+
+	// Output:
+	// vcenter_cpu_costop_summation
+	// vcenter_cpu_demand_average
+	// vcenter_cpu_idle_summation
+	// vcenter_cpu_latency_average
 }
 
 func ExampleQuery_json() {
