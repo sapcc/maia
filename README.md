@@ -1,7 +1,7 @@
 # Maia
 
-Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers a [Prometheus-compatible](https://prometheus.io/docs/querying/api/) 
-API and supports federation.
+Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers 
+a [Prometheus-compatible](https://prometheus.io/docs/querying/api/) API and supports federation.
 
 At SAP we use it to share tenant-specific metrics from our Converged Cloud platform
 with our users. For their convenience we included a CLI, so that metrics can be discovered and
@@ -25,17 +25,20 @@ Maia CLI
 
 ## Concept
 
-Maia adds multi-tenant support to Prometheus by using dedicated labels to assign metrics to OpenStack projects and domains.
+Maia adds multi-tenant support to an existing Prometheus installation by using dedicated labels to assign metrics to
+OpenStack projects and domains. These labels either have to be supplied by the exporters or they have to be
+mapped from other labels using the [Prometheus relabelling](https://prometheus.io/docs/operating/configuration/#relabel_config)
+capabilities.
  
-The following labels have a special meaning in Maia. *Only metrics with these labels are visible though the Maia API.*
+The following labels have a special meaning in Maia. *Only metrics with these labels are visible through the Maia API.*
  
  | Label Key  | Description  |
  |------------|--------------|
  | project_id | OpenStack project UUID |
  | domain_id  | OpenStack domain UUID |
  
-Metrics without `domain_id` will not be available when authorized to domain scope. Likewise, metrics without `project_id`
-will be omitted when project scope is used. There is no inheritance of metrics to parent projects. Users authorized
+Metrics without `project_id` will be omitted when project scope is used. Likewise, metrics without `domain_id` will not
+be available when authorized to domain scope. There is no inheritance of metrics to parent projects. Users authorized
 to a domain will be able to access the metrics of all projects in that domain that have been labelled for the domain.
 
 # Installation
@@ -143,6 +146,18 @@ this amount can be changed:
 ```
 token_cache_time = "3600s"
 ```
+
+## Available Exporters
+
+As explained in the Concept chapter, Maia requires all series to be labelled with OpenStack project_id resp. domain_id.
+
+The following exporters are known to produce suitible metrics:
+* [VCenter Exporter](https://github.com/sapcc/vcenter-exporter) provides project-specific metrics from an OpenStack-
+controlled VCenter. 
+* [SNMP Exporter](https://github.com/prometheus/snmp_exporter) can be configured to extract project IDs from
+SNMP variables into labels. Since most of the SNMP-enabled devices are shared, only a few metrics can be mapped to
+OpenStack projects or domains.
+
 
 ## Starting the Service
 

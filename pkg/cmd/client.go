@@ -66,13 +66,13 @@ func recoverAll() {
 	}
 }
 
-func fetchToken() string {
+func fetchToken() {
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
 	}
 	// authenticate calls to Maia
-	if auth.TokenID != "" {
-		return auth.TokenID
+	if auth.TokenID != "" && maiaURL != "" {
+		return
 	}
 	if auth.Password == "$OS_PASSWORD" {
 		auth.Password = os.Getenv("OS_PASSWORD")
@@ -80,19 +80,25 @@ func fetchToken() string {
 	if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
 		panic(fmt.Errorf("You must at least specify --os-username / --os-user-id and --os-password"))
 	}
-	context, err := keystoneInstance().Authenticate(&auth)
+	context, url, err := keystoneInstance().Authenticate(&auth)
 	if err != nil {
 		panic(err)
 	}
-	return context.Auth["token"]
+	auth.TokenID = context.Auth["token"]
+	if maiaURL == "" {
+		maiaURL = url
+	}
 }
 
 func storageInstance() storage.Driver {
 	if storageDriver == nil {
-		if maiaURL != "" {
-			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": fetchToken()})
-		} else if promURL != "" {
+		if promURL != "" {
 			storageDriver = storage.NewPrometheusDriver(promURL, map[string]string{})
+		} else if auth.IdentityEndpoint != "" {
+			// authenticate and set maiaURL if missing
+			fetchToken()
+			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
+		} else if promURL != "" {
 		} else {
 			panic(fmt.Errorf("Either --maia-url or --storageInstance-url need to be specified (or MAIA_URL resp. MAIA_PROMETHEUS_URL)"))
 		}
