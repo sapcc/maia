@@ -1,0 +1,9 @@
+{
+  "Status": "success",
+  "data": [
+    "vcenter_cpu_costop_summation",
+    "vcenter_cpu_demand_average",
+    "vcenter_cpu_idle_summation",
+    "vcenter_cpu_latency_average"
+  ]
+}

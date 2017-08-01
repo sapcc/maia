@@ -1,7 +1,7 @@
 # Maia
 
-Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers a [Prometheus-compatible](https://prometheus.io/docs/querying/api/) 
-API and supports federation.
+Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers 
+a [Prometheus-compatible](https://prometheus.io/docs/querying/api/) API and supports federation.
 
 At SAP we use it to share tenant-specific metrics from our Converged Cloud platform
 with our users. For their convenience we included a CLI, so that metrics can be discovered and
@@ -25,17 +25,20 @@ Maia CLI
 
 ## Concept
 
-Maia adds multi-tenant support to Prometheus by using dedicated labels to assign metrics to OpenStack projects and domains.
+Maia adds multi-tenant support to an existing Prometheus installation by using dedicated labels to assign metrics to
+OpenStack projects and domains. These labels either have to be supplied by the exporters or they have to be
+mapped from other labels using the [Prometheus relabelling](https://prometheus.io/docs/operating/configuration/#relabel_config)
+capabilities.
  
-The following labels have a special meaning in Maia. *Only metrics with these labels are visible though the Maia API.*
+The following labels have a special meaning in Maia. *Only metrics with these labels are visible through the Maia API.*
  
  | Label Key  | Description  |
  |------------|--------------|
  | project_id | OpenStack project UUID |
  | domain_id  | OpenStack domain UUID |
  
-Metrics without `domain_id` will not be available when authorized to domain scope. Likewise, metrics without `project_id`
-will be omitted when project scope is used. There is no inheritance of metrics to parent projects. Users authorized
+Metrics without `project_id` will be omitted when project scope is used. Likewise, metrics without `domain_id` will not
+be available when authorized to domain scope. There is no inheritance of metrics to parent projects. Users authorized
 to a domain will be able to access the metrics of all projects in that domain that have been labelled for the domain.
 
 # Installation
@@ -60,7 +63,7 @@ either OpenStack identity tokens or basic authentication.
 
 The service is configured using a TOML configuration file that is usually located in `etc/maia/maia.conf`. This file
 contains settings for the connection to Prometheus, the integration with OpenStack identity and technical configuration
-like the bind-address of the server process.
+like the bind-address of the server process. You can always override the entries of this file using command line parameters.
 
 Use the example in the `etc` folder of this repo to get started. 
 
@@ -152,6 +155,18 @@ Once you have finalized the configuration file, you are set to go
 maia serve
 ```
 
+## Available Exporters
+
+As explained in the Concept chapter, Maia requires all series to be labelled with OpenStack project_id resp. domain_id.
+
+The following exporters are known to produce suitible metrics:
+* [VCenter Exporter](https://github.com/sapcc/vcenter-exporter) provides project-specific metrics from an OpenStack-
+controlled VCenter. 
+* [SNMP Exporter](https://github.com/prometheus/snmp_exporter) can be configured to extract project IDs from
+SNMP variables into labels. Since most of the SNMP-enabled devices are shared, only a few metrics can be mapped to
+OpenStack projects or domains.
+
+
 ## Notes on Scalability
 
 Currently Maia only supports a single Prometheus backend as data source. Therefore scalability has to happen behind the
@@ -188,7 +203,8 @@ Use `openstack token issue` to generate a token and pass it to the Maia CLI in t
 export OS_TOKEN=$(openstack token issue -c id -f value)
 ```
  
-If Maia does not have a catalog entry, then you have to specify the Maia endpoint URL manually:
+If for some reason you want to use another Maia endpoint than the one registered in the OpenStack service catalog,
+then you can override its URL using the `--maia-url` option:
 
 | Option | Environment Variable | Description |
 |--------|----------------------|-------------|

@@ -53,7 +53,6 @@ type keystone struct {
 	mutex          *sync.Mutex
 	tokenCache     *cache.Cache
 	providerClient *gophercloud.ServiceClient
-	catalog        *tokens.ServiceCatalog
 	seqErrors      int
 }
 
@@ -149,13 +148,13 @@ func (d *keystone) reauthServiceUser() error {
 	result := tokens.Create(d.providerClient, authOpts)
 	token, err := result.ExtractToken()
 	if err != nil {
-		// wait up-to (2^errors)/2, i.e. 0..1, 2, 4, ... increasing with every sequential error
+		// wait ~ (2^errors)/2, i.e. 0..1, 0..2, 0..4, ... increasing with every sequential error
 		r := rand.Intn(int(math.Exp2(float64(d.seqErrors))))
 		time.Sleep(time.Duration(r) * time.Second)
 		d.seqErrors++
 		return fmt.Errorf("Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
 	}
-	d.catalog, err = result.ExtractServiceCatalog()
+	catalog, err := result.ExtractServiceCatalog()
 	if err != nil {
 		return fmt.Errorf("cannot read service catalog: %v", err)
 	}
@@ -165,7 +164,7 @@ func (d *keystone) reauthServiceUser() error {
 	d.providerClient.TokenID = token.ID
 	d.providerClient.ReauthFunc = d.reauthServiceUser
 	d.providerClient.EndpointLocator = func(opts gophercloud.EndpointOpts) (string, error) {
-		return openstack.V3EndpointURL(d.catalog, opts)
+		return openstack.V3EndpointURL(catalog, opts)
 	}
 
 	return nil
@@ -201,28 +200,29 @@ func authOpts2StringKey(authOpts *tokens.AuthOptions) string {
 
 // Authenticate authenticates a non-service user using available authOptionsFromRequest (username+password or token)
 // It returns the authorization context
-func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, error) {
+func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, string, error) {
 	return d.authenticate(authOpts, false)
 }
 
 // authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
 // It returns the authorization context
-func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool) (*policy.Context, error) {
+func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool) (*policy.Context, string, error) {
 	// check cache briefly
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found {
 		util.LogDebug("Token cache hit for %s", authOpts.TokenID)
-		return entry.(*policy.Context), nil
+		return entry.(*policy.Context), "", nil
 	}
 
 	// get identity connection
 	client, err := d.keystoneClient()
-	if client == nil || err != nil {
+	if err != nil {
 		util.LogError(err.Error())
-		return nil, err
+		return nil, "", err
 	}
 
 	//use a custom token struct instead of tokens.Token which is way incomplete
 	var tokenData keystoneToken
+	var catalog *tokens.ServiceCatalog
 	if authOpts.TokenID != "" && asServiceUser {
 		util.LogDebug("verifying token")
 		// need an authenticated service user to check tokens
@@ -233,11 +233,15 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 		response := tokens.Get(client, authOpts.TokenID)
 		if response.Err != nil {
 			//this includes 4xx responses, so after this point, we can be sure that the token is valid
-			return nil, response.Err
+			return nil, "", response.Err
 		}
 		err = response.ExtractInto(&tokenData)
 		if err != nil {
-			return nil, err
+			return nil, "", err
+		}
+		catalog, err = response.ExtractServiceCatalog()
+		if err != nil {
+			return nil, "", err
 		}
 	} else {
 		util.LogDebug("authenticate %s%s with scope %s.", authOpts.Username, authOpts.UserID, authOpts.Scope)
@@ -251,19 +255,25 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 			} else {
 				util.LogInfo("Failed login of with token %s ... for scope %s: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, response.Err.Error())
 			}
-			return nil, response.Err
+			return nil, "", response.Err
 		}
 		err = response.ExtractInto(&tokenData)
 		if err != nil {
-			return nil, err
+			return nil, "", err
+		}
+		catalog, err = response.ExtractServiceCatalog()
+		if err != nil {
+			return nil, "", err
 		}
 		// the token is passed separately
 		tokenData.Token = response.Header.Get("X-Subject-Token")
+		client.TokenID = tokenData.Token
 	}
 
 	context := tokenData.ToContext()
 	d.tokenCache.Set(authOpts2StringKey(authOpts), &context, cache.DefaultExpiration)
-	return &context, nil
+	endpointURL, err := openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
+	return &context, endpointURL, nil
 }
 
 // AuthenticateRequest attempts to Authenticate a user using the request header contents
@@ -277,7 +287,7 @@ func (d *keystone) AuthenticateRequest(r *http.Request) (*policy.Context, error)
 		return nil, err
 	}
 
-	context, err := d.authenticate(authOpts, true)
+	context, _, err := d.authenticate(authOpts, true)
 	if err != nil {
 		return nil, err
 	}

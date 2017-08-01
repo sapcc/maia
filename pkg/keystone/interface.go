@@ -33,11 +33,12 @@ import (
 type Driver interface {
 	// AuthenticateRequest authenticates a user using authOptionsFromRequest passed in the HTTP request header.
 	// After successful authentication, additional context information is added to the request header
-	// In addition a Context object is returned.
+	// In addition a Context object is returned for policy evaluation.
 	AuthenticateRequest(req *http.Request) (*policy.Context, error)
 
-	// Authenticate authenticates a user using the provided authOptionsFromRequest
-	Authenticate(options *tokens.AuthOptions) (*policy.Context, error)
+	// Authenticate authenticates a user using the provided authOptions.
+	// It returns a context for policy evaluation and the public endpoint retrieved from the service catalog
+	Authenticate(options *tokens.AuthOptions) (*policy.Context, string, error)
 }
 
 // NewKeystoneDriver is a factory method which chooses the right driver implementation based on configuration settings
