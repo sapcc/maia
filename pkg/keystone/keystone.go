@@ -267,7 +267,6 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 		}
 		// the token is passed separately
 		tokenData.Token = response.Header.Get("X-Subject-Token")
-		client.TokenID = tokenData.Token
 	}
 
 	context := tokenData.ToContext()
