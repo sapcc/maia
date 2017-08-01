@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/databus23/goslo.policy"
 	"github.com/golang/mock/gomock"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
@@ -31,17 +32,33 @@ import (
 	"github.com/spf13/viper"
 )
 
-func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, keystone.Driver, *storage.MockDriver) {
+func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, *keystone.MockDriver, *storage.MockDriver) {
 	//load test policy (where everything is allowed)
 	viper.Set("maia.policy_file", "../test/policy.json")
 	viper.Set("maia.label_value_ttl", "72h")
 
 	//create test driver with the domains and projects from start-data.sql
-	keystone := keystone.Mock()
+	keystone := keystone.NewMockDriver(controller)
 	storage := storage.NewMockDriver(controller)
 	//storage = storage.Prometheus("https://prometheus.staging.cloud.sap")
 	router, _ := NewV1Router(keystone, storage)
 	return router, keystone, storage
+}
+
+type UpdateHeaderMatcher struct {
+	gomock.Matcher
+}
+
+func (UpdateHeaderMatcher) Matches(x interface{}) bool {
+	httpReq := x.(*http.Request)
+	if httpReq != nil {
+		httpReq.Header.Set("X-Project-Id", "12345")
+	}
+	return true
+}
+
+func (UpdateHeaderMatcher) String() string {
+	return "is anything"
 }
 
 // HTTP based tests
@@ -50,8 +67,11 @@ func Test_Federate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	router, _, storageMock := setupTest(t, ctrl)
+	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(UpdateHeaderMatcher{}).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
+	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
 	storageMock.EXPECT().Federate([]string{"{vmware_name=\"win_cifs_13\",project_id=\"12345\"}"}, storage.PlainText).Return(test.HTTPResponseFromFile("fixtures/federate.txt"), nil)
 
 	test.APIRequest{
@@ -67,9 +87,13 @@ func Test_Series(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	router, _, storageMock := setupTest(t, ctrl)
+	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
-	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=\"12345\"}"}, "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "application/json").Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(UpdateHeaderMatcher{}).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
+	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{"67890"}).After(authCall)
+
+	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=\"12345|67890\"}"}, "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "application/json").Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
@@ -84,7 +108,10 @@ func Test_LabelValues(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	router, _, storageMock := setupTest(t, ctrl)
+	router, keystoneMock, storageMock := setupTest(t, ctrl)
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(UpdateHeaderMatcher{}).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
+	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
 
 	storageMock.EXPECT().Series([]string{"{project_id=\"12345\",component!=\"\"}"}, gomock.Any(), gomock.Any(), "application/json").Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
@@ -101,7 +128,10 @@ func TestQuery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	router, _, storageMock := setupTest(t, ctrl)
+	router, keystoneMock, storageMock := setupTest(t, ctrl)
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(UpdateHeaderMatcher{}).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
+	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
 
 	storageMock.EXPECT().Query("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "24m", "application/json").Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
@@ -118,7 +148,11 @@ func TestQuery_syntaxError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	router, _, _ := setupTest(t, ctrl)
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(UpdateHeaderMatcher{}).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
+	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id@12345:password")), "Accept": "application/json"},
@@ -133,8 +167,11 @@ func TestQueryRange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	router, _, storageMock := setupTest(t, ctrl)
+	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(UpdateHeaderMatcher{}).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
+	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
 	storageMock.EXPECT().QueryRange("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "5m", "90s", "application/json").Return(test.HTTPResponseFromFile("fixtures/query_range.json"), nil)
 
 	test.APIRequest{

@@ -29,6 +29,7 @@ import (
 	"github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
@@ -44,16 +45,17 @@ import (
 func Keystone() Driver {
 	ks := keystone{}
 	ks.tokenCache = cache.New(viper.GetDuration("keystone.token_cache_time"), time.Minute)
+	ks.projectTreeCache = cache.New(viper.GetDuration("keystone.token_cache_time"), time.Minute)
 	ks.mutex = &sync.Mutex{}
 
 	return &ks
 }
 
 type keystone struct {
-	mutex          *sync.Mutex
-	tokenCache     *cache.Cache
-	providerClient *gophercloud.ServiceClient
-	seqErrors      int
+	mutex                        *sync.Mutex
+	tokenCache, projectTreeCache *cache.Cache
+	providerClient               *gophercloud.ServiceClient
+	seqErrors                    int
 }
 
 func (d *keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
@@ -137,6 +139,12 @@ func (t *keystoneToken) ToContext() policy.Context {
 	return c
 }
 
+type cacheEntry struct {
+	context     *policy.Context
+	endpointURL string
+	projectTree []string
+}
+
 // reauthServiceUser refreshes an expired keystone token
 func (d *keystone) reauthServiceUser() error {
 	d.mutex.Lock()
@@ -210,7 +218,7 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 	// check cache briefly
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found {
 		util.LogDebug("Token cache hit for %s", authOpts.TokenID)
-		return entry.(*policy.Context), "", nil
+		return entry.(*cacheEntry).context, entry.(*cacheEntry).endpointURL, nil
 	}
 
 	// get identity connection
@@ -220,15 +228,19 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 		return nil, "", err
 	}
 
+	// authenticate service user
+	if asServiceUser {
+		// need an authenticated service user to check tokens and build the project tree
+		if client.TokenID == "" {
+			d.reauthServiceUser()
+		}
+	}
+
 	//use a custom token struct instead of tokens.Token which is way incomplete
 	var tokenData keystoneToken
 	var catalog *tokens.ServiceCatalog
 	if authOpts.TokenID != "" && asServiceUser {
 		util.LogDebug("verifying token")
-		// need an authenticated service user to check tokens
-		if client.TokenID == "" {
-			d.reauthServiceUser()
-		}
 		// get token from token-ID which is being verified on that occasion
 		response := tokens.Get(client, authOpts.TokenID)
 		if response.Err != nil {
@@ -269,10 +281,65 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 		tokenData.Token = response.Header.Get("X-Subject-Token")
 	}
 
+	// authorization context
 	context := tokenData.ToContext()
-	d.tokenCache.Set(authOpts2StringKey(authOpts), &context, cache.DefaultExpiration)
+	// project tree (children)
+	projectID := tokenData.ProjectScope.ID
+	if asServiceUser && projectID != "" {
+		d.updateProjectTree(client, projectID)
+	}
+	// service endpoint
 	endpointURL, err := openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
+
+	// update the cache
+	ce := cacheEntry{
+		context:     &context,
+		endpointURL: endpointURL,
+	}
+	d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
 	return &context, endpointURL, nil
+}
+
+func (d *keystone) ChildProjects(projectID string) []string {
+	if ce, ok := d.projectTreeCache.Get(projectID); ok {
+		return ce.([]string)
+	}
+
+	return []string{}
+}
+
+func (d *keystone) updateProjectTree(client *gophercloud.ServiceClient, projectID string) {
+
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	childProjectIDs, err := childProjects(client, projectID)
+	if err != nil {
+		util.LogError("Unable to obtain project tree of project %s: %v", projectID, err)
+	}
+	d.projectTreeCache.Set(projectID, childProjectIDs, cache.DefaultExpiration)
+}
+
+func childProjects(client *gophercloud.ServiceClient, projectID string) ([]string, error) {
+	enabledVal := true
+	list, err := projects.List(client, projects.ListOpts{ParentID: projectID, Enabled: &enabledVal}).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	slice, err := projects.ExtractProjects(list)
+	if err != nil {
+		return nil, err
+	}
+	projectIDs := []string{}
+	for _, p := range slice {
+		projectIDs = append(projectIDs, p.ID)
+		children, err := childProjects(client, p.ID)
+		if err != nil {
+			return nil, err
+		}
+		projectIDs = append(projectIDs, children...)
+	}
+	return projectIDs, nil
 }
 
 // AuthenticateRequest attempts to Authenticate a user using the request header contents

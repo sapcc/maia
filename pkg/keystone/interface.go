@@ -21,7 +21,7 @@ package keystone
 
 import (
 	"fmt"
-	"github.com/databus23/goslo.policy"
+	policy "github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/spf13/viper"
 	"net/http"
@@ -39,6 +39,9 @@ type Driver interface {
 	// Authenticate authenticates a user using the provided authOptions.
 	// It returns a context for policy evaluation and the public endpoint retrieved from the service catalog
 	Authenticate(options *tokens.AuthOptions) (*policy.Context, string, error)
+
+	// ChildProjects returns the IDs of all child-projects of the project denoted by projectID
+	ChildProjects(projectID string) []string
 }
 
 // NewKeystoneDriver is a factory method which chooses the right driver implementation based on configuration settings

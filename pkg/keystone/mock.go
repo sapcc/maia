@@ -42,3 +42,7 @@ func (d mock) AuthenticateRequest(req *http.Request) (*policy.Context, error) {
 	return &policy.Context{Request: map[string]string{"user_id": "testuser",
 		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil
 }
+
+func (d mock) ChildProjects(projectID string) []string {
+	return []string{}
+}
