@@ -63,7 +63,7 @@ either OpenStack identity tokens or basic authentication.
 
 The service is configured using a TOML configuration file that is usually located in `etc/maia/maia.conf`. This file
 contains settings for the connection to Prometheus, the integration with OpenStack identity and technical configuration
-like the bind-address of the server process.
+like the bind-address of the server process. You can always override the entries of this file using command line parameters.
 
 Use the example in the `etc` folder of this repo to get started. 
 
@@ -147,6 +147,14 @@ this amount can be changed:
 token_cache_time = "3600s"
 ```
 
+## Starting the Service
+
+Once you have finalized the configuration file, you are set to go
+
+```
+maia serve
+```
+
 ## Available Exporters
 
 As explained in the Concept chapter, Maia requires all series to be labelled with OpenStack project_id resp. domain_id.
@@ -158,14 +166,6 @@ controlled VCenter.
 SNMP variables into labels. Since most of the SNMP-enabled devices are shared, only a few metrics can be mapped to
 OpenStack projects or domains.
 
-
-## Starting the Service
-
-Once you have finalized the configuration file, you are set to go
-
-```
-maia serve
-```
 
 ## Notes on Scalability
 
@@ -203,7 +203,8 @@ Use `openstack token issue` to generate a token and pass it to the Maia CLI in t
 export OS_TOKEN=$(openstack token issue -c id -f value)
 ```
  
-If Maia does not have a catalog entry, then you have to specify the Maia endpoint URL manually:
+If for some reason you want to use another Maia endpoint than the one registered in the OpenStack service catalog,
+then you can override its URL using the `--maia-url` option:
 
 | Option | Environment Variable | Description |
 |--------|----------------------|-------------|
