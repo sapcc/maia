@@ -52,7 +52,8 @@ clean: FORCE
 	rm -f -- ./maia_*_*
 	rm -rf vendor
 	# remove generated mocks
-	rm -f pkg/storage/prometheus_mock.go
+	rm -f pkg/storage/genmock.go
+	rm -f pkg/keystone/genmock.go
 
 build/docker.tar:
 	glide install -v
@@ -77,6 +78,7 @@ dependencies:
 	# provide dependencies
 	glide install -v
 	# generate mocks
-	mockgen --source pkg/storage/interface.go --destination pkg/storage/prometheus_mock.go --package storage
+	mockgen --source pkg/storage/interface.go --destination pkg/storage/genmock.go --package storage
+	mockgen --source pkg/keystone/interface.go --destination pkg/keystone/genmock.go --package keystone
 
 .PHONY: FORCE

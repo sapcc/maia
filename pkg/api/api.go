@@ -35,8 +35,12 @@ import (
 	"time"
 )
 
-func scopeToLabelConstraint(req *http.Request) (string, string) {
+func (p *v1Provider) scopeToLabelConstraint(req *http.Request) (string, string) {
 	if projectID := req.Header.Get("X-Project-Id"); projectID != "" {
+		children := p.keystone.ChildProjects(projectID)
+		for _, subID := range children {
+			projectID = projectID + "|" + subID
+		}
 		return "project_id", projectID
 	} else if domainID := req.Header.Get("X-Domain-Id"); domainID != "" {
 		return "domain_id", domainID
@@ -47,7 +51,7 @@ func scopeToLabelConstraint(req *http.Request) (string, string) {
 
 // Federate handles GET /federate.
 func (p *v1Provider) Federate(w http.ResponseWriter, req *http.Request) {
-	selectors, err := buildSelectors(req)
+	selectors, err := p.buildSelectors(req)
 	if err != nil {
 		util.LogInfo("Invalid request params %s", req.URL)
 		ReturnError(w, err, 400)
@@ -65,7 +69,7 @@ func (p *v1Provider) Federate(w http.ResponseWriter, req *http.Request) {
 }
 
 func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request) {
-	labelKey, labelValue := scopeToLabelConstraint(req)
+	labelKey, labelValue := p.scopeToLabelConstraint(req)
 
 	queryParams := req.URL.Query()
 	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), labelKey, labelValue)
@@ -84,7 +88,7 @@ func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request) {
 }
 
 func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
-	labelKey, labelValue := scopeToLabelConstraint(req)
+	labelKey, labelValue := p.scopeToLabelConstraint(req)
 
 	queryParams := req.URL.Query()
 	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), labelKey, labelValue)
@@ -105,7 +109,7 @@ func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
 // LabelValues utilizes the series API in order to implement a tenant-aware list.
 // This is a complex operation.
 func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
-	labelKey, labelValue := scopeToLabelConstraint(req)
+	labelKey, labelValue := p.scopeToLabelConstraint(req)
 
 	name := model.LabelName(mux.Vars(req)["name"])
 	// do not list label values from series older than maia.label_value_ttl
@@ -156,8 +160,8 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 
 // buildSelectors takes the selectors contained in the "match[]" URL query parameter(s)
 // and extends them with a label-constrained for the project/domain scope
-func buildSelectors(req *http.Request) (*[]string, error) {
-	labelKey, labelValue := scopeToLabelConstraint(req)
+func (p *v1Provider) buildSelectors(req *http.Request) (*[]string, error) {
+	labelKey, labelValue := p.scopeToLabelConstraint(req)
 
 	queryParams := req.URL.Query()
 	selectors := queryParams["match[]"]
@@ -178,7 +182,7 @@ func buildSelectors(req *http.Request) (*[]string, error) {
 }
 
 func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request) {
-	selectors, err := buildSelectors(req)
+	selectors, err := p.buildSelectors(req)
 	if err != nil {
 		ReturnError(w, err, 400)
 		return

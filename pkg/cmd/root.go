@@ -53,6 +53,7 @@ func Execute() {
 func setDefaultConfig() {
 	viper.SetDefault("maia.keystone_driver", "keystone")
 	viper.SetDefault("maia.storage_driver", "prometheus")
+	viper.SetDefault("maia.label_value_ttl", "1h")
 	viper.SetDefault("keystone.token_cache_time", "900s")
 }
 
