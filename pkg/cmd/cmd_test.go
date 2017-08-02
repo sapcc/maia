@@ -21,7 +21,9 @@ package cmd
 
 import (
 	"fmt"
+	policy "github.com/databus23/goslo.policy"
 	"github.com/golang/mock/gomock"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
@@ -40,10 +42,10 @@ func (r testReporter) Fatalf(format string, args ...interface{}) {
 	panic(fmt.Errorf(format, args))
 }
 
-func setupTest(controller *gomock.Controller) (keystone.Driver, *storage.MockDriver) {
+func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.MockDriver) {
 	// set mandatory parameters
 	auth.UserID = "user_id"
-	auth.Password = "password"
+	auth.Password = "testwd"
 	auth.Scope.ProjectID = "12345"
 	outputFormat = ""
 	starttime = ""
@@ -52,7 +54,7 @@ func setupTest(controller *gomock.Controller) (keystone.Driver, *storage.MockDri
 	columns = ""
 
 	// create dummy keystone and storage mock
-	keystone := keystone.Mock()
+	keystone := keystone.NewMockDriver(controller)
 	storage := storage.NewMockDriver(controller)
 	tzLocation = time.UTC
 
@@ -62,6 +64,16 @@ func setupTest(controller *gomock.Controller) (keystone.Driver, *storage.MockDri
 	return keystone, storage
 }
 
+func expectAuth(keystoneMock *keystone.MockDriver) {
+	keystoneMock.EXPECT().Authenticate(&tokens.AuthOptions{UserID: "user_id", Password: "testwd", Scope: tokens.Scope{ProjectID: "12345"}}).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
+	// call this explicitly since the mocked storage does not
+	fetchToken()
+	//authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+	//	"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
+	//keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
+}
+
 // HTTP based tests
 
 func ExampleSnapshot() {
@@ -69,10 +81,12 @@ func ExampleSnapshot() {
 	ctrl := gomock.NewController(&t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	outputFormat = "vAlue"
 	selector = "vmware_name=\"win_cifs_13\""
+
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().Federate([]string{"{" + selector + "}"}, storage.PlainText).Return(test.HTTPResponseFromFile("fixtures/federate.txt"), nil)
 
 	snapshotCmd.RunE(snapshotCmd, []string{})
@@ -86,13 +100,14 @@ func ExampleSeries_json() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	selector = "component!=\"\""
 	starttime = "2017-07-01T20:10:30.781Z"
 	endtime = "2017-07-02T04:00:00.000Z"
 	outputFormat = "jsoN"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().Series([]string{"{" + selector + "}"}, starttime, endtime, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
 	seriesCmd.RunE(seriesCmd, []string{})
@@ -121,13 +136,14 @@ func ExampleSeries_table() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	selector = "component!=\"\""
 	starttime = "2017-07-01T20:10:30.781Z"
 	endtime = "2017-07-02T04:00:00.000Z"
 	outputFormat = "table"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().Series([]string{"{" + selector + "}"}, starttime, endtime, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
 	seriesCmd.RunE(seriesCmd, []string{})
@@ -142,11 +158,12 @@ func ExampleLabelValues_json() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	labelName := "component"
 	outputFormat = "jSon"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().LabelValues(labelName, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/label_values.json"), nil)
 
 	labelValuesCmd.RunE(labelValuesCmd, []string{labelName})
@@ -165,11 +182,12 @@ func ExampleLabelValues_values() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	labelName := "component"
 	outputFormat = "VaLue"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().LabelValues(labelName, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/label_values.json"), nil)
 
 	labelValuesCmd.RunE(labelValuesCmd, []string{labelName})
@@ -184,10 +202,11 @@ func ExampleMetricNames_values() {
 	defer ctrl.Finish()
 
 	maiaURL = "http://localhost:9091"
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	outputFormat = "valuE"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().LabelValues("__name__", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/metric_names.json"), nil)
 
 	metricNamesCmd.RunE(metricNamesCmd, []string{})
@@ -204,7 +223,7 @@ func ExampleQuery_json() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	timestamp = "2017-07-01T20:10:30.781Z"
 	timeoutStr := "1440s"
@@ -212,6 +231,7 @@ func ExampleQuery_json() {
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "jsoN"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
 	queryCmd.RunE(queryCmd, []string{query})
@@ -239,7 +259,7 @@ func ExampleQuery_table() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	timestamp = "2017-07-03T07:26:23.997Z"
 	timeoutStr := "1440s"
@@ -247,6 +267,7 @@ func ExampleQuery_table() {
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "TaBle"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
 	queryCmd.RunE(queryCmd, []string{query})
@@ -261,7 +282,7 @@ func ExampleQuery_rangeJSON() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	starttime = "2017-07-13T20:10:30.781Z"
 	endtime = "2017-07-13T20:15:00.781Z"
@@ -272,6 +293,7 @@ func ExampleQuery_rangeJSON() {
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "jsoN"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().QueryRange(query, starttime, endtime, stepsizeStr, timeoutStr, "application/json").Return(test.HTTPResponseFromFile("fixtures/query_range_values.json"), nil)
 
 	queryCmd.RunE(queryCmd, []string{query})
@@ -305,7 +327,7 @@ func ExampleQuery_rangeValuesTable() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	starttime = "2017-07-13T20:10:30.000Z"
 	endtime = "2017-07-13T20:15:00.000Z"
@@ -316,6 +338,7 @@ func ExampleQuery_rangeValuesTable() {
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "tablE"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().QueryRange(query, starttime, endtime, stepsizeStr, timeoutStr, "application/json").Return(test.HTTPResponseFromFile("fixtures/query_range_values.json"), nil)
 
 	queryCmd.RunE(queryCmd, []string{query})
@@ -330,7 +353,7 @@ func ExampleQuery_rangeSeriesTable() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, storageMock := setupTest(ctrl)
+	keystoneMock, storageMock := setupTest(ctrl)
 
 	starttime = "2017-07-22T20:10:00.000Z"
 	endtime = "2017-07-22T20:20:00.000Z"
@@ -342,6 +365,7 @@ func ExampleQuery_rangeSeriesTable() {
 	outputFormat = "tablE"
 	columns = "region,check,instance"
 
+	expectAuth(keystoneMock)
 	storageMock.EXPECT().QueryRange(query, starttime, endtime, stepsizeStr, timeoutStr, "application/json").Return(test.HTTPResponseFromFile("fixtures/query_range_series.json"), nil)
 
 	queryCmd.RunE(queryCmd, []string{query})
