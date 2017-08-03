@@ -11,14 +11,19 @@ If you don't use OpenStack, you can still use Maia CLI as a feature-complete she
 
 ## Features
 
-Maia Service
+[Maia Service](#deploying-the-maia-service)
 * OpenStack Identity v3 authentication and authorization
 * Project- and domain-level access control (scoping)
 * Compatible to Grafana's Prometheus data source 
 * Compatible to Prometheus API (read-only)
 * Supports federation with other Prometheus
 
-Maia CLI
+[Maia UI](#using-the-maia-ui)
+* Prometheus expression browser adapted to Maia
+* List metrics
+* Perform ad-hoc queries
+ 
+[Maia CLI](#using-the-maia-cli)
 * Feature-complete CLI supporting all API operations
 * JSON and Go-template-based output for reliable automation
 * Works with Prometheus, too (no OpenStack required)
@@ -50,7 +55,7 @@ Via Makefile
 * `make && make install PREFIX=/some/path` to install to `/some/path`
 * `make docker` to build the Docker image (set image name and tag with the `DOCKER_IMAGE` and `DOCKER_TAG` variables)
 
-# Using Maia as Service
+# Deploying the Maia Service
 
 Maia is depending on an existing\* Prometheus installation that is responsible for collecting metrics. These metrics are exposed
 by Maia using the same, familiar Prometheus API. The only difference is that all API requests have to be authenticated and scoped using
@@ -268,7 +273,7 @@ maia query 'vcenter ...' --start 2017-07-01T05:10:51.781Z
 ```
 
 Check `maia query --help` for more options. Timestamps can be specified in Unix or RFC3339 format. Durations are
-specififed as numbers with a unit suffix, such as "30s", "1.5h" or "2h45m". Valid time units are "ns", "us" (or "µs"),
+specififed as numbers with a unit suffix, such as "30s", "1.5h" or "2h45m". Valid time units are "ns", "us" (or "?s"),
 "ms", "s", "m", "h".
 
 ## Output Formatting
@@ -323,6 +328,20 @@ You can also use the maia client with a plain Prometheus (no authentication).
 maia snapshot --prometheus-url http://localhost:9090
 ```
 
+# Using the Maia UI
+
+Maia comes with the well-known [Expression Browser](https://prometheus.io/docs/visualization/browser/) borrowed from
+Prometheus.
+
+You can it to discover metrics and perform ad-hoc queries.
+
+Just log-on using your OpenStack credentials using the special username syntax described [here](#openstack-authentication-and-authorization).
+
+```
+Username: myUser@myOSDomain|myProject@myOSDomain
+Password: ********
+```
+
 # Federating Tenant Metrics from Maia to another Prometheus
 
 To configure Prometheus to receive data from Maia, the following job configuration has to be applied.
@@ -355,7 +374,6 @@ The Maia implements the readonly part of the [Prometheus API doc.](https://prome
 OpenStack authentication and authorization on top.
 
 ## OpenStack Authentication and Authorization
-<a name="openstack_auth"></a>
 
 In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order 
 to support existing clients like Grafana and federated Prometheus. 
@@ -391,7 +409,7 @@ Domain scoped user:
 # Using the Prometheus Data Source in Grafana with Maia
  
 Configure the data source like with a regular Prometheus. Select `Basic Authentication` and enter the extended
- user credentials following the scheme explained in the [Maia API section](#openstack_auth).
+ user credentials following the scheme explained in the [Maia API section](#openstack-authentication-and-authorization).
 
 # Contributing
 

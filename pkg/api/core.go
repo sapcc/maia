@@ -27,12 +27,16 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
+	"github.com/sapcc/maia/pkg/ui"
 
+	"bytes"
 	"fmt"
 	"github.com/databus23/goslo.policy"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
+	"io"
 	"io/ioutil"
+	"path/filepath"
 )
 
 //VersionData is used by version advertisement handlers.
@@ -123,7 +127,37 @@ func NewV1Router(keystone keystone.Driver, storage storage.Driver) (http.Handler
 	// tenant-aware series metadata
 	r.Methods("GET").Path("/api/v1/series").HandlerFunc(p.AuthorizedHandlerFunc(p.Series, "metric:list"))
 
+	// forward requests for static content
+	r.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(p.serveStaticContent)
+	r.Methods("GET").PathPrefix("/graph").HandlerFunc(p.AuthorizedHandlerFunc(p.graph, "metric:show"))
+
 	return r, p.versionData
+}
+
+func (p *v1Provider) serveStaticContent(w http.ResponseWriter, req *http.Request) {
+	fp := req.URL.Path
+	fp = filepath.Join("web", fp)
+
+	info, err := ui.AssetInfo(fp)
+	if err != nil {
+		util.LogWarning("Could not get file info: %v", err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	file, err := ui.Asset(fp)
+	if err != nil {
+		if err != io.EOF {
+			util.LogWarning("Could not get file info: %v", err)
+		}
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	http.ServeContent(w, req, info.Name(), info.ModTime(), bytes.NewReader(file))
+}
+
+func (p *v1Provider) graph(w http.ResponseWriter, req *http.Request) {
+	ui.ExecuteTemplate(w, req, "graph.html", nil)
 }
 
 func (p *v1Provider) AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), rule string) func(w http.ResponseWriter, req *http.Request) {
@@ -135,6 +169,7 @@ func (p *v1Provider) AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.Respon
 		context, err := p.keystone.AuthenticateRequest(req)
 		if err != nil {
 			util.LogInfo(err.Error())
+			w.Header().Set("WWW-Authenticate", "Basic")
 			ReturnError(w, err, 401)
 			return
 		}
@@ -145,12 +180,14 @@ func (p *v1Provider) AuthorizedHandlerFunc(wrappedHandlerFunc func(w http.Respon
 		if !pe.Enforce(rule, *context) {
 			err := fmt.Errorf("User %s with roles %s does not fulfill authorization rule %s", context.Request["user_id"], context.Roles, rule)
 			util.LogInfo(err.Error())
-			ReturnError(w, err, 401)
+			ReturnError(w, err, 403)
 			return
 		}
 
 		// call
 		wrappedHandlerFunc(w, req)
+
+		http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Value: req.Header.Get("X-Auth-Token")})
 	}
 }
 

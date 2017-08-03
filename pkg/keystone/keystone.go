@@ -58,32 +58,41 @@ type keystone struct {
 	seqErrors                    int
 }
 
-func (d *keystone) keystoneClient() (*gophercloud.ServiceClient, error) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
+func (d *keystone) keystoneClient(asServiceUser bool) (*gophercloud.ServiceClient, error) {
 
-	if d.providerClient == nil {
-		util.LogInfo("Setting up identity connection to %s", viper.GetString("keystone.auth_url"))
-		provider, err := openstack.NewClient(viper.GetString("keystone.auth_url"))
-		if viper.IsSet("maia.proxy") {
-			proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
-			if err != nil {
-				util.LogError("Could not set proxy for gophercloud client: %s .\n%s", proxyURL, err.Error())
-			} else {
-				provider.HTTPClient.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
-			}
-		}
-		client, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{
-			Region: "",
-		})
-		if err != nil {
-			return nil, fmt.Errorf("cannot initialize OpenStack client: %v", err)
-		}
+	if asServiceUser {
+		d.mutex.Lock()
+		defer d.mutex.Unlock()
 
-		d.providerClient = client
+		var err error
+		if d.providerClient == nil {
+			util.LogInfo("Setting up identity connection to %s", viper.GetString("keystone.auth_url"))
+			d.providerClient, err = newKeystoneClient()
+		}
+		return d.providerClient, err
 	}
 
-	return d.providerClient, nil
+	return newKeystoneClient()
+}
+
+func newKeystoneClient() (*gophercloud.ServiceClient, error) {
+	provider, err := openstack.NewClient(viper.GetString("keystone.auth_url"))
+	if viper.IsSet("maia.proxy") {
+		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
+		if err != nil {
+			util.LogError("Could not set proxy for gophercloud client: %s .\n%s", proxyURL, err.Error())
+		} else {
+			provider.HTTPClient.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+		}
+	}
+	client, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{
+		Region: "",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize OpenStack client: %v", err)
+	}
+
+	return client, nil
 }
 
 type keystoneToken struct {
@@ -222,7 +231,7 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 	}
 
 	// get identity connection
-	client, err := d.keystoneClient()
+	client, err := d.keystoneClient(asServiceUser)
 	if err != nil {
 		util.LogError(err.Error())
 		return nil, "", err
@@ -353,7 +362,11 @@ func (d *keystone) AuthenticateRequest(r *http.Request) (*policy.Context, error)
 		return nil, err
 	}
 
-	context, _, err := d.authenticate(authOpts, true)
+	// if the request does not have a keystone token, then a new token has to be requested on behalf of the client
+	// this must not happen with the connection of the service otherwise wrong credentials will cause reauthentication
+	// of the service user
+	hasToken := authOpts.TokenID != ""
+	context, _, err := d.authenticate(authOpts, hasToken)
 	if err != nil {
 		return nil, err
 	}
@@ -375,6 +388,9 @@ func (d *keystone) AuthenticateRequest(r *http.Request) (*policy.Context, error)
 	for _, role := range context.Roles {
 		r.Header.Add("X-Roles", role)
 	}
+	if r.Header.Get("X-Auth-Token") == "" {
+		r.Header.Set("X-Auth-Token", context.Auth["token"])
+	}
 
 	return context, nil
 }
@@ -386,11 +402,18 @@ func (d *keystone) AuthenticateRequest(r *http.Request) (*policy.Context, error)
 func authOptionsFromRequest(r *http.Request) (*tokens.AuthOptions, error) {
 	ba := tokens.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		AllowReauth:      true,
+		AllowReauth:      false,
 	}
 
-	username, password, ok := r.BasicAuth()
-	if ok {
+	if token := r.Header.Get("X-Auth-Token"); token != "" {
+		ba.TokenID = token
+
+		return &ba, nil
+	} else if cookie, err := r.Cookie("X-Auth-Token"); err == nil {
+		ba.TokenID = cookie.Value
+
+		return &ba, nil
+	} else if username, password, ok := r.BasicAuth(); ok {
 		usernameParts := strings.Split(username, "|")
 		if len(usernameParts) != 2 {
 			util.LogError("Insufficient parameters for basic authentication. Provide user|project or user|@domain and password")
@@ -421,11 +444,7 @@ func authOptionsFromRequest(r *http.Request) (*tokens.AuthOptions, error) {
 		ba.Password = password
 
 		return &ba, nil
-	} else if token := r.Header.Get("X-Auth-Token"); token != "" {
-		ba.TokenID = token
-
-		return &ba, nil
-	} else {
-		return nil, errors.New("Authorization header missing")
 	}
+
+	return nil, errors.New("Authorization header missing")
 }

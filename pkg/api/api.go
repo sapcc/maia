@@ -196,3 +196,14 @@ func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request) {
 
 	ReturnResponse(w, resp)
 }
+
+func (p *v1Provider) ForwardRequest(w http.ResponseWriter, req *http.Request) {
+	resp, err := p.storage.DelegateRequest(req)
+
+	if err != nil {
+		ReturnError(w, err, 502)
+		return
+	}
+
+	ReturnResponse(w, resp)
+}

@@ -67,31 +67,31 @@ const (
 
 // Response encapsulates a generic response of a Prometheus API
 type Response struct {
-	Status    Status        `json:"Status"`
+	Status    Status        `json:"status"`
 	Data      []interface{} `json:"data,omitempty"`
-	ErrorType ErrorType     `json:"ErrorType,omitempty"`
+	ErrorType ErrorType     `json:"errorType,omitempty"`
 	Error     string        `json:"error,omitempty"`
 }
 
 // SeriesResponse encapsulates a response to the /series API of Prometheus
 type SeriesResponse struct {
-	Status    Status           `json:"Status"`
+	Status    Status           `json:"status"`
 	Data      []model.LabelSet `json:"data,omitempty"`
-	ErrorType ErrorType        `json:"ErrorType,omitempty"`
+	ErrorType ErrorType        `json:"errorType,omitempty"`
 	Error     string           `json:"error,omitempty"`
 }
 
 // LabelValuesResponse encapsulates a response to the /label/values API of Prometheus
 type LabelValuesResponse struct {
-	Status Status            `json:"Status"`
+	Status Status            `json:"status"`
 	Data   model.LabelValues `json:"data"`
 }
 
 // QueryResponse contains the response from a call to query or query_range
 type QueryResponse struct {
-	Status    Status      `json:"Status"`
+	Status    Status      `json:"status"`
 	Data      QueryResult `json:"data,omitempty"`
-	ErrorType ErrorType   `json:"ErrorType,omitempty"`
+	ErrorType ErrorType   `json:"errorType,omitempty"`
 	Error     string      `json:"error,omitempty"`
 }
 
@@ -150,6 +150,7 @@ type Driver interface {
 	QueryRange(query, start, end, step, timeout string, acceptContentType string) (*http.Response, error)
 	Series(match []string, start, end string, acceptContentType string) (*http.Response, error)
 	LabelValues(name string, acceptContentType string) (*http.Response, error)
+	DelegateRequest(request *http.Request) (*http.Response, error)
 }
 
 // NewPrometheusDriver is a factory method which chooses the right driver implementation based on configuration settings
