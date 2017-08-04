@@ -40,8 +40,9 @@ func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, *keys
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.NewMockDriver(controller)
 	storage := storage.NewMockDriver(controller)
-	//storage = storage.Prometheus("https://prometheus.staging.cloud.sap")
-	router, _ := NewV1Router(keystone, storage)
+
+	router := setupRouter(keystone, storage)
+
 	return router, keystone, storage
 }
 
@@ -179,12 +180,14 @@ func TestAPIMetadata(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	router, _, _ := setupTest(t, ctrl)
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	keystoneMock.EXPECT().ServiceURL().Return("http://localhost:9091/api/v1")
 
 	test.APIRequest{
 		Method:           "GET",
-		Path:             "/api/v1/",
-		ExpectStatusCode: 200,
+		Path:             "/api",
+		ExpectStatusCode: 300,
 		ExpectJSON:       "fixtures/api-metadata.json",
 	}.Check(t, router)
 }

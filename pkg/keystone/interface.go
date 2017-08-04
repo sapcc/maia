@@ -42,6 +42,10 @@ type Driver interface {
 
 	// ChildProjects returns the IDs of all child-projects of the project denoted by projectID
 	ChildProjects(projectID string) []string
+
+	// ServiceURL returns the service's global catalog entry
+	// The result is empty when called from a client
+	ServiceURL() string
 }
 
 // NewKeystoneDriver is a factory method which chooses the right driver implementation based on configuration settings

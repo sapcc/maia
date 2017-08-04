@@ -48,6 +48,11 @@ func Keystone() Driver {
 	ks.projectTreeCache = cache.New(viper.GetDuration("keystone.token_cache_time"), time.Minute)
 	ks.mutex = &sync.Mutex{}
 
+	if viper.Get("keystone.username") != nil {
+		ks.keystoneClient(true)
+		ks.reauthServiceUser()
+	}
+
 	return &ks
 }
 
@@ -56,6 +61,7 @@ type keystone struct {
 	tokenCache, projectTreeCache *cache.Cache
 	providerClient               *gophercloud.ServiceClient
 	seqErrors                    int
+	serviceURL                   string
 }
 
 func (d *keystone) keystoneClient(asServiceUser bool) (*gophercloud.ServiceClient, error) {
@@ -154,6 +160,12 @@ type cacheEntry struct {
 	projectTree []string
 }
 
+// ServiceURL returns the service's global catalog entry
+// The result is empty when called from a client
+func (d *keystone) ServiceURL() string {
+	return d.serviceURL
+}
+
 // reauthServiceUser refreshes an expired keystone token
 func (d *keystone) reauthServiceUser() error {
 	d.mutex.Lock()
@@ -172,9 +184,11 @@ func (d *keystone) reauthServiceUser() error {
 		return fmt.Errorf("Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
 	}
 	catalog, err := result.ExtractServiceCatalog()
+
 	if err != nil {
 		return fmt.Errorf("cannot read service catalog: %v", err)
 	}
+	d.serviceURL, err = openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
 
 	// store token so that it is considered for next authentication attempt
 	viper.Set("keystone.token", token.ID)

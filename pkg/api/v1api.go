@@ -24,9 +24,9 @@ import (
 
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/common/model"
+	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
@@ -35,41 +35,36 @@ import (
 	"time"
 )
 
-func (p *v1Provider) scopeToLabelConstraint(req *http.Request) (string, string) {
-	if projectID := req.Header.Get("X-Project-Id"); projectID != "" {
-		children := p.keystone.ChildProjects(projectID)
-		for _, subID := range children {
-			projectID = projectID + "|" + subID
-		}
-		return "project_id", projectID
-	} else if domainID := req.Header.Get("X-Domain-Id"); domainID != "" {
-		return "domain_id", domainID
-	}
-
-	panic(fmt.Errorf("Missing OpenStack scope attributes in request header"))
+// class for Prometheus v1 API provider implementation
+type v1Provider struct {
+	keystone keystone.Driver
+	storage  storage.Driver
 }
 
-// Federate handles GET /federate.
-func (p *v1Provider) Federate(w http.ResponseWriter, req *http.Request) {
-	selectors, err := p.buildSelectors(req)
-	if err != nil {
-		util.LogInfo("Invalid request params %s", req.URL)
-		ReturnError(w, err, 400)
-		return
+//NewV1Handler creates a http.Handler that serves the Maia v1 API.
+//It also returns the VersionData for this API version which is needed for the
+//version advertisement on "GET /".
+func NewV1Handler(keystone keystone.Driver, storage storage.Driver) http.Handler {
+
+	r := mux.NewRouter()
+	p := &v1Provider{
+		keystone: keystone,
+		storage:  storage,
 	}
 
-	response, err := p.storage.Federate(*selectors, req.Header.Get("Accept"))
-	if err != nil {
-		util.LogError("Could not get metrics for %s", selectors)
-		ReturnError(w, err, 503)
-		return
-	}
+	// tenant-aware query
+	r.Methods(http.MethodGet).Path("/query").HandlerFunc(authorizedHandlerFunc(p.Query, "metric:show"))
+	r.Methods(http.MethodGet).Path("/query_range").HandlerFunc(authorizedHandlerFunc(p.QueryRange, "metric:show"))
+	// tenant-aware label value lists
+	r.Methods(http.MethodGet).Path("/label/{name}/values").HandlerFunc(authorizedHandlerFunc(p.LabelValues, "metric:list"))
+	// tenant-aware series metadata
+	r.Methods(http.MethodGet).Path("/series").HandlerFunc(authorizedHandlerFunc(p.Series, "metric:list"))
 
-	ReturnResponse(w, response)
+	return r
 }
 
 func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request) {
-	labelKey, labelValue := p.scopeToLabelConstraint(req)
+	labelKey, labelValue := scopeToLabelConstraint(req, p.keystone)
 
 	queryParams := req.URL.Query()
 	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), labelKey, labelValue)
@@ -88,7 +83,7 @@ func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request) {
 }
 
 func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
-	labelKey, labelValue := p.scopeToLabelConstraint(req)
+	labelKey, labelValue := scopeToLabelConstraint(req, p.keystone)
 
 	queryParams := req.URL.Query()
 	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), labelKey, labelValue)
@@ -109,7 +104,7 @@ func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
 // LabelValues utilizes the series API in order to implement a tenant-aware list.
 // This is a complex operation.
 func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
-	labelKey, labelValue := p.scopeToLabelConstraint(req)
+	labelKey, labelValue := scopeToLabelConstraint(req, p.keystone)
 
 	name := model.LabelName(mux.Vars(req)["name"])
 	// do not list label values from series older than maia.label_value_ttl
@@ -158,39 +153,16 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	ReturnJSON(w, 200, &result)
 }
 
-// buildSelectors takes the selectors contained in the "match[]" URL query parameter(s)
-// and extends them with a label-constrained for the project/domain scope
-func (p *v1Provider) buildSelectors(req *http.Request) (*[]string, error) {
-	labelKey, labelValue := p.scopeToLabelConstraint(req)
-
-	queryParams := req.URL.Query()
-	selectors := queryParams["match[]"]
-	if selectors == nil {
-		// behave like Prometheus, but do not proxy through
-		return nil, errors.New("no match[] parameter provided")
-	}
-	// enrich all match statements
-	for i, sel := range selectors {
-		newSel, err := util.AddLabelConstraintToSelector(sel, labelKey, labelValue)
-		if err != nil {
-			return nil, err
-		}
-		selectors[i] = newSel
-	}
-
-	return &selectors, nil
-}
-
 func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request) {
-	selectors, err := p.buildSelectors(req)
+	selectors, err := buildSelectors(req, p.keystone)
 	if err != nil {
-		ReturnError(w, err, 400)
+		ReturnError(w, err, http.StatusBadRequest)
 		return
 	}
 	queryParams := req.URL.Query()
 	resp, err := p.storage.Series(*selectors, queryParams.Get("start"), queryParams.Get("end"), req.Header.Get("Accept"))
 	if err != nil {
-		ReturnError(w, err, 502)
+		ReturnError(w, err, http.StatusBadGateway)
 		return
 	}
 
@@ -201,7 +173,7 @@ func (p *v1Provider) ForwardRequest(w http.ResponseWriter, req *http.Request) {
 	resp, err := p.storage.DelegateRequest(req)
 
 	if err != nil {
-		ReturnError(w, err, 502)
+		ReturnError(w, err, http.StatusBadGateway)
 		return
 	}
 

@@ -1,5 +1,5 @@
 hash: 715fcca3635c79b12c44aa65cd941541fb0d2dd4c9f9c3e7c177ad1129661228
-updated: 2017-08-03T15:10:50.039529154+02:00
+updated: 2017-08-03T17:38:03.097106039+02:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -99,6 +99,8 @@ imports:
   - util/strutil
   - util/testutil
   - web/ui
+- name: github.com/rs/cors
+  version: eabcc6af4bbe5ad3a949d36450326a2b0b9894b8
 - name: github.com/sirupsen/logrus
   version: c2f40cf57934a1f046302d34079c6c3ce49e9bd6
 - name: github.com/spf13/afero

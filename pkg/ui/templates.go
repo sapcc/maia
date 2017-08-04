@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/web/ui"
 	html_template "html/template"
 	"io"
 	"net/http"
@@ -42,11 +41,11 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, data
 }
 
 func getTemplate(name string) (string, error) {
-	baseTmpl, err := ui.Asset("web/templates/_base.html")
+	baseTmpl, err := Asset("web/templates/_base.html")
 	if err != nil {
 		return "", fmt.Errorf("error reading base template: %s", err)
 	}
-	pageTmpl, err := ui.Asset(filepath.Join("web/templates", name))
+	pageTmpl, err := Asset(filepath.Join("web/templates", name))
 	if err != nil {
 		return "", fmt.Errorf("error reading page template %s: %s", name, err)
 	}
