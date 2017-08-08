@@ -85,11 +85,11 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) *mux.Router {
 
 	// other endpoints
 	// maia's federate endpoint
-	mainRouter.Methods(http.MethodGet).Path("/federate").HandlerFunc(authorizedHandlerFunc(Federate, "metric:list"))
+	mainRouter.Methods(http.MethodGet).Path("/federate").HandlerFunc(authorizedHandlerFunc(Federate, false, "metric:list"))
 	// expression browser
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
-	mainRouter.Methods(http.MethodGet).PathPrefix("/graph").HandlerFunc(authorizedHandlerFunc(graph, "metric:show"))
-	//add the version advertisement that lists all available API versions
+	mainRouter.Methods(http.MethodGet).PathPrefix("/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
+
 	return mainRouter
 }
 
@@ -139,5 +139,18 @@ func Federate(w http.ResponseWriter, req *http.Request) {
 }
 
 func graph(w http.ResponseWriter, req *http.Request) {
-	ui.ExecuteTemplate(w, req, "graph.html", nil)
+	ui.ExecuteTemplate(w, req, "graph.html", keystoneInstance, nil)
 }
+
+/*
+func forwardRequest(w http.ResponseWriter, req *http.Request) {
+	resp, err := storageInstance.DelegateRequest(req)
+
+	if err != nil {
+		ReturnError(w, err, http.StatusBadGateway)
+		return
+	}
+
+	ReturnResponse(w, resp)
+}
+*/

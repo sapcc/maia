@@ -34,14 +34,18 @@ type Driver interface {
 	// AuthenticateRequest authenticates a user using authOptionsFromRequest passed in the HTTP request header.
 	// After successful authentication, additional context information is added to the request header
 	// In addition a Context object is returned for policy evaluation.
-	AuthenticateRequest(req *http.Request) (*policy.Context, error)
+	// When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
+	AuthenticateRequest(req *http.Request, guessScope bool) (*policy.Context, error)
 
 	// Authenticate authenticates a user using the provided authOptions.
 	// It returns a context for policy evaluation and the public endpoint retrieved from the service catalog
 	Authenticate(options *tokens.AuthOptions) (*policy.Context, string, error)
 
 	// ChildProjects returns the IDs of all child-projects of the project denoted by projectID
-	ChildProjects(projectID string) []string
+	ChildProjects(projectID string) ([]string, error)
+
+	// UserProjects returns the project IDs and name of all projects where the current user has a monitoring role
+	UserProjects(userID string) ([]tokens.Scope, error)
 
 	// ServiceURL returns the service's global catalog entry
 	// The result is empty when called from a client

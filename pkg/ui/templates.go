@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/prometheus/common/model"
+	"github.com/sapcc/maia/pkg/keystone"
 	html_template "html/template"
 	"io"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 )
 
 // ExecuteTemplate renders an HTML-template stored in web/templates/
-func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, data interface{}) {
+func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keystone keystone.Driver, data interface{}) {
 	text, err := getTemplate(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -29,6 +30,37 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, data
 				delete(lset, ln)
 			}
 			return lset
+		},
+		"userId":      func() string { return req.Header.Get("X-User-Id") },
+		"userName":    func() string { return req.Header.Get("X-User-Name") },
+		"projectName": func() string { return req.Header.Get("X-Project-Name") },
+		"projectId":   func() string { return req.Header.Get("X-Project-Id") },
+		"domainName":  func() string { return req.Header.Get("X-Domain-Name") },
+		"domainId":    func() string { return req.Header.Get("X-Domain-Id") },
+		//"authRules": func() []string {
+		//	rules, ok := data.([]string)
+		//	if ok {
+		//		return rules
+		//	}
+		//	return []string{}
+		//},
+		"childProjects": func() []string {
+			children, err := keystone.ChildProjects(req.Header.Get("X-Project-Id"))
+			if err != nil {
+				return []string{}
+			}
+			return children
+		},
+		// return list of user's projects with monitoring role: name --> id
+		"userProjects": func() map[string]string {
+			result := map[string]string{}
+			projects, err := keystone.UserProjects(req.Header.Get("X-User-Id"))
+			if err == nil {
+				for _, p := range projects {
+					result[p.ProjectName] = p.ProjectID
+				}
+			}
+			return result
 		},
 	}
 

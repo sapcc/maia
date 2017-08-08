@@ -48,22 +48,22 @@ func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, *keys
 
 func expectAuthByProjectID(keystoneMock *keystone.MockDriver) {
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: map[string]string{"X-Project-Id": "12345"}}
-	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
 		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
-	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
+	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}, nil).After(authCall)
 }
 
 func expectAuthByDomainName(keystoneMock *keystone.MockDriver) {
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: map[string]string{"X-Domain-Id": "77777"}}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
 		"domain_id": "77777", "password": "testwd"}, Auth: map[string]string{"domain_id": "77777"}, Roles: []string{"monitoring_viewer"}}, nil)
 }
 
 func expectAuthWithChildren(keystoneMock *keystone.MockDriver) {
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: map[string]string{"X-Project-Id": "12345"}}
-	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
 		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
-	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{"67890"}).After(authCall)
+	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{"67890"}, nil).After(authCall)
 }
 
 // HTTP based tests

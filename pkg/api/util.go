@@ -132,7 +132,10 @@ func ReturnError(w http.ResponseWriter, err error, code int) bool {
 
 func scopeToLabelConstraint(req *http.Request, keystone keystone.Driver) (string, string) {
 	if projectID := req.Header.Get("X-Project-Id"); projectID != "" {
-		children := keystone.ChildProjects(projectID)
+		children, err := keystone.ChildProjects(projectID)
+		if err != nil {
+			panic(err)
+		}
 		for _, subID := range children {
 			projectID = projectID + "|" + subID
 		}
@@ -192,33 +195,50 @@ func policyEngine() *policy.Enforcer {
 	return policyEnforcer
 }
 
-func authorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), rule string) func(w http.ResponseWriter, req *http.Request) {
+func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, rules []string) []string {
+	util.LogDebug("authenticate")
+	matchedRules := []string{}
+
+	// 1. authenticate
+	context, err := keystoneInstance.AuthenticateRequest(req, guessScope)
+	if err != nil {
+		util.LogInfo(err.Error())
+		w.Header().Set("WWW-Authenticate", "Basic")
+		// expire the cookie
+		http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", MaxAge: -1, Secure: false})
+		ReturnError(w, err, http.StatusUnauthorized)
+		return matchedRules
+	}
+
+	// 2. authorize
+	// make sure policyEnforcer is available
+	pe := policyEngine()
+	for _, rule := range rules {
+		if pe.Enforce(rule, *context) {
+			matchedRules = append(matchedRules, rule)
+		}
+	}
+
+	if len(matchedRules) == 0 {
+		err := fmt.Errorf("User %s with roles %s does not fulfill any authorization rule %v", context.Request["user_id"], context.Roles, rules)
+		util.LogInfo(err.Error())
+		ReturnError(w, err, http.StatusForbidden)
+		return matchedRules
+	}
+
+	// call
+	http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Value: req.Header.Get("X-Auth-Token"),
+		MaxAge: int(viper.GetDuration("keystone.token_cache_time").Seconds()), Secure: false})
+
+	return matchedRules
+}
+
+func authorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), guessScope bool, rule string) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		util.LogDebug("authenticate")
-
-		// 1. authenticate
-		context, err := keystoneInstance.AuthenticateRequest(req)
-		if err != nil {
-			util.LogInfo(err.Error())
-			w.Header().Set("WWW-Authenticate", "Basic")
-			ReturnError(w, err, http.StatusUnauthorized)
-			return
+		matchedRules := authorizeRules(w, req, guessScope, []string{rule})
+		if len(matchedRules) > 0 {
+			wrappedHandlerFunc(w, req)
 		}
-
-		// 2. authorize
-		// make sure policyEnforcer is available
-		pe := policyEngine()
-		if !pe.Enforce(rule, *context) {
-			err := fmt.Errorf("User %s with roles %s does not fulfill authorization rule %s", context.Request["user_id"], context.Roles, rule)
-			util.LogInfo(err.Error())
-			ReturnError(w, err, http.StatusForbidden)
-			return
-		}
-
-		// call
-		wrappedHandlerFunc(w, req)
-
-		http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Value: req.Header.Get("X-Auth-Token"), Secure: true})
 	}
 }
