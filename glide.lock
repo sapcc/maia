@@ -1,5 +1,5 @@
 hash: 715fcca3635c79b12c44aa65cd941541fb0d2dd4c9f9c3e7c177ad1129661228
-updated: 2017-07-27T10:53:28.213097211+02:00
+updated: 2017-08-03T17:38:03.097106039+02:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -9,6 +9,10 @@ imports:
   version: 3ae74dd07ebf48d1f2babbd1d2177cd1878a09ee
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
+- name: github.com/golang/mock
+  version: 13f360950a79f5864a972c786a10a50e44b69541
+  subpackages:
+  - gomock
 - name: github.com/golang/protobuf
   version: 748d386b5c1ea99658fd69fe9f03991ce86a90c1
   subpackages:
@@ -21,6 +25,7 @@ imports:
   - openstack
   - openstack/identity/v2/tenants
   - openstack/identity/v2/tokens
+  - openstack/identity/v3/projects
   - openstack/identity/v3/tokens
   - openstack/utils
   - pagination
@@ -93,6 +98,9 @@ imports:
   - util/stats
   - util/strutil
   - util/testutil
+  - web/ui
+- name: github.com/rs/cors
+  version: eabcc6af4bbe5ad3a949d36450326a2b0b9894b8
 - name: github.com/sirupsen/logrus
   version: c2f40cf57934a1f046302d34079c6c3ce49e9bd6
 - name: github.com/spf13/afero
@@ -142,8 +150,4 @@ imports:
   - unicode/norm
 - name: gopkg.in/yaml.v2
   version: 25c4ec802a7d637f88d584ab26798e94ad14c13b
-testImports:
-- name: github.com/golang/mock
-  version: 13f360950a79f5864a972c786a10a50e44b69541
-  subpackages:
-  - gomock
+testImports: []

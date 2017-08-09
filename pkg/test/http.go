@@ -60,7 +60,6 @@ func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 		requestBody = bytes.NewReader([]byte(body))
 	}
 	request := httptest.NewRequest(r.Method, r.Path, requestBody)
-	request.Header.Set("X-Auth-Token", "something")
 	for k, v := range r.Headers {
 		request.Header.Set(k, v)
 	}

@@ -1,5 +1,5 @@
 {
-  "Status": "success",
+  "status": "success",
   "data": [
     "barbican",
     "dns",

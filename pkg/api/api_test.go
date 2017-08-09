@@ -24,50 +24,92 @@ import (
 	"net/http"
 	"testing"
 
+	"errors"
 	"github.com/databus23/goslo.policy"
 	"github.com/golang/mock/gomock"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
 	"github.com/spf13/viper"
 )
 
+var projectContext = &policy.Context{Request: map[string]string{"project_id": "12345", "domain_id": "77777", "user_id": "u12345"},
+	Auth: map[string]string{"project_id": "12345", "project_name": "testproject",
+		"project_domain_name": "testdomain", "project_domain_id": "77777",
+		"user_id": "u12345", "user_name": "testuser", "user_domain_name": "testdomain", "user_domain_id": "77777"},
+	Roles: []string{"monitoring_viewer"}}
+var projectInsufficientRolesContext = &policy.Context{Request: map[string]string{"project_id": "12345", "domain_id": "77777", "user_id": "u12345"},
+	Auth: map[string]string{"project_id": "12345", "project_name": "testproject",
+		"project_domain_name": "testdomain", "project_domain_id": "77777",
+		"user_id": "u12345", "user_name": "testuser", "user_domain_name": "testdomain", "user_domain_id": "77777"},
+	Roles: []string{"member"}}
+var projectHeader = map[string]string{"X-User-Id": projectContext.Auth["user_id"], "X-User-Name": projectContext.Auth["user_name"],
+	"X-User-Domain-Name": projectContext.Auth["user_domain_name"],
+	"X-Project-Id":       projectContext.Auth["project_id"], "X-Project-Name": projectContext.Auth["project_name"]}
+var domainContext = &policy.Context{Request: map[string]string{"project_id": "12345", "domain_id": "77777", "user_id": "u12345"},
+	Auth: map[string]string{"domain_id": "77777", "domain_name": "testdomain",
+		"user_id": "u12345", "user_name": "testuser", "user_domain_name": "testdomain", "user_domain_id": "77777"},
+	Roles: []string{"monitoring_viewer"}}
+var domainHeader = map[string]string{"X-User-Id": domainContext.Auth["user_id"], "X-User-Name": domainContext.Auth["user_name"],
+	"X-User-Domain-Name": domainContext.Auth["user_domain_name"],
+	"X-Domain-Id":        domainContext.Auth["domain_id"], "X-Domain-Name": domainContext.Auth["domain_name"]}
+
 func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, *keystone.MockDriver, *storage.MockDriver) {
 	//load test policy (where everything is allowed)
-	viper.Set("maia.policy_file", "../test/policy.json")
+	viper.Set("keystone.policy_file", "../test/policy.json")
 	viper.Set("maia.label_value_ttl", "72h")
 
 	//create test driver with the domains and projects from start-data.sql
 	keystone := keystone.NewMockDriver(controller)
 	storage := storage.NewMockDriver(controller)
-	//storage = storage.Prometheus("https://prometheus.staging.cloud.sap")
-	router, _ := NewV1Router(keystone, storage)
+
+	router := setupRouter(keystone, storage)
+
 	return router, keystone, storage
 }
 
 func expectAuthByProjectID(keystoneMock *keystone.MockDriver) {
-	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: map[string]string{"X-Project-Id": "12345"}}
-	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
-		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
-	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
+	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(projectContext, nil)
+	keystoneMock.EXPECT().ChildProjects(projectContext.Auth["project_id"]).Return([]string{}, nil).After(authCall)
 }
 
 func expectAuthByDomainName(keystoneMock *keystone.MockDriver) {
-	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: map[string]string{"X-Domain-Id": "77777"}}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
-		"domain_id": "77777", "password": "testwd"}, Auth: map[string]string{"domain_id": "77777"}, Roles: []string{"monitoring_viewer"}}, nil)
+	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: domainHeader}
+	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(domainContext, nil)
 }
 
 func expectAuthWithChildren(keystoneMock *keystone.MockDriver) {
-	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: map[string]string{"X-Project-Id": "12345"}}
-	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
-		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
-	keystoneMock.EXPECT().ChildProjects("12345").Return([]string{"67890"}).After(authCall)
+	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(projectContext, nil)
+	keystoneMock.EXPECT().ChildProjects(projectContext.Auth["project_id"]).Return([]string{"67890"}, nil).After(authCall)
+}
+
+func expectAuthByDefaults(keystoneMock *keystone.MockDriver) {
+	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(projectContext, nil)
+	keystoneMock.EXPECT().UserProjects(projectContext.Auth["user_id"]).Return([]tokens.Scope{{ProjectID: projectContext.Auth["project_id"], DomainID: projectContext.Auth["project_domain_id"]}}, nil).After(authCall)
+}
+
+func expectAuthAndRedirect(keystoneMock *keystone.MockDriver) {
+	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
+	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(projectContext, nil)
+}
+
+func expectAuthAndFail(keystoneMock *keystone.MockDriver) {
+	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
+	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(nil, errors.New("negativetesterror"))
+}
+
+func expectAuthAndDenyAuthorization(keystoneMock *keystone.MockDriver) {
+	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
+	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(projectInsufficientRolesContext, nil)
 }
 
 // HTTP based tests
 
-func Test_Federate(t *testing.T) {
+func TestFederate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -77,15 +119,64 @@ func Test_Federate(t *testing.T) {
 	storageMock.EXPECT().Federate([]string{"{vmware_name=\"win_cifs_13\",domain_id=\"77777\"}"}, storage.PlainText).Return(test.HTTPResponseFromFile("fixtures/federate.txt"), nil)
 
 	test.APIRequest{
-		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|@77777:password")), "Accept": storage.PlainText},
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic u12345|@77777:password")), "Accept": storage.PlainText},
 		Method:           "GET",
 		Path:             "/federate?match[]={vmware_name=%22win_cifs_13%22}",
-		ExpectStatusCode: 200,
+		ExpectStatusCode: http.StatusOK,
 		ExpectFile:       "fixtures/federate.txt",
 	}.Check(t, router)
 }
 
-func Test_Series(t *testing.T) {
+func TestFederate_errorNoMatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	expectAuthByDomainName(keystoneMock)
+
+	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic u12345|@77777:password")), "Accept": storage.PlainText},
+		Method:           "GET",
+		Path:             "/federate?bla[]={vmwa...}",
+		ExpectStatusCode: http.StatusBadRequest,
+	}.Check(t, router)
+}
+
+func TestFederate_errorInvalidSelector(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	expectAuthByDomainName(keystoneMock)
+
+	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic u12345|@77777:password")), "Accept": storage.PlainText},
+		Method:           "GET",
+		Path:             "/federate?match[]={invalid_syntax=}",
+		ExpectStatusCode: http.StatusBadRequest,
+	}.Check(t, router)
+}
+
+func TestFederate_errorBackendFailed(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, keystoneMock, storageMock := setupTest(t, ctrl)
+
+	expectAuthByDomainName(keystoneMock)
+	storageMock.EXPECT().Federate([]string{"{vmware_name=\"win_cifs_13\",domain_id=\"77777\"}"}, storage.PlainText).Return(nil, errors.New("testerror"))
+
+	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic u12345|@77777:password")), "Accept": storage.PlainText},
+		Method:           "GET",
+		Path:             "/federate?match[]={vmware_name=%22win_cifs_13%22}",
+		ExpectStatusCode: http.StatusServiceUnavailable,
+	}.Check(t, router)
+}
+
+func TestSeries(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -102,7 +193,38 @@ func Test_Series(t *testing.T) {
 		ExpectJSON:       "fixtures/series.json",
 	}.Check(t, router)
 }
-func Test_LabelValues(t *testing.T) {
+
+func TestSeries_failAuthentication(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	expectAuthAndFail(keystoneMock)
+
+	test.APIRequest{
+		Method:           "GET",
+		Path:             "/api/v1/series?match[]={component!=%22%22}&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z",
+		ExpectStatusCode: http.StatusUnauthorized,
+	}.Check(t, router)
+}
+
+func TestSeries_failAuthorization(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	expectAuthAndDenyAuthorization(keystoneMock)
+
+	test.APIRequest{
+		Method:           "GET",
+		Path:             "/api/v1/series?match[]={component!=%22%22}&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z",
+		ExpectStatusCode: http.StatusForbidden,
+	}.Check(t, router)
+}
+
+func TestLabelValues(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -179,12 +301,69 @@ func TestAPIMetadata(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	keystoneMock.EXPECT().ServiceURL().Return("http://localhost:9091/api/v1")
+
+	test.APIRequest{
+		Method:           "GET",
+		Path:             "/api",
+		ExpectStatusCode: 300,
+		ExpectJSON:       "fixtures/api-metadata.json",
+	}.Check(t, router)
+}
+
+func TestServeStaticContent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	router, _, _ := setupTest(t, ctrl)
 
 	test.APIRequest{
 		Method:           "GET",
-		Path:             "/api/v1/",
-		ExpectStatusCode: 200,
-		ExpectJSON:       "fixtures/api-metadata.json",
+		Path:             "/static/css/graph.css",
+		ExpectStatusCode: http.StatusOK,
+		ExpectFile:       "../../web/static/css/graph.css",
+	}.Check(t, router)
+}
+
+func TestServeStaticContent_notFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, _ := setupTest(t, ctrl)
+
+	test.APIRequest{
+		Method:           "GET",
+		Path:             "/static/bla.xyz",
+		ExpectStatusCode: http.StatusNotFound,
+	}.Check(t, router)
+}
+
+func TestGraph(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, keystoneMock, _ := setupTest(t, ctrl)
+	expectAuthByDefaults(keystoneMock)
+
+	test.APIRequest{
+		Method:           "GET",
+		Path:             "/graph?project_id=" + projectContext.Auth["project_id"],
+		ExpectStatusCode: http.StatusOK,
+	}.Check(t, router)
+}
+
+func TestGraph_otherOSDomain(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, keystoneMock, _ := setupTest(t, ctrl)
+	expectAuthAndRedirect(keystoneMock)
+
+	test.APIRequest{
+		Method:           "GET",
+		Path:             "/nottestdomain/graph?project_id=" + projectContext.Auth["project_id"],
+		ExpectStatusCode: http.StatusFound,
 	}.Check(t, router)
 }
