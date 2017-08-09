@@ -33,6 +33,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/roles"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
+	"github.com/gorilla/mux"
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/sapcc/maia/pkg/util"
@@ -52,7 +53,9 @@ func Keystone() Driver {
 }
 
 type keystone struct {
-	serviceConnMutex, cacheMutex                                 *sync.Mutex
+	// these locks are used to make sure the connection or token is altered while somebody is working on it
+	serviceConnMutex, serviceTokenMutex *sync.Mutex
+	// these caches are thread-safe, no need to lock because worst-case is duplicate processing efforts
 	tokenCache, projectTreeCache, userProjectsCache, userIDCache *cache.Cache
 	providerClient                                               *gophercloud.ServiceClient
 	seqErrors                                                    int
@@ -71,7 +74,7 @@ func (d *keystone) init() {
 	d.userProjectsCache = cache.New(viper.GetDuration("keystone.token_cache_time"), time.Minute)
 	d.userIDCache = cache.New(cache.NoExpiration, time.Minute)
 	d.serviceConnMutex = &sync.Mutex{}
-	d.cacheMutex = &sync.Mutex{}
+	d.serviceTokenMutex = &sync.Mutex{}
 	if viper.Get("keystone.username") != nil {
 		// force service logon
 		_, err := d.serviceKeystoneClient()
@@ -188,6 +191,9 @@ func (d *keystone) ServiceURL() string {
 
 // reauthServiceUser refreshes an expired keystone token
 func (d *keystone) reauthServiceUser() error {
+	d.serviceTokenMutex.Lock()
+	defer d.serviceTokenMutex.Unlock()
+
 	authOpts := authOptionsFromConfig()
 	util.LogInfo("Fetching token for service user %s%s@%s%s", authOpts.UserID, authOpts.Username, authOpts.DomainID, authOpts.DomainName)
 
@@ -311,187 +317,6 @@ func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, 
 	return d.authenticate(authOpts, false)
 }
 
-// authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
-// It returns the authorization context
-func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool) (*policy.Context, string, error) {
-	// check cache briefly
-	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found {
-		util.LogDebug("Token cache hit for %s", authOpts.TokenID)
-		return entry.(*cacheEntry).context, entry.(*cacheEntry).endpointURL, nil
-	}
-
-	//use a custom token struct instead of tokens.Token which is way incomplete
-	var tokenData keystoneToken
-	var catalog *tokens.ServiceCatalog
-	emptyScope := tokens.Scope{}
-	if authOpts.TokenID != "" && authOpts.Scope == emptyScope && asServiceUser {
-		util.LogDebug("verify token")
-		// get token from token-ID which is being verified on that occasion
-		if d.providerClient.TokenID == "" {
-			err := d.reauthServiceUser()
-			if err != nil {
-				return nil, "", err
-			}
-		}
-		response := tokens.Get(d.providerClient, authOpts.TokenID)
-		if response.Err != nil {
-			//this includes 4xx responses, so after this point, we can be sure that the token is valid
-			return nil, "", response.Err
-		}
-		err := response.ExtractInto(&tokenData)
-		if err != nil {
-			return nil, "", err
-		}
-		catalog, err = response.ExtractServiceCatalog()
-		if err != nil {
-			return nil, "", err
-		}
-	} else {
-		util.LogDebug("authenticate %s%s with scope %s.", authOpts.Username, authOpts.UserID, authOpts.Scope)
-		client, err := newKeystoneClient()
-		if err != nil {
-			return nil, "", err
-		}
-		// create new token from basic authentication credentials or token ID
-		response := tokens.Create(client, authOpts)
-		// ugly copy & paste because the base-type of CreateResult and GetResult is private
-		if response.Err != nil {
-			//this includes 4xx responses, so after this point, we can be sure that the token is valid
-			if authOpts.Username != "" || authOpts.UserID != "" {
-				util.LogInfo("Failed login of user %s%s for scope %s: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, response.Err.Error())
-			} else if authOpts.TokenID != "" {
-				util.LogInfo("Failed login of with token %s ... for scope %s: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, response.Err.Error())
-			} else {
-				util.LogError("Login attempt with empty credentials")
-			}
-			return nil, "", response.Err
-		}
-		err = response.ExtractInto(&tokenData)
-		if err != nil {
-			return nil, "", err
-		}
-		catalog, err = response.ExtractServiceCatalog()
-		if err != nil {
-			return nil, "", err
-		}
-		// the token is passed separately
-		tokenData.Token = response.Header.Get("X-Subject-Token")
-	}
-
-	// authorization context
-	context := tokenData.ToContext()
-
-	// service endpoint
-	endpointURL, err := openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
-	if err != nil {
-		return nil, "", err
-	}
-	// update the cache
-	ce := cacheEntry{
-		context:     &context,
-		endpointURL: endpointURL,
-	}
-	d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
-	return &context, endpointURL, nil
-}
-
-func (d *keystone) ChildProjects(projectID string) ([]string, error) {
-	if ce, ok := d.projectTreeCache.Get(projectID); ok {
-		return ce.([]string), nil
-	} else if err := d.updateProjectTree(projectID); err != nil {
-		return nil, err
-	}
-
-	return d.ChildProjects(projectID)
-}
-
-func (d *keystone) updateProjectTree(projectID string) error {
-
-	d.cacheMutex.Lock()
-	defer d.cacheMutex.Unlock()
-
-	childProjectIDs, err := d.childProjects(projectID)
-	if err != nil {
-		util.LogError("Unable to obtain project tree of project %s: %v", projectID, err)
-		return err
-	}
-	d.projectTreeCache.Set(projectID, childProjectIDs, cache.DefaultExpiration)
-
-	return nil
-}
-
-func (d *keystone) childProjects(projectID string) ([]string, error) {
-	enabledVal := true
-	list, err := projects.List(d.providerClient, projects.ListOpts{ParentID: projectID, Enabled: &enabledVal}).AllPages()
-	if err != nil {
-		return nil, err
-	}
-	slice, err := projects.ExtractProjects(list)
-	if err != nil {
-		return nil, err
-	}
-	projectIDs := []string{}
-	for _, p := range slice {
-		projectIDs = append(projectIDs, p.ID)
-		children, err := d.childProjects(p.ID)
-		if err != nil {
-			return nil, err
-		}
-		projectIDs = append(projectIDs, children...)
-	}
-	return projectIDs, nil
-}
-
-func (d *keystone) UserProjects(userID string) ([]tokens.Scope, error) {
-	if ce, ok := d.userProjectsCache.Get(userID); ok {
-		return ce.([]tokens.Scope), nil
-	} else if err := d.updateUserProjects(userID); err != nil {
-		return nil, err
-	}
-	return d.UserProjects(userID)
-}
-
-func (d *keystone) updateUserProjects(userID string) error {
-
-	d.cacheMutex.Lock()
-	defer d.cacheMutex.Unlock()
-
-	userProjects, err := d.userProjects(userID)
-	if err != nil {
-		util.LogError("Unable to obtain monitoring project list of user %s: %v", userID, err)
-		return err
-	}
-
-	d.userProjectsCache.Set(userID, userProjects, cache.DefaultExpiration)
-
-	return nil
-}
-
-func (d *keystone) userProjects(userID string) ([]tokens.Scope, error) {
-	effectiveVal := true
-	list, err := roles.ListAssignments(d.providerClient, roles.ListAssignmentsOpts{UserID: userID, Effective: &effectiveVal}).AllPages()
-	if err != nil {
-		return nil, err
-	}
-	slice, err := roles.ExtractRoleAssignments(list)
-	if err != nil {
-		return nil, err
-	}
-	scopes := []tokens.Scope{}
-	for _, ra := range slice {
-		if _, ok := d.monitoringRoles[ra.Role.ID]; ok {
-			project, err := projects.Get(d.providerClient, ra.Scope.Project.ID).Extract()
-			if err != nil {
-				return nil, err
-			}
-			domainName := d.domainNames[project.DomainID]
-			scopes = append(scopes, tokens.Scope{ProjectID: ra.Scope.Project.ID, ProjectName: project.Name,
-				DomainID: project.DomainID, DomainName: domainName})
-		}
-	}
-	return scopes, nil
-}
-
 // AuthenticateRequest attempts to Authenticate a user using the request header contents
 // The resulting policy context can be used to authorize the user
 // If no supported authOptionsFromRequest could be found, the context is nil
@@ -580,6 +405,9 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, g
 		if len(userParts) > 1 {
 			ba.Username = userParts[0]
 			ba.DomainName = userParts[1]
+		} else if domainPrefix, ok := mux.Vars(r)["domain"]; ok && len(userParts) == 1 {
+			ba.Username = userParts[0]
+			ba.DomainName = domainPrefix
 		} else {
 			ba.UserID = userParts[0]
 		}
@@ -606,7 +434,7 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, g
 			if err != nil {
 				return nil, err
 			} else if len(projects) == 0 {
-				return nil, fmt.Errorf("User %s%s does not have monitoring autorization on any project", ba.UserID, ba.Username)
+				return nil, fmt.Errorf("User %s%s does not have monitoring authorization on any project", ba.UserID, ba.Username)
 			}
 
 			// default to first project (note that redundant attributes are not copied here to aovid errors)
@@ -641,13 +469,175 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, g
 	return &ba, nil
 }
 
+// authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
+// It returns the authorization context
+func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool) (*policy.Context, string, error) {
+	// check cache briefly
+	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found {
+		util.LogDebug("Token cache hit for %s", authOpts.TokenID)
+		return entry.(*cacheEntry).context, entry.(*cacheEntry).endpointURL, nil
+	}
+
+	//use a custom token struct instead of tokens.Token which is way incomplete
+	var tokenData keystoneToken
+	var catalog *tokens.ServiceCatalog
+	emptyScope := tokens.Scope{}
+	if authOpts.TokenID != "" && authOpts.Scope == emptyScope && asServiceUser {
+		util.LogDebug("verify token")
+		// get token from token-ID which is being verified on that occasion
+		if d.providerClient.TokenID == "" {
+			err := d.reauthServiceUser()
+			if err != nil {
+				return nil, "", err
+			}
+		}
+		response := tokens.Get(d.providerClient, authOpts.TokenID)
+		if response.Err != nil {
+			//this includes 4xx responses, so after this point, we can be sure that the token is valid
+			return nil, "", response.Err
+		}
+		err := response.ExtractInto(&tokenData)
+		if err != nil {
+			return nil, "", err
+		}
+		catalog, err = response.ExtractServiceCatalog()
+		if err != nil {
+			return nil, "", err
+		}
+	} else {
+		util.LogDebug("authenticate %s%s with scope %s.", authOpts.Username, authOpts.UserID, authOpts.Scope)
+		client, err := newKeystoneClient()
+		if err != nil {
+			return nil, "", err
+		}
+		// create new token from basic authentication credentials or token ID
+		response := tokens.Create(client, authOpts)
+		// ugly copy & paste because the base-type of CreateResult and GetResult is private
+		if response.Err != nil {
+			//this includes 4xx responses, so after this point, we can be sure that the token is valid
+			if authOpts.Username != "" || authOpts.UserID != "" {
+				util.LogInfo("Failed login of user %s%s for scope %s: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, response.Err.Error())
+			} else if authOpts.TokenID != "" {
+				util.LogInfo("Failed login of with token %s ... for scope %s: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, response.Err.Error())
+			} else {
+				util.LogError("Login attempt with empty credentials")
+			}
+			return nil, "", response.Err
+		}
+		err = response.ExtractInto(&tokenData)
+		if err != nil {
+			return nil, "", err
+		}
+		catalog, err = response.ExtractServiceCatalog()
+		if err != nil {
+			return nil, "", err
+		}
+		// the token is passed separately
+		tokenData.Token = response.Header.Get("X-Subject-Token")
+	}
+
+	// authorization context
+	context := tokenData.ToContext()
+
+	// service endpoint
+	endpointURL, err := openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
+	if err != nil {
+		return nil, "", err
+	}
+	// update the cache
+	ce := cacheEntry{
+		context:     &context,
+		endpointURL: endpointURL,
+	}
+	d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
+	return &context, endpointURL, nil
+}
+
+func (d *keystone) ChildProjects(projectID string) ([]string, error) {
+	if ce, ok := d.projectTreeCache.Get(projectID); ok {
+		return ce.([]string), nil
+	}
+
+	projects, err := d.fetchChildProjects(projectID)
+	if err != nil {
+		util.LogError("Unable to obtain project tree of project %s: %v", projectID, err)
+		return nil, err
+	}
+
+	d.projectTreeCache.Set(projectID, projects, cache.DefaultExpiration)
+	return projects, nil
+}
+
+func (d *keystone) fetchChildProjects(projectID string) ([]string, error) {
+	enabledVal := true
+	list, err := projects.List(d.providerClient, projects.ListOpts{ParentID: projectID, Enabled: &enabledVal}).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	slice, err := projects.ExtractProjects(list)
+	if err != nil {
+		return nil, err
+	}
+	projectIDs := []string{}
+	for _, p := range slice {
+		projectIDs = append(projectIDs, p.ID)
+		children, err := d.fetchChildProjects(p.ID)
+		if err != nil {
+			return nil, err
+		}
+		projectIDs = append(projectIDs, children...)
+	}
+	return projectIDs, nil
+}
+
+func (d *keystone) UserProjects(userID string) ([]tokens.Scope, error) {
+	if up, ok := d.userProjectsCache.Get(userID); ok {
+		return up.([]tokens.Scope), nil
+	}
+
+	up, err := d.fetchUserProjects(userID)
+	if err != nil {
+		util.LogError("Unable to obtain monitoring project list of user %s: %v", userID, err)
+		return nil, err
+	}
+
+	// cache should be updated at this point
+	d.userProjectsCache.Set(userID, up, cache.DefaultExpiration)
+	return up, nil
+}
+
+func (d *keystone) fetchUserProjects(userID string) ([]tokens.Scope, error) {
+	effectiveVal := true
+	list, err := roles.ListAssignments(d.providerClient, roles.ListAssignmentsOpts{UserID: userID, Effective: &effectiveVal}).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	slice, err := roles.ExtractRoleAssignments(list)
+	if err != nil {
+		return nil, err
+	}
+	scopes := []tokens.Scope{}
+	for _, ra := range slice {
+		if _, ok := d.monitoringRoles[ra.Role.ID]; ok {
+			project, err := projects.Get(d.providerClient, ra.Scope.Project.ID).Extract()
+			if err != nil {
+				return nil, err
+			}
+			domainName := d.domainNames[project.DomainID]
+			scopes = append(scopes, tokens.Scope{ProjectID: ra.Scope.Project.ID, ProjectName: project.Name,
+				DomainID: project.DomainID, DomainName: domainName})
+		}
+	}
+	return scopes, nil
+}
+
 func (d *keystone) UserID(username, userDomain string) (string, error) {
 	key := username + "@" + userDomain
 	if ce, ok := d.userIDCache.Get(key); ok {
 		return ce.(string), nil
 	}
 
-	id, err := d.userID(username, userDomain)
+	id, err := d.fetchUserID(username, userDomain)
 	if err != nil {
 		return "", err
 	}
@@ -657,7 +647,7 @@ func (d *keystone) UserID(username, userDomain string) (string, error) {
 	return id, nil
 }
 
-func (d *keystone) userID(username string, userDomain string) (string, error) {
+func (d *keystone) fetchUserID(username string, userDomain string) (string, error) {
 	userDomainID := d.domainIDs[userDomain]
 	enabled := true
 	list, err := users.List(d.providerClient, users.ListOpts{Name: username, DomainID: userDomainID, Enabled: &enabled}).AllPages()
@@ -671,32 +661,6 @@ func (d *keystone) userID(username string, userDomain string) (string, error) {
 	for _, user := range users {
 		return user.ID, nil
 	}
-	err = fmt.Errorf("user %s@%s disappeared", username, userDomain)
-	util.LogError("%v", err)
-	panic(err)
-}
 
-func (d *keystone) domainID(domainName string) (string, error) {
-	trueVal := true
-	list, err := projects.List(d.providerClient, projects.ListOpts{Name: domainName, IsDomain: &trueVal, Enabled: &trueVal}).AllPages()
-	if err != nil {
-		return "", err
-	}
-	domains, err := projects.ExtractProjects(list)
-	if err != nil {
-		return "", err
-	}
-	for _, domain := range domains {
-		return domain.ID, nil
-	}
-	panic(err)
-}
-
-func (d *keystone) domainName(domainID string) (string, error) {
-	domain, err := projects.Get(d.providerClient, domainID).Extract()
-	if err != nil {
-		return "", err
-	}
-
-	return domain.Name, nil
+	return "", fmt.Errorf("no such user %s@%s", username, userDomain)
 }

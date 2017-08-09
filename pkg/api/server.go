@@ -88,13 +88,14 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) *mux.Router {
 	mainRouter.Methods(http.MethodGet).Path("/federate").HandlerFunc(authorizedHandlerFunc(Federate, false, "metric:list"))
 	// expression browser
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
-	mainRouter.Methods(http.MethodGet).PathPrefix("/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
+	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
+	mainRouter.Methods(http.MethodGet).PathPrefix("/{domain}/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
 
 	return mainRouter
 }
 
 func redirectRootPage(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/graph", http.StatusFound)
+	http.Redirect(w, r, "/"+viper.GetString("keystone.default_user_domain_name")+"/graph", http.StatusFound)
 }
 
 func serveStaticContent(w http.ResponseWriter, req *http.Request) {
@@ -124,14 +125,14 @@ func Federate(w http.ResponseWriter, req *http.Request) {
 	selectors, err := buildSelectors(req, keystoneInstance)
 	if err != nil {
 		util.LogInfo("Invalid request params %s", req.URL)
-		ReturnError(w, err, 400)
+		ReturnPromError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	response, err := storageInstance.Federate(*selectors, req.Header.Get("Accept"))
 	if err != nil {
 		util.LogError("Could not get metrics for %s", selectors)
-		ReturnError(w, err, 503)
+		ReturnPromError(w, err, http.StatusServiceUnavailable)
 		return
 	}
 
@@ -139,7 +140,17 @@ func Federate(w http.ResponseWriter, req *http.Request) {
 }
 
 func graph(w http.ResponseWriter, req *http.Request) {
-	ui.ExecuteTemplate(w, req, "graph.html", keystoneInstance, nil)
+	userDomain := req.Header.Get("X-User-Domain-Name")
+	if domain, ok := mux.Vars(req)["domain"]; ok && domain != userDomain {
+		mux.Vars(req)["domain"] = userDomain
+		newURL := "/" + userDomain + "/graph"
+		if req.URL.RawQuery != "" {
+			newURL += "?" + req.URL.RawQuery
+		}
+		http.Redirect(w, req, newURL, http.StatusFound)
+	} else {
+		ui.ExecuteTemplate(w, req, "graph.html", keystoneInstance, nil)
+	}
 }
 
 /*
@@ -147,7 +158,7 @@ func forwardRequest(w http.ResponseWriter, req *http.Request) {
 	resp, err := storageInstance.DelegateRequest(req)
 
 	if err != nil {
-		ReturnError(w, err, http.StatusBadGateway)
+		ReturnPromError(w, err, http.StatusBadGateway)
 		return
 	}
 

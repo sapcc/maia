@@ -92,15 +92,6 @@ prometheus_url = "http://myprometheus:9090"
 # proxy = proxy for reaching <prometheus_url>
 ```
 
-### Authorization Roles
-
-An OpenStack [policy file](https://docs.openstack.org/security-guide/identity/policies.html) controls the
-authorization of incoming requests.  
-
-```
-policy_file = "/etc/maia/policy.json"
-```
-
 ### Performance
 
 The Prometheus API does not offer an efficient way to list known all historic label values for a given tenant. This
@@ -138,6 +129,25 @@ password = "asafepassword"
 user_domain_name = "Default"
 project_name = "serviceusers"
 project_domain_name = "Default"
+```
+
+#### Authorization Roles
+
+An OpenStack [policy file](https://docs.openstack.org/security-guide/identity/policies.html) controls the
+authorization of incoming requests.  
+
+```
+policy_file = "/etc/maia/policy.json"
+roles = "monitoring_viewer,monitoring_admin"
+```
+
+#### Default Domain
+
+To logging into the UI without specifying a user-domain, you can specify which user-domain should be used
+by default. By default this is the `Default` domain of OpenStack.
+
+```
+default_user_domain_name = "myOSDomain"
 ```
 
 #### Token Cache
@@ -335,11 +345,34 @@ Prometheus.
 
 You can it to discover metrics and perform ad-hoc queries.
 
-Just log-on using your OpenStack credentials using the special username syntax described [here](#openstack-authentication-and-authorization).
+Just log-on using your OpenStack credentials. You may use the special username syntax described [here](#openstack-authentication-and-authorization)
+to log right into your target project. 
 
 ```
-Username: myUser@myOSDomain|myProject@myOSDomain
+Username: myUser@mydomain|myproject@mydomain
 Password: ********
+```
+
+If you omit the scope information (the part right of the `|`), Maia will choose a project for you.
+
+```
+Username: myUser@mydomain
+Password: ********
+```
+
+Instead of specifying the domain in the username, you can also use the domain-name as path in the Maia URL and omit the `@mydomain`.
+
+```
+URL: https://maia.myopenstack.net/<mydomain>
+Username: myUser
+```
+
+If you neither specifiy the user-domain in the username nor the URL, Maia will assume that the user is part
+of the configured default domain (not to be confused with the OpenStack domain `default`).
+
+```
+URL: https://maia.myopenstack.net
+Username: myUser
 ```
 
 # Federating Tenant Metrics from Maia to another Prometheus

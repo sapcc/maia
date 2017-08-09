@@ -69,13 +69,13 @@ func (p *v1Provider) Query(w http.ResponseWriter, req *http.Request) {
 	queryParams := req.URL.Query()
 	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), labelKey, labelValue)
 	if err != nil {
-		ReturnError(w, err, 400)
+		ReturnPromError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	resp, err := p.storage.Query(newQuery, queryParams.Get("time"), queryParams.Get("timeout"), req.Header.Get("Accept"))
 	if err != nil {
-		ReturnError(w, err, 503)
+		ReturnPromError(w, err, http.StatusServiceUnavailable)
 		return
 	}
 
@@ -88,13 +88,13 @@ func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
 	queryParams := req.URL.Query()
 	newQuery, err := util.AddLabelConstraintToExpression(queryParams.Get("query"), labelKey, labelValue)
 	if err != nil {
-		ReturnError(w, err, 400)
+		ReturnPromError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	resp, err := p.storage.QueryRange(newQuery, queryParams.Get("start"), queryParams.Get("end"), queryParams.Get("step"), queryParams.Get("timeout"), req.Header.Get("Accept"))
 	if err != nil {
-		ReturnError(w, err, 503)
+		ReturnPromError(w, err, http.StatusServiceUnavailable)
 		return
 	}
 
@@ -110,7 +110,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	// do not list label values from series older than maia.label_value_ttl
 	ttl, err := time.ParseDuration(viper.GetString("maia.label_value_ttl"))
 	if err != nil {
-		ReturnError(w, errors.New("Invalid Maia configuration (maia.label_value_ttl)"), 500)
+		ReturnPromError(w, errors.New("Invalid Maia configuration (maia.label_value_ttl)"), http.StatusInternalServerError)
 		return
 	}
 
@@ -118,7 +118,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	end := time.Now()
 	resp, err := p.storage.Series([]string{"{" + labelKey + "=\"" + labelValue + "\"," + string(name) + "!=\"\"}"}, start.Format(time.RFC3339), end.Format(time.RFC3339), req.Header.Get("Accept"))
 	if err != nil {
-		ReturnError(w, err, 502)
+		ReturnPromError(w, err, http.StatusBadGateway)
 		return
 	}
 
@@ -126,13 +126,13 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	defer resp.Body.Close()
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		ReturnError(w, err, resp.StatusCode)
+		ReturnPromError(w, err, resp.StatusCode)
 		return
 	}
 
 	var sr storage.SeriesResponse
 	if err := json.Unmarshal(buf, &sr); err != nil {
-		ReturnError(w, err, 500)
+		ReturnPromError(w, err, http.StatusInternalServerError)
 		return
 	}
 	// collect unique values from 1000x bigger :( series list
@@ -156,13 +156,13 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request) {
 	selectors, err := buildSelectors(req, p.keystone)
 	if err != nil {
-		ReturnError(w, err, http.StatusBadRequest)
+		ReturnPromError(w, err, http.StatusBadRequest)
 		return
 	}
 	queryParams := req.URL.Query()
 	resp, err := p.storage.Series(*selectors, queryParams.Get("start"), queryParams.Get("end"), req.Header.Get("Accept"))
 	if err != nil {
-		ReturnError(w, err, http.StatusBadGateway)
+		ReturnPromError(w, err, http.StatusBadGateway)
 		return
 	}
 

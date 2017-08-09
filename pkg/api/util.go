@@ -102,13 +102,8 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 	}
 }
 
-//ReturnError produces a Prometheus error Response with HTTP Status code if the given
-//error is non-nil. Otherwise, nothing is done and false is returned.
-func ReturnError(w http.ResponseWriter, err error, code int) bool {
-	if err == nil {
-		return false
-	}
-
+//ReturnPromError produces a Prometheus error Response with HTTP Status code
+func ReturnPromError(w http.ResponseWriter, err error, code int) {
 	var errorType = storage.ErrorNone
 	switch code {
 	case http.StatusBadRequest:
@@ -121,13 +116,10 @@ func ReturnError(w http.ResponseWriter, err error, code int) bool {
 		errorType = storage.ErrorTimeout
 	default:
 		http.Error(w, err.Error(), code)
-		return true
 	}
 
 	jsonErr := storage.Response{Status: storage.StatusError, ErrorType: errorType, Error: err.Error()}
 	ReturnJSON(w, code, jsonErr)
-
-	return true
 }
 
 func scopeToLabelConstraint(req *http.Request, keystone keystone.Driver) (string, string) {
@@ -178,9 +170,9 @@ func policyEngine() *policy.Enforcer {
 	}
 
 	// set up policy engine lazily
-	bytes, err := ioutil.ReadFile(viper.GetString("maia.policy_file"))
+	bytes, err := ioutil.ReadFile(viper.GetString("keystone.policy_file"))
 	if err != nil {
-		panic(fmt.Errorf("Policy file %s not found: %s", viper.GetString("maia.policy_file"), err))
+		panic(fmt.Errorf("Policy file %s not found: %s", viper.GetString("keystone.policy_file"), err))
 	}
 	var rules map[string]string
 	err = json.Unmarshal(bytes, &rules)
@@ -195,7 +187,7 @@ func policyEngine() *policy.Enforcer {
 	return policyEnforcer
 }
 
-func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, rules []string) []string {
+func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, rules []string) ([]string, error) {
 	util.LogDebug("authenticate")
 	matchedRules := []string{}
 
@@ -205,9 +197,8 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 		util.LogInfo(err.Error())
 		w.Header().Set("WWW-Authenticate", "Basic")
 		// expire the cookie
-		http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", MaxAge: -1, Secure: false})
-		ReturnError(w, err, http.StatusUnauthorized)
-		return matchedRules
+		http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Path: "/", MaxAge: -1, Secure: false})
+		return nil, err
 	}
 
 	// 2. authorize
@@ -220,25 +211,42 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	}
 
 	if len(matchedRules) == 0 {
-		err := fmt.Errorf("User %s with roles %s does not fulfill any authorization rule %v", context.Request["user_id"], context.Roles, rules)
-		util.LogInfo(err.Error())
-		ReturnError(w, err, http.StatusForbidden)
-		return matchedRules
+		return matchedRules, nil
 	}
 
 	// call
-	http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Value: req.Header.Get("X-Auth-Token"),
+	http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Path: "/", Value: req.Header.Get("X-Auth-Token"),
 		MaxAge: int(viper.GetDuration("keystone.token_cache_time").Seconds()), Secure: false})
 
-	return matchedRules
+	return matchedRules, nil
 }
 
 func authorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), guessScope bool, rule string) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		matchedRules := authorizeRules(w, req, guessScope, []string{rule})
-		if len(matchedRules) > 0 {
+		matchedRules, err := authorizeRules(w, req, guessScope, []string{rule})
+		if err != nil {
+			if strings.HasPrefix(req.Header.Get("Accept"), storage.JSON) {
+				ReturnPromError(w, err, http.StatusUnauthorized)
+			} else {
+				http.Error(w, fmt.Sprintf("User does not have monitoring permissions on any project (required roles: %s)", viper.GetString("keystone.roles")), http.StatusUnauthorized)
+			}
+		} else if len(matchedRules) > 0 {
 			wrappedHandlerFunc(w, req)
+		} else {
+			// authenticated but not authorized
+			h := req.Header
+			username := h.Get("X-User-Name")
+			userDomain := h.Get("X-User-Domain-Name")
+			scopedDomain := h.Get("X-Domain-Name")
+			scopedProject := h.Get("X-Project-Name")
+			scope := scopedDomain
+			if scopedProject != "" {
+				scope = scopedProject + "@" + scopedDomain
+			}
+			actRoles := h.Get("X-Roles")
+			reqRoles := viper.GetString("keystone.roles")
+			http.Error(w, fmt.Sprintf("User %s@%s does not have monitoring permissions on %s (actual roles: %s, required roles: %s)", username, userDomain, scope, actRoles, reqRoles), http.StatusForbidden)
 		}
 	}
 }
