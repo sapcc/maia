@@ -46,7 +46,7 @@ type Driver interface {
 
 // NewKeystoneDriver is a factory method which chooses the right driver implementation based on configuration settings
 func NewKeystoneDriver() Driver {
-	driverName := viper.GetString("maia.keystone_driver")
+	driverName := viper.GetString("maia.auth_driver")
 	switch driverName {
 	case "keystone":
 		return Keystone()

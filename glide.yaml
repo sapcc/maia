@@ -8,8 +8,6 @@ import:
   - openstack/identity/v3/tokens
 - package: github.com/gorilla/mux
   version: ~1.4.0
-- package: github.com/pkg/errors
-  version: ~0.8.0
 - package: github.com/prometheus/client_golang
   version: ~0.8.0
   subpackages:
@@ -29,3 +27,4 @@ import:
 - package: github.com/spf13/cobra
 - package: github.com/spf13/viper
 - package: github.com/patrickmn/go-cache
+- package: github.com/jteeuwen/go-bindata
