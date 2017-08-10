@@ -1,0 +1,16 @@
+{
+  "roles": [
+    {
+      "id": "r00000",
+      "name": "service"
+    },
+    {
+      "id": "r00001",
+      "name": "monitoring_admin"
+    },
+    {
+      "id": "r00002",
+      "name": "monitoring_viewer"
+    }
+  ]
+}

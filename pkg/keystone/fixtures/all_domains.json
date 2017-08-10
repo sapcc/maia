@@ -1,0 +1,23 @@
+{
+  "projects": [
+    {
+      "is_domain": true,
+      "description": null,
+      "domain_id": "default",
+      "enabled": true,
+      "id": "d00000",
+      ""
+      "name": "Default",
+      "parent_id": null
+    },
+    {
+      "is_domain": true,
+      "description": null,
+      "domain_id": "d00001",
+      "enabled": true,
+      "id": "d00001",
+      "name": "testdomain",
+      "parent_id": null
+    }
+  ]
+}

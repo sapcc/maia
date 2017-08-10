@@ -55,6 +55,8 @@ func setDefaultConfig() {
 	viper.SetDefault("maia.storage_driver", "prometheus")
 	viper.SetDefault("maia.label_value_ttl", "1h")
 	viper.SetDefault("keystone.token_cache_time", "900s")
+	viper.SetDefault("keystone.roles", "monitoring_viewer,monitoring_admin")
+	viper.SetDefault("keystone.default_user_domain_name", "Default")
 }
 
 func init() {

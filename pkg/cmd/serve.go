@@ -91,5 +91,5 @@ func init() {
 	serveCmd.Flags().StringVar(&bindAddr, "bind-address", "0.0.0.0:9091", "IP-Address and port where Maia is listening for incoming requests (e.g. 0.0.0.0:9091)")
 	viper.BindPFlag("maia.bind_address", serveCmd.Flags().Lookup("bind-address"))
 	serveCmd.Flags().StringVar(&policyFile, "policy-file", "", "Location of the OpenStack policy file")
-	viper.BindPFlag("maia.policy_file", serveCmd.Flags().Lookup("policy-file"))
+	viper.BindPFlag("keystone.policy_file", serveCmd.Flags().Lookup("policy-file"))
 }
