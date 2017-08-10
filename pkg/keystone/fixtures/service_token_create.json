@@ -1,0 +1,78 @@
+{
+  "token": {
+    "methods": [
+      "password"
+    ],
+    "roles": [
+      {
+        "id": "r00000",
+        "name": "service"
+      }
+    ],
+    "expires_at": "2017-08-09T23:51:19.000000Z",
+    "project": {
+      "domain": {
+        "id": "default",
+        "name": "Default"
+      },
+      "id": "p00000",
+      "name": "service"
+    },
+    "catalog": [
+      {
+        "endpoints": [
+          {
+            "url": "https://identity-3.staging.cloud.sap:443/v3",
+            "interface": "public",
+            "region": "staging",
+            "region_id": "staging",
+            "id": "7859f84c67d740b294c9a607d03c2991"
+          },
+          {
+            "url": "http://keystone.monsoon3.svc.kubernetes.staging.cloud.sap:5000/v3",
+            "interface": "internal",
+            "region": "staging",
+            "region_id": "staging",
+            "id": "a2cff5bcad944eb4a10c06e6c05140eb"
+          },
+          {
+            "url": "https://identity-admin-3.staging.cloud.sap:443/v3",
+            "interface": "admin",
+            "region": "staging",
+            "region_id": "staging",
+            "id": "5973c23918b8460886140c5ed6a5411b"
+          }
+        ],
+        "type": "identity",
+        "id": "70c56d9a4833404e823ba1195a0f1a63",
+        "name": "keystone"
+      },
+      {
+        "endpoints": [
+          {
+            "url": "https://maia.staging.cloud.sap:443/api/v1",
+            "interface": "public",
+            "region": "staging",
+            "region_id": "staging",
+            "id": "ff236c3fd49d4d9388e8a63b9304fd38"
+          }
+        ],
+        "type": "metrics",
+        "id": "16f7be69f0a44a9e825fbe22a5405d7b",
+        "name": "maia"
+      }
+    ],
+    "user": {
+      "domain": {
+        "id": "default",
+        "name": "Default"
+      },
+      "id": "u00001",
+      "name": "testuser"
+    },
+    "audit_ids": [
+      "xxxxxxxxxx"
+    ],
+    "issued_at": "2017-08-09T15:51:19.000000Z"
+  }
+}

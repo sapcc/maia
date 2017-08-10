@@ -1,0 +1,13 @@
+{
+  "projects": [
+    {
+      "is_domain": false,
+      "description": null,
+      "domain_id": "d00001",
+      "enabled": true,
+      "id": "p00002",
+      "name": "Child",
+      "parent_id": "p00001"
+    }
+  ]
+}
