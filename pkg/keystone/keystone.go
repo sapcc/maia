@@ -437,7 +437,7 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, g
 			if err != nil {
 				return nil, err
 			} else if len(projects) == 0 {
-				return nil, fmt.Errorf("User %s%s does not have monitoring authorization on any project", ba.UserID, ba.Username)
+				return nil, fmt.Errorf("User %s (%s@%s) does not have monitoring authorization on any project in any domain (required roles: %s)", userID, username, ba.DomainName, viper.GetString("keystone.roles"))
 			}
 
 			// default to first project (note that redundant attributes are not copied here to aovid errors)

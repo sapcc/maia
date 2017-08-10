@@ -229,7 +229,7 @@ func authorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 			if strings.HasPrefix(req.Header.Get("Accept"), storage.JSON) {
 				ReturnPromError(w, err, http.StatusUnauthorized)
 			} else {
-				http.Error(w, fmt.Sprintf("User does not have monitoring permissions on any project (required roles: %s)", viper.GetString("keystone.roles")), http.StatusUnauthorized)
+				http.Error(w, err.Error(), http.StatusUnauthorized)
 			}
 		} else if len(matchedRules) > 0 {
 			wrappedHandlerFunc(w, req)
