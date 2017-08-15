@@ -46,9 +46,8 @@ func AddLabelConstraintToSelector(metricSelector string, key string, values []st
 func makeLabelMatcher(key string, values []string) (*metric.LabelMatcher, error) {
 	if len(values) == 1 {
 		return metric.NewLabelMatcher(metric.Equal, model.LabelName(key), model.LabelValue(values[0]))
-	} else {
-		return metric.NewLabelMatcher(metric.RegexMatch, model.LabelName(key), model.LabelValue(strings.Join(values, "|")))
 	}
+	return metric.NewLabelMatcher(metric.RegexMatch, model.LabelName(key), model.LabelValue(strings.Join(values, "|")))
 }
 
 // labelInjector enhances every reference to a metric (vector-selector) with an additional label-constraint
