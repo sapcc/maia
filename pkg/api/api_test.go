@@ -183,7 +183,7 @@ func TestSeries(t *testing.T) {
 	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
 	expectAuthWithChildren(keystoneMock)
-	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=\"12345|67890\"}"}, "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
+	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=~\"12345|67890\"}"}, "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"X-Auth-Token": "someverylongtokenideed", "Accept": storage.JSON},
@@ -233,7 +233,7 @@ func TestLabelValues(t *testing.T) {
 	expectAuthByProjectID(keystoneMock)
 	// Maia's label-values implementation uses the series API and a time-based filter stale series out. The exact start
 	// and end date of the filter cannot be predicted, therefore we accept anything that is a parsable date.
-	storageMock.EXPECT().Series([]string{"{project_id=\"12345\",component!=\"\"}"}, test.TimeStringMatcher{}, test.TimeStringMatcher{}, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
+	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=\"12345\"}"}, test.TimeStringMatcher{}, test.TimeStringMatcher{}, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},

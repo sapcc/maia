@@ -122,18 +122,15 @@ func ReturnPromError(w http.ResponseWriter, err error, code int) {
 	ReturnJSON(w, code, jsonErr)
 }
 
-func scopeToLabelConstraint(req *http.Request, keystone keystone.Driver) (string, string) {
+func scopeToLabelConstraint(req *http.Request, keystone keystone.Driver) (string, []string) {
 	if projectID := req.Header.Get("X-Project-Id"); projectID != "" {
 		children, err := keystone.ChildProjects(projectID)
 		if err != nil {
 			panic(err)
 		}
-		for _, subID := range children {
-			projectID = projectID + "|" + subID
-		}
-		return "project_id", projectID
+		return "project_id", append([]string{projectID}, children...)
 	} else if domainID := req.Header.Get("X-Domain-Id"); domainID != "" {
-		return "domain_id", domainID
+		return "domain_id", []string{domainID}
 	}
 
 	panic(fmt.Errorf("Missing OpenStack scope attributes in request header"))
@@ -142,7 +139,7 @@ func scopeToLabelConstraint(req *http.Request, keystone keystone.Driver) (string
 // buildSelectors takes the selectors contained in the "match[]" URL query parameter(s)
 // and extends them with a label-constrained for the project/domain scope
 func buildSelectors(req *http.Request, keystone keystone.Driver) (*[]string, error) {
-	labelKey, labelValue := scopeToLabelConstraint(req, keystone)
+	labelKey, labelValues := scopeToLabelConstraint(req, keystone)
 
 	queryParams := req.URL.Query()
 	selectors := queryParams["match[]"]
@@ -152,7 +149,7 @@ func buildSelectors(req *http.Request, keystone keystone.Driver) (*[]string, err
 	}
 	// enrich all match statements
 	for i, sel := range selectors {
-		newSel, err := util.AddLabelConstraintToSelector(sel, labelKey, labelValue)
+		newSel, err := util.AddLabelConstraintToSelector(sel, labelKey, labelValues)
 		if err != nil {
 			return nil, err
 		}

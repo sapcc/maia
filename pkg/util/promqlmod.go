@@ -4,15 +4,16 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/storage/metric"
+	"strings"
 )
 
 // AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label
-func AddLabelConstraintToExpression(expression string, key string, value string) (string, error) {
+func AddLabelConstraintToExpression(expression string, key string, values []string) (string, error) {
 	exprNode, err := promql.ParseExpr(expression)
 	if err != nil {
 		return "", err
 	}
-	matcher, err := metric.NewLabelMatcher(metric.Equal, model.LabelName(key), model.LabelValue(value))
+	matcher, err := makeLabelMatcher(key, values)
 	if err != nil {
 		return "", err
 	}
@@ -24,8 +25,8 @@ func AddLabelConstraintToExpression(expression string, key string, value string)
 }
 
 // AddLabelConstraintToSelector enhances a PromQL selector with an additional label selector
-func AddLabelConstraintToSelector(metricSelector string, key string, value string) (string, error) {
-	matcher, err := metric.NewLabelMatcher(metric.Equal, model.LabelName(key), model.LabelValue(value))
+func AddLabelConstraintToSelector(metricSelector string, key string, values []string) (string, error) {
+	matcher, err := makeLabelMatcher(key, values)
 	if err != nil {
 		return "", err
 	}
@@ -40,6 +41,14 @@ func AddLabelConstraintToSelector(metricSelector string, key string, value strin
 		return "", err
 	}
 	return "{" + metric.LabelMatchers(append(labelMatchers, matcher)).String() + "}", nil
+}
+
+func makeLabelMatcher(key string, values []string) (*metric.LabelMatcher, error) {
+	if len(values) == 1 {
+		return metric.NewLabelMatcher(metric.Equal, model.LabelName(key), model.LabelValue(values[0]))
+	} else {
+		return metric.NewLabelMatcher(metric.RegexMatch, model.LabelName(key), model.LabelValue(strings.Join(values, "|")))
+	}
 }
 
 // labelInjector enhances every reference to a metric (vector-selector) with an additional label-constraint

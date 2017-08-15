@@ -104,8 +104,6 @@ func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
 // LabelValues utilizes the series API in order to implement a tenant-aware list.
 // This is a complex operation.
 func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
-	labelKey, labelValue := scopeToLabelConstraint(req, p.keystone)
-
 	name := model.LabelName(mux.Vars(req)["name"])
 	// do not list label values from series older than maia.label_value_ttl
 	ttl, err := time.ParseDuration(viper.GetString("maia.label_value_ttl"))
@@ -114,9 +112,15 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	labelKey, labelValues := scopeToLabelConstraint(req, p.keystone)
+	selector, err := util.AddLabelConstraintToSelector("{"+string(name)+"!=\"\"}", labelKey, labelValues)
+	if err != nil {
+		ReturnPromError(w, err, http.StatusBadRequest)
+	}
+
 	start := time.Now().Add(-ttl)
 	end := time.Now()
-	resp, err := p.storage.Series([]string{"{" + labelKey + "=\"" + labelValue + "\"," + string(name) + "!=\"\"}"}, start.Format(time.RFC3339), end.Format(time.RFC3339), req.Header.Get("Accept"))
+	resp, err := p.storage.Series([]string{selector}, start.Format(time.RFC3339), end.Format(time.RFC3339), req.Header.Get("Accept"))
 	if err != nil {
 		ReturnPromError(w, err, http.StatusBadGateway)
 		return
