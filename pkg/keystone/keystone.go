@@ -621,7 +621,7 @@ func (d *keystone) fetchUserProjects(userID string) ([]tokens.Scope, error) {
 			return false, err
 		}
 		for _, ra := range slice {
-			if _, ok := d.monitoringRoles[ra.Role.ID]; ok {
+			if _, ok := d.monitoringRoles[ra.Role.ID]; ok && ra.Scope.Project.ID != "" {
 				project, err := projects.Get(d.providerClient, ra.Scope.Project.ID).Extract()
 				if err != nil {
 					return false, err

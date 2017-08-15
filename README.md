@@ -23,7 +23,7 @@ If you don't use OpenStack, you can still use Maia CLI as a feature-complete she
 * List metrics
 * Perform ad-hoc queries
  
-[Maia CLI](#using-the-maia-cli)
+[Maia CLI](#using-the-maia-client)
 * Feature-complete CLI supporting all API operations
 * JSON and Go-template-based output for reliable automation
 * Works with Prometheus, too (no OpenStack required)
@@ -131,15 +131,21 @@ project_name = "serviceusers"
 project_domain_name = "Default"
 ```
 
-#### Authorization Roles
+#### Authorization
 
 An OpenStack [policy file](https://docs.openstack.org/security-guide/identity/policies.html) controls the
-authorization of incoming requests.  
+authorization of incoming requests. The roles mentioned in the policy file also need to be
+listed in the configuration, so that Maia can discover which projects are relevant
+for monitoring.
 
 ```
 policy_file = "/etc/maia/policy.json"
 roles = "monitoring_viewer,monitoring_admin"
 ```
+
+Maia distinguishes the following permissions
+* `metric:list`: List which metrics and measurement series are available for inspection
+* `metric:show`: Show actual measurement data (details)
 
 #### Default Domain
 
