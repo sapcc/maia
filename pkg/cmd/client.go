@@ -99,7 +99,7 @@ func storageInstance() storage.Driver {
 			fetchToken()
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
 		} else {
-			panic(fmt.Errorf("Either --maia-url or --storageInstance-url need to be specified (or MAIA_URL resp. MAIA_PROMETHEUS_URL)"))
+			panic(fmt.Errorf("Either --os-auth-url or --prometheus-url need to be specified (or OS_AUTH_URL resp. MAIA_PROMETHEUS_URL)"))
 		}
 	}
 
