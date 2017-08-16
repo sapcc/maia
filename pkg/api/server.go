@@ -89,13 +89,18 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) *mux.Router {
 	// expression browser
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
 	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
-	mainRouter.Methods(http.MethodGet).PathPrefix("/{domain}/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
+	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
+	mainRouter.Methods(http.MethodGet).Path("/{domain}").HandlerFunc(redirectRootPage)
 
 	return mainRouter
 }
 
 func redirectRootPage(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/"+viper.GetString("keystone.default_user_domain_name")+"/graph", http.StatusFound)
+	domain, ok := mux.Vars(r)["domain"]
+	if !ok {
+		domain = viper.GetString("keystone.default_user_domain_name")
+	}
+	http.Redirect(w, r, "/"+domain+"/graph", http.StatusFound)
 }
 
 func serveStaticContent(w http.ResponseWriter, req *http.Request) {
@@ -140,17 +145,7 @@ func Federate(w http.ResponseWriter, req *http.Request) {
 }
 
 func graph(w http.ResponseWriter, req *http.Request) {
-	userDomain := req.Header.Get("X-User-Domain-Name")
-	if domain, ok := mux.Vars(req)["domain"]; ok && domain != userDomain {
-		mux.Vars(req)["domain"] = userDomain
-		newURL := "/" + userDomain + "/graph"
-		if req.URL.RawQuery != "" {
-			newURL += "?" + req.URL.RawQuery
-		}
-		http.Redirect(w, req, newURL, http.StatusFound)
-	} else {
-		ui.ExecuteTemplate(w, req, "graph.html", keystoneInstance, nil)
-	}
+	ui.ExecuteTemplate(w, req, "graph.html", keystoneInstance, nil)
 }
 
 /*

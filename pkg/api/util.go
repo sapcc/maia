@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/databus23/goslo.policy"
+	"github.com/gorilla/mux"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
@@ -184,13 +185,33 @@ func policyEngine() *policy.Enforcer {
 	return policyEnforcer
 }
 
+func isPlainBasicAuth(req *http.Request) bool {
+	if username, _, ok := req.BasicAuth(); ok {
+		return !strings.ContainsAny(username, "@|")
+	}
+	return false
+}
+
 func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, rules []string) ([]string, error) {
 	util.LogDebug("authenticate")
 	matchedRules := []string{}
 
-	// 1. authenticate
+	domain, domainSet := mux.Vars(req)["domain"]
+
+	// 1. check cookies or user-domain override via path prefix
+	if cookie, err := req.Cookie("X-Auth-Token"); err == nil && cookie.Value != "" && req.Header.Get("X-Auth-Token") == "" {
+		req.Header.Set("X-Auth-Token", cookie.Value)
+	} else if domainSet && isPlainBasicAuth(req) {
+		req.Header.Set("X-User-Domain-Name", domain)
+	}
+
+	// 2. authenticate
 	context, err := keystoneInstance.AuthenticateRequest(req, guessScope)
-	if err != nil {
+	if err != nil || (domainSet && req.Header.Get("X-User-Domain-Name") != domain) {
+		// either cookie is expired or credentials do not match the domain selected in the URL path
+		if err == nil {
+			err = fmt.Errorf("User domain %s specified in URL does not match the domain %s that was provided in the login dialog", domain, req.Header.Get("X-User-Domain-Name"))
+		}
 		util.LogInfo(err.Error())
 		w.Header().Set("WWW-Authenticate", "Basic")
 		// expire the cookie
@@ -198,7 +219,7 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 		return nil, err
 	}
 
-	// 2. authorize
+	// 3. authorize
 	// make sure policyEnforcer is available
 	pe := policyEngine()
 	for _, rule := range rules {

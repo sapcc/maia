@@ -64,8 +64,8 @@
     ],
     "user": {
       "domain": {
-        "id": "d00001",
-        "name": "testdomain"
+        "id": "default",
+        "name": "Default"
       },
       "id": "u00001",
       "name": "testuser"

@@ -1,0 +1,18 @@
+{
+  "role_assignments": [
+    {
+      "user": {
+        "id": "u00001"
+      },
+      "role": {
+        "id": "r00001"
+      },
+      "scope": {
+        "project": {
+          "id": "p00001"
+        }
+      }
+    }
+  ]
+}
+

@@ -35,7 +35,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/gorilla/mux"
 	"github.com/patrickmn/go-cache"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
@@ -326,7 +325,7 @@ func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, 
 // If the authOptionsFromRequest are invalid or the authentication provider has issues, an error is returned
 // When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
 func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*policy.Context, error) {
-	authOpts, err := d.authOptionsFromRequest(r, false, guessScope)
+	authOpts, err := d.authOptionsFromRequest(r, guessScope)
 	if err != nil {
 		util.LogError(err.Error())
 		return nil, err
@@ -337,16 +336,7 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 	// of the service user
 	context, _, err := d.authenticate(authOpts, true)
 	if err != nil {
-		if authOpts.TokenID != "" {
-			// ignore tokens passed as cookies
-			if authOpts, err = d.authOptionsFromRequest(r, true, guessScope); err != nil {
-				return nil, err
-			} else if context, _, err = d.authenticate(authOpts, true); err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	// write this to request header (compatible with databus23/keystone)
@@ -375,9 +365,8 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 // It requires username to contain a qualified OpenStack username and project/domain scope information
 // Format: <user>"|"<project> or <user>"|@"<domain>
 // user/project can either be a unique OpenStack ID or a qualified name with domain information, e.g. username"@"domain
-// When ignoreCookies is set to false, the method will look for an KS token also in the cookies
 // When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
-func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, guessScope bool) (*tokens.AuthOptions, error) {
+func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*tokens.AuthOptions, error) {
 	ba := tokens.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		AllowReauth:      false,
@@ -386,15 +375,8 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, g
 	// extract credentials
 	if token := r.Header.Get("X-Auth-Token"); token != "" {
 		ba.TokenID = token
-	} else if cookie, err := r.Cookie("X-Auth-Token"); err == nil && cookie.Value != "" && !ignoreCookies {
-		ba.TokenID = cookie.Value
 	} else if username, password, ok := r.BasicAuth(); ok {
 		usernameParts := strings.Split(username, "|")
-		if len(usernameParts) < 1 {
-			util.LogError("Insufficient parameters for basic authentication: %s", username)
-			return nil, errors.New("Insufficient parameters for basic authentication. Provide user, user|project or user|@domain and password")
-		}
-
 		userParts := strings.Split(usernameParts[0], "@")
 		var scopeParts []string
 		if len(usernameParts) >= 2 {
@@ -406,11 +388,12 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, g
 
 		// parse username part
 		if len(userParts) > 1 {
+			// username + user-domain-name
 			ba.Username = userParts[0]
 			ba.DomainName = userParts[1]
-		} else if domainPrefix, ok := mux.Vars(r)["domain"]; ok && len(userParts) == 1 {
+		} else if headerUserDomain := r.Header.Get("X-User-Domain-Name"); headerUserDomain != "" {
 			ba.Username = userParts[0]
-			ba.DomainName = domainPrefix
+			ba.DomainName = headerUserDomain
 		} else {
 			ba.UserID = userParts[0]
 		}
@@ -425,25 +408,8 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, g
 		} else if len(scopeParts) >= 1 {
 			ba.Scope.ProjectID = scopeParts[0]
 		} else if guessScope {
-			// guess scope if it is missing
-			userID := ba.UserID
-			if userID == "" {
-				userID, err = d.UserID(ba.Username, ba.DomainName)
-				if err != nil {
-					return nil, err
-				}
-			}
-			projects, err := d.UserProjects(userID)
-			if err != nil {
+			if err := d.guessScope(&ba); err != nil {
 				return nil, err
-			} else if len(projects) == 0 {
-				return nil, fmt.Errorf("User %s (%s@%s) does not have monitoring authorization on any project in any domain (required roles: %s)", userID, username, ba.DomainName, viper.GetString("keystone.roles"))
-			}
-
-			// default to first project (note that redundant attributes are not copied here to aovid errors)
-			ba.Scope.ProjectID = projects[0].ProjectID
-			if ba.Scope.ProjectID == "" {
-				ba.Scope.DomainID = projects[0].DomainID
 			}
 		}
 
@@ -470,6 +436,32 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, ignoreCookies bool, g
 	}
 
 	return &ba, nil
+}
+
+func (d *keystone) guessScope(ba *tokens.AuthOptions) error {
+	// guess scope if it is missing
+	userID := ba.UserID
+	var err error
+	if userID == "" {
+		userID, err = d.UserID(ba.Username, ba.DomainName)
+		if err != nil {
+			return err
+		}
+	}
+	projects, err := d.UserProjects(userID)
+	if err != nil {
+		return err
+	} else if len(projects) == 0 {
+		return fmt.Errorf("User %s (%s@%s) does not have monitoring authorization on any project in any domain (required roles: %s)", userID, ba.Username, ba.DomainName, viper.GetString("keystone.roles"))
+	}
+
+	// default to first project (note that redundant attributes are not copied here to aovid errors)
+	ba.Scope.ProjectID = projects[0].ProjectID
+	if ba.Scope.ProjectID == "" {
+		ba.Scope.DomainID = projects[0].DomainID
+	}
+
+	return nil
 }
 
 // authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
