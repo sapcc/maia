@@ -359,7 +359,8 @@ Username: myUser@mydomain|myproject@mydomain
 Password: ********
 ```
 
-If you omit the scope information (the part right of the `|`), Maia will choose a project for you.
+If you omit the scope information (the part right of the `|`), Maia will choose a project for you. You can switch to any
+other project via the dropdown menu on the top-right side.
 
 ```
 Username: myUser@mydomain

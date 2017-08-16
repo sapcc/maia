@@ -1,0 +1,11 @@
+{
+  "project": {
+    "is_domain": false,
+    "description": null,
+    "domain_id": "d00001",
+    "enabled": true,
+    "id": "p00001",
+    "name": "testproject",
+    "parent_id": "d00001"
+  }
+}

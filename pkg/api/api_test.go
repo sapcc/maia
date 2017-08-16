@@ -92,7 +92,7 @@ func expectAuthByDefaults(keystoneMock *keystone.MockDriver) {
 	keystoneMock.EXPECT().UserProjects(projectContext.Auth["user_id"]).Return([]tokens.Scope{{ProjectID: projectContext.Auth["project_id"], DomainID: projectContext.Auth["project_domain_id"]}}, nil).After(authCall)
 }
 
-func expectAuthAndRedirect(keystoneMock *keystone.MockDriver) {
+func expectAuth(keystoneMock *keystone.MockDriver) {
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
 	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(projectContext, nil)
 }
@@ -359,11 +359,11 @@ func TestGraph_otherOSDomain(t *testing.T) {
 	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
-	expectAuthAndRedirect(keystoneMock)
+	expectAuth(keystoneMock)
 
 	test.APIRequest{
 		Method:           "GET",
 		Path:             "/nottestdomain/graph?project_id=" + projectContext.Auth["project_id"],
-		ExpectStatusCode: http.StatusFound,
+		ExpectStatusCode: http.StatusUnauthorized,
 	}.Check(t, router)
 }

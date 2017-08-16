@@ -1,0 +1,12 @@
+{
+  "users": [
+    {
+      "domain_id": "d00001",
+      "enabled": true,
+      "id": "u00001",
+      "name": "testuser",
+      "password_expires_at": null
+    }
+  ]
+}
+
