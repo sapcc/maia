@@ -89,7 +89,7 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) *mux.Router {
 	mainRouter.Methods(http.MethodGet).Path("/federate").HandlerFunc(authorizedHandlerFunc(Federate, false, "metric:show"))
 	// expression browser
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
-	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
+	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(redirectRootPage)
 	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
 	mainRouter.Methods(http.MethodGet).Path("/{domain}").HandlerFunc(redirectRootPage)
 
