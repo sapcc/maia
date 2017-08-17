@@ -31,12 +31,13 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 			}
 			return lset
 		},
-		"userId":      func() string { return req.Header.Get("X-User-Id") },
-		"userName":    func() string { return req.Header.Get("X-User-Name") },
-		"projectName": func() string { return req.Header.Get("X-Project-Name") },
-		"projectId":   func() string { return req.Header.Get("X-Project-Id") },
-		"domainName":  func() string { return req.Header.Get("X-Domain-Name") },
-		"domainId":    func() string { return req.Header.Get("X-Domain-Id") },
+		"userId":         func() string { return req.Header.Get("X-User-Id") },
+		"userName":       func() string { return req.Header.Get("X-User-Name") },
+		"projectName":    func() string { return req.Header.Get("X-Project-Name") },
+		"projectId":      func() string { return req.Header.Get("X-Project-Id") },
+		"domainName":     func() string { return req.Header.Get("X-Domain-Name") },
+		"domainId":       func() string { return req.Header.Get("X-Domain-Id") },
+		"userDomainName": func() string { return req.Header.Get("X-User-Domain-Name") },
 		//"authRules": func() []string {
 		//	rules, ok := data.([]string)
 		//	if ok {

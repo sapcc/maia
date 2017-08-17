@@ -92,14 +92,14 @@ func expectAuthByDefaults(keystoneMock *keystone.MockDriver) {
 	keystoneMock.EXPECT().UserProjects(projectContext.Auth["user_id"]).Return([]tokens.Scope{{ProjectID: projectContext.Auth["project_id"], DomainID: projectContext.Auth["project_domain_id"]}}, nil).After(authCall)
 }
 
-func expectAuth(keystoneMock *keystone.MockDriver) {
-	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(projectContext, nil)
-}
-
 func expectAuthAndFail(keystoneMock *keystone.MockDriver) {
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
 	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(nil, errors.New("negativetesterror"))
+}
+
+func expectPlainBasicAuthAndFail(keystoneMock *keystone.MockDriver) {
+	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
+	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(nil, errors.New("negativetesterror"))
 }
 
 func expectAuthAndDenyAuthorization(keystoneMock *keystone.MockDriver) {
@@ -359,9 +359,10 @@ func TestGraph_otherOSDomain(t *testing.T) {
 	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
-	expectAuth(keystoneMock)
+	expectPlainBasicAuthAndFail(keystoneMock)
 
 	test.APIRequest{
+		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic testuser|12345:password")), "Accept": storage.JSON},
 		Method:           "GET",
 		Path:             "/nottestdomain/graph?project_id=" + projectContext.Auth["project_id"],
 		ExpectStatusCode: http.StatusUnauthorized,

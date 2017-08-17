@@ -351,27 +351,22 @@ Prometheus.
 
 You can it to discover metrics and perform ad-hoc queries.
 
-Just log-on using your OpenStack credentials. You may use the special username syntax described [here](#openstack-authentication-and-authorization)
-to log right into your target project. 
+Just log-on using your OpenStack credentials. 
 
 ```
-Username: myUser@mydomain|myproject@mydomain
-Password: ********
-```
-
-If you omit the scope information (the part right of the `|`), Maia will choose a project for you. You can switch to any
-other project via the dropdown menu on the top-right side.
-
-```
-Username: myUser@mydomain
-Password: ********
-```
-
-Instead of specifying the domain in the username, you can also use the domain-name as path in the Maia URL and omit the `@mydomain`.
-
-```
-URL: https://maia.myopenstack.net/<mydomain>
+URL: https://maia.myopenstack.net/myUserDomain
 Username: myUser
+Password: ********
+```
+
+Maia will choose a project for you. You can switch to any other project via the dropdown menu on the top-right side.
+
+Instead of adding the name of the user-domain (e.g. `myUserDomain`) to the URL, you may also specify it as part of
+the username, when the browser prompts for your credentials.
+
+```
+Username: myUser@myUserDomain
+Password: ******
 ```
 
 If you neither specifiy the user-domain in the username nor the URL, Maia will assume that the user is part
@@ -380,6 +375,14 @@ of the configured default domain (not to be confused with the OpenStack domain `
 ```
 URL: https://maia.myopenstack.net
 Username: myUser
+```
+
+You may also use the special username syntax described [here](#openstack-authentication-and-authorization)
+to log right into your target project. 
+
+```
+Username: myUser@mydomain|myproject@mydomain
+Password: ********
 ```
 
 # Federating Tenant Metrics from Maia to another Prometheus

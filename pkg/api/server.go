@@ -85,7 +85,7 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) *mux.Router {
 
 	// other endpoints
 	// maia's federate endpoint
-	mainRouter.Methods(http.MethodGet).Path("/federate").HandlerFunc(authorizedHandlerFunc(Federate, false, "metric:list"))
+	mainRouter.Methods(http.MethodGet).Path("/federate").HandlerFunc(authorizedHandlerFunc(Federate, false, "metric:show"))
 	// expression browser
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
 	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))

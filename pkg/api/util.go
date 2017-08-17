@@ -38,6 +38,9 @@ import (
 
 // utility functionality
 
+const authTokenCookieName = "X-Auth-Token"
+const authTokenHeader = "X-Auth-Token"
+
 //VersionData is used by version advertisement handlers.
 type VersionData struct {
 	Status string            `json:"status"`
@@ -199,23 +202,22 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	domain, domainSet := mux.Vars(req)["domain"]
 
 	// 1. check cookies or user-domain override via path prefix
-	if cookie, err := req.Cookie("X-Auth-Token"); err == nil && cookie.Value != "" && req.Header.Get("X-Auth-Token") == "" {
-		req.Header.Set("X-Auth-Token", cookie.Value)
+	if cookie, err := req.Cookie(authTokenCookieName); err == nil && cookie.Value != "" && req.Header.Get(authTokenHeader) == "" {
+		util.LogDebug("found cookie: %s", cookie.String())
+		req.Header.Set(authTokenHeader, cookie.Value)
 	} else if domainSet && isPlainBasicAuth(req) {
+		util.LogDebug("setting domain via URL: %s", domain)
 		req.Header.Set("X-User-Domain-Name", domain)
 	}
 
 	// 2. authenticate
 	context, err := keystoneInstance.AuthenticateRequest(req, guessScope)
-	if err != nil || (domainSet && req.Header.Get("X-User-Domain-Name") != domain) {
-		// either cookie is expired or credentials do not match the domain selected in the URL path
-		if err == nil {
-			err = fmt.Errorf("User domain %s specified in URL does not match the domain %s that was provided in the login dialog", domain, req.Header.Get("X-User-Domain-Name"))
-		}
+	if err != nil {
 		util.LogInfo(err.Error())
-		w.Header().Set("WWW-Authenticate", "Basic")
 		// expire the cookie
-		http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Path: "/", MaxAge: -1, Secure: false})
+		util.LogDebug("expire cookie")
+		http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", MaxAge: -1, Secure: false})
+		w.Header().Set("WWW-Authenticate", "Basic")
 		return nil, err
 	}
 
@@ -233,8 +235,11 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	}
 
 	// call
-	http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Path: "/", Value: req.Header.Get("X-Auth-Token"),
-		MaxAge: int(viper.GetDuration("keystone.token_cache_time").Seconds()), Secure: false})
+	if cookie, err := req.Cookie(authTokenCookieName); err != nil || cookie.Value == "" {
+		util.LogInfo("Adding cookie: %s", req.Header.Get(authTokenHeader))
+		http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
+			MaxAge: int(viper.GetDuration("keystone.token_cache_time").Seconds()), Secure: false})
+	}
 
 	return matchedRules, nil
 }
@@ -250,6 +255,19 @@ func authorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 			}
 		} else if len(matchedRules) > 0 {
+			domain, domainSet := mux.Vars(req)["domain"]
+			if domainSet && req.Header.Get("X-User-Domain-Name") != domain {
+				// either the basic authentication credentials or the cookie do not match the domain in the URL
+				if cookie, err := req.Cookie("X-Auth-Token"); err == nil && cookie.Value != "" {
+					// there is a cookie: clear it and ask for new credentials
+					http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Path: "/", MaxAge: -1, Secure: false})
+					w.Header().Set("WWW-Authenticate", "Basic")
+					http.Error(w, fmt.Sprintf("User domain changed from %s to %s. Please log on again.", req.Header.Get("X-User-Domain-Name"), domain), http.StatusUnauthorized)
+				} else {
+					// redirect to the domain that fits the user credentials
+					http.Redirect(w, req, strings.Replace(req.URL.Path, domain, req.Header.Get("X-User-Domain-Name"), 1), http.StatusFound)
+				}
+			}
 			wrappedHandlerFunc(w, req)
 		} else {
 			// authenticated but not authorized

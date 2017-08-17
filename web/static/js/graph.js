@@ -193,14 +193,18 @@ Prometheus.Graph.prototype.initialize = function() {
 
 Prometheus.Graph.prototype.populateInsertableMetrics = function() {
   var self = this;
-   var params = {
-     "project_id": self.projectIDField.textContent  // Maia enhancement
-   };
+  var params = {
+    "project_id": self.projectIDField.textContent  // Maia enhancement
+  };
+  var headers = {
+    "X-Auth-Token": Cookies.get("X-Auth-Token")
+  };
   $.ajax({
       method: "GET",
       url: PATH_PREFIX + "/api/v1/label/__name__/values",
       dataType: "json",
       data: params,
+      headers: headers,
       success: function(json, textStatus) {
         if (json.status !== "success") {
           self.showError("Error loading available metrics!");
@@ -383,6 +387,9 @@ Prometheus.Graph.prototype.submitQuery = function() {
     "query": self.expr.val(),
     "project_id": self.projectIDField.textContent   // Maia enhancement
   };
+  var headers = {
+    "X-Auth-Token": Cookies.get("X-Auth-Token")
+  };
   if (self.options.tab === 0) {
     params.start = endDate - rangeSeconds;
     params.end = endDate;
@@ -401,6 +408,7 @@ Prometheus.Graph.prototype.submitQuery = function() {
       url: url,
       dataType: "json",
       data: params,
+      headers: headers,
       success: function(json, textStatus) {
         if (json.status !== "success") {
           self.showError(json.error);
