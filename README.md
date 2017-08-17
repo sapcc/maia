@@ -349,7 +349,7 @@ maia snapshot --prometheus-url http://localhost:9090
 Maia comes with the well-known [Expression Browser](https://prometheus.io/docs/visualization/browser/) borrowed from
 Prometheus.
 
-You can it to discover metrics and perform ad-hoc queries.
+You can use it to discover metrics and perform ad-hoc queries.
 
 Just log-on using your OpenStack credentials. 
 
