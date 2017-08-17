@@ -34,12 +34,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // utility functionality
 
 const authTokenCookieName = "X-Auth-Token"
 const authTokenHeader = "X-Auth-Token"
+const authTokenExpiryHeader = "X-Auth-Token-Expiry"
 
 //VersionData is used by version advertisement handlers.
 type VersionData struct {
@@ -234,13 +236,6 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 		return matchedRules, nil
 	}
 
-	// call
-	if cookie, err := req.Cookie(authTokenCookieName); err != nil || cookie.Value == "" {
-		util.LogInfo("Adding cookie: %s", req.Header.Get(authTokenHeader))
-		http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
-			MaxAge: int(viper.GetDuration("keystone.token_cache_time").Seconds()), Secure: false})
-	}
-
 	return matchedRules, nil
 }
 
@@ -267,6 +262,18 @@ func authorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 					// redirect to the domain that fits the user credentials
 					http.Redirect(w, req, strings.Replace(req.URL.Path, domain, req.Header.Get("X-User-Domain-Name"), 1), http.StatusFound)
 				}
+			}
+			// set cookie
+			if cookie, err := req.Cookie(authTokenCookieName); err != nil || cookie.Value == "" {
+				util.LogInfo("Adding cookie: %s", req.Header.Get(authTokenHeader))
+				expiryStr := req.Header.Get(authTokenExpiryHeader)
+				expiry, err := time.Parse(time.RFC3339Nano, expiryStr)
+				if err != nil {
+					util.LogWarning("Incompatible token format for expiry data: %s", expiryStr)
+					expiry = time.Now().UTC().Add(viper.GetDuration("keystone.token_cache_time"))
+				}
+				http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
+					Expires: expiry.UTC(), Secure: false})
 			}
 			wrappedHandlerFunc(w, req)
 		} else {

@@ -130,6 +130,7 @@ type keystoneToken struct {
 	Roles        []keystoneTokenThing       `json:"roles"`
 	User         keystoneTokenThingInDomain `json:"user"`
 	Token        string
+	ExpiresAt    string `json:"expires_at"`
 }
 
 type keystoneTokenThing struct {
@@ -157,6 +158,7 @@ func (t *keystoneToken) ToContext() policy.Context {
 			"project_domain_id":   t.ProjectScope.Domain.ID,
 			"project_domain_name": t.ProjectScope.Domain.Name,
 			"token":               t.Token,
+			"token-expiry":        t.ExpiresAt,
 		},
 		Request: map[string]string{
 			"user_id":    t.User.ID,
@@ -357,6 +359,7 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 		r.Header.Add("X-Roles", role)
 	}
 	r.Header.Set("X-Auth-Token", context.Auth["token"])
+	r.Header.Set("X-Auth-Token-Expiry", context.Auth["token-expiry"])
 
 	return context, nil
 }
