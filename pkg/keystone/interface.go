@@ -27,6 +27,48 @@ import (
 	"net/http"
 )
 
+const (
+	// StatusNotAvailable means that the user could not be authenticated because the identity service is not available
+	StatusNotAvailable = http.StatusServiceUnavailable
+	// StatusWrongCredentials means that the user provided invalid credentials and thus cannot be authenticated
+	StatusMissingCredentials = http.StatusUnauthorized
+	// StatusWrongCredentials means that the user provided invalid credentials and thus cannot be authenticated
+	StatusWrongCredentials = http.StatusUnauthorized
+	// StatusNoPermission means that the user could be authenticated but does not have access to the requested scope (no roles)
+	StatusNoPermission = http.StatusForbidden
+	// StatusInternalError means that some internal error occured. Retry makes sense
+	StatusInternalError = http.StatusInternalServerError
+)
+
+// AuthenticationError extends the error interface with a status code
+type AuthenticationError interface {
+	// error - embedding breaks mockgen
+	// Error returns the error as string
+	Error() string
+	// StatusCode returns a machine-readable reason for the error (values correspond to http status codes)
+	StatusCode() int
+}
+
+type authenticationError struct {
+	AuthenticationError
+
+	msg        string // description of error
+	statusCode int    // status code (values correspond to http status codes)
+}
+
+func (e *authenticationError) Error() string {
+	return e.msg
+}
+
+func (e *authenticationError) StatusCode() int {
+	return e.statusCode
+}
+
+// NewAuthenticationError creates a new error instance
+func NewAuthenticationError(statusCode int, format string, args ...interface{}) AuthenticationError {
+	return &authenticationError{msg: fmt.Sprintf(format, args...), statusCode: statusCode}
+}
+
 // Driver is an interface that wraps the authentication of the service user and
 // token checking of API users. Because it is an interface, the real implementation
 // can be mocked away in unit tests.
@@ -35,11 +77,11 @@ type Driver interface {
 	// After successful authentication, additional context information is added to the request header
 	// In addition a Context object is returned for policy evaluation.
 	// When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
-	AuthenticateRequest(req *http.Request, guessScope bool) (*policy.Context, error)
+	AuthenticateRequest(req *http.Request, guessScope bool) (*policy.Context, AuthenticationError)
 
 	// Authenticate authenticates a user using the provided authOptions.
 	// It returns a context for policy evaluation and the public endpoint retrieved from the service catalog
-	Authenticate(options *tokens.AuthOptions) (*policy.Context, string, error)
+	Authenticate(options *tokens.AuthOptions) (*policy.Context, string, AuthenticationError)
 
 	// ChildProjects returns the IDs of all child-projects of the project denoted by projectID
 	ChildProjects(projectID string) ([]string, error)
