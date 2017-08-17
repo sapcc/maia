@@ -30,7 +30,7 @@ import (
 const (
 	// StatusNotAvailable means that the user could not be authenticated because the identity service is not available
 	StatusNotAvailable = http.StatusServiceUnavailable
-	// StatusWrongCredentials means that the user provided invalid credentials and thus cannot be authenticated
+	// StatusMissingCredentials means that the user provided invalid credentials and thus cannot be authenticated
 	StatusMissingCredentials = http.StatusUnauthorized
 	// StatusWrongCredentials means that the user provided invalid credentials and thus cannot be authenticated
 	StatusWrongCredentials = http.StatusUnauthorized
