@@ -16,12 +16,13 @@ If you don't use OpenStack, you can still use Maia CLI as a feature-complete she
 * Project- and domain-level access control (scoping)
 * Compatible to Grafana's Prometheus data source 
 * Compatible to Prometheus API (read-only)
-* Supports federation with other Prometheus
+* Supports secure federation to additional Prometheus instances
 
 [Maia UI](#using-the-maia-ui)
 * Prometheus expression browser adapted to Maia
-* List metrics
-* Perform ad-hoc queries
+* Browse projects and metrics
+* Perform ad-hoc PromQL queries
+* Graph metrics
  
 [Maia CLI](#using-the-maia-client)
 * Feature-complete CLI supporting all API operations
@@ -43,8 +44,9 @@ The following labels have a special meaning in Maia. *Only metrics with these la
  | domain_id  | OpenStack domain UUID |
  
 Metrics without `project_id` will be omitted when project scope is used. Likewise, metrics without `domain_id` will not
-be available when authorized to domain scope. There is no inheritance of metrics to parent projects. Users authorized
-to a domain will be able to access the metrics of all projects in that domain that have been labelled for the domain.
+be available when authorized to domain scope.
+
+Users authorized to a project will be able to access the metrics of all sub-projects. Users authorized to a domain will be able to access the metrics of all projects in that domain that have been labelled for the domain.
 
 # Installation
 
