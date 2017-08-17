@@ -283,9 +283,10 @@ func authorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 			userDomain := h.Get("X-User-Domain-Name")
 			scopedDomain := h.Get("X-Domain-Name")
 			scopedProject := h.Get("X-Project-Name")
-			scope := scopedDomain
-			if scopedProject != "" {
-				scope = scopedProject + "@" + scopedDomain
+			scopedProjectDomain := h.Get("X-Project-Domain-Name")
+			scope := scopedProject + " in domain " + scopedProjectDomain
+			if scopedProject == "" {
+				scope = scopedDomain
 			}
 			actRoles := h.Get("X-Roles")
 			reqRoles := viper.GetString("keystone.roles")
