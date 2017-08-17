@@ -33,6 +33,7 @@ import (
 	"github.com/spf13/viper"
 	"io"
 	"path/filepath"
+	"strings"
 )
 
 var storageInstance storage.Driver
@@ -98,7 +99,13 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) *mux.Router {
 func redirectRootPage(w http.ResponseWriter, r *http.Request) {
 	domain, ok := mux.Vars(r)["domain"]
 	if !ok {
-		domain = viper.GetString("keystone.default_user_domain_name")
+		username, _, ok := r.BasicAuth()
+		if ok && strings.Contains(strings.Split(username, "|")[0], "@") {
+			domain = strings.Split(username, "@")[1]
+			util.LogDebug("Username contains domain info. Redirecting to domain %s", domain)
+		} else {
+			domain = viper.GetString("keystone.default_user_domain_name")
+		}
 	}
 	http.Redirect(w, r, "/"+domain+"/graph", http.StatusFound)
 }
