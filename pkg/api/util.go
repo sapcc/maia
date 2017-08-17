@@ -96,13 +96,13 @@ func ReturnResponse(w http.ResponseWriter, response *http.Response) {
 //ReturnJSON is a convenience function for HTTP handlers returning JSON data.
 //The `code` argument specifies the HTTP Response code, usually 200.
 func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
-	escapedJSON, err := json.Marshal(&data)
+	payload, err := json.Marshal(&data)
 	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		// TODO: @Arno, what is this good for?
-		jsonData := bytes.Replace(escapedJSON, []byte("\\u0026"), []byte("&"), -1)
-		w.Write(jsonData)
+		// payload := bytes.Replace(playload, []byte("\\u0026"), []byte("&"), -1)
+		w.Write(payload)
 	} else {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -216,10 +216,12 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	context, err := keystoneInstance.AuthenticateRequest(req, guessScope)
 	if err != nil {
 		util.LogInfo(err.Error())
-		// expire the cookie
-		util.LogDebug("expire cookie")
-		http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", MaxAge: -1, Secure: false})
-		w.Header().Set("WWW-Authenticate", "Basic")
+		// expire the cookie and ask for new credentials if they are wrong
+		if err.StatusCode() == keystone.StatusWrongCredentials {
+			util.LogDebug("expire cookie")
+			http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", MaxAge: -1, Secure: false})
+			w.Header().Set("WWW-Authenticate", "Basic")
+		}
 		return nil, err
 	}
 
@@ -264,17 +266,15 @@ func authorizedHandlerFunc(wrappedHandlerFunc func(w http.ResponseWriter, req *h
 				}
 			}
 			// set cookie
-			if cookie, err := req.Cookie(authTokenCookieName); err != nil || cookie.Value == "" {
-				util.LogInfo("Adding cookie: %s", req.Header.Get(authTokenHeader))
-				expiryStr := req.Header.Get(authTokenExpiryHeader)
-				expiry, err := time.Parse(time.RFC3339Nano, expiryStr)
-				if err != nil {
-					util.LogWarning("Incompatible token format for expiry data: %s", expiryStr)
-					expiry = time.Now().UTC().Add(viper.GetDuration("keystone.token_cache_time"))
-				}
-				http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
-					Expires: expiry.UTC(), Secure: false})
+			util.LogInfo("Setting cookie: %s", req.Header.Get(authTokenHeader))
+			expiryStr := req.Header.Get(authTokenExpiryHeader)
+			expiry, err := time.Parse(time.RFC3339Nano, expiryStr)
+			if err != nil {
+				util.LogWarning("Incompatible token format for expiry data: %s", expiryStr)
+				expiry = time.Now().UTC().Add(viper.GetDuration("keystone.token_cache_time"))
 			}
+			http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
+				Expires: expiry.UTC(), Secure: false})
 			wrappedHandlerFunc(w, req)
 		} else {
 			// authenticated but not authorized
