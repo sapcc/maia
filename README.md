@@ -388,8 +388,10 @@ Password: ********
 # Federating Tenant Metrics from Maia to another Prometheus
 
 To configure Prometheus to receive data from Maia, the following job configuration has to be applied.
-In the `basic_auth` section a valid user id, project id and password, corresponding to your OpenStack User and Project, has to be provided.
-Moreover the user is required to have the `metric-list` role.
+
+In the `basic_auth` section a valid user id, project id and password, corresponding to your OpenStack User and Project, has to be provided. For convenience you can always use the `user_name@user_domain_name` syntax instead of the technical IDs.
+
+The user is required to have the `metric:show` permission.
 
 ```yaml
 scrape_configs:
@@ -399,7 +401,7 @@ scrape_configs:
     metrics_path: "/federate"
     basic_auth:
       # Corresponds to your OpenStack User and Project
-      username: <user_id>|<project_id>
+      username: <user_name>@<user_domain_name>|<project_name>@<project_domain_name>  # or <user_id>|<project_id>
       password: <password>
 
     static_configs:
