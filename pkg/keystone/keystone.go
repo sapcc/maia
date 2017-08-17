@@ -26,7 +26,6 @@ import (
 	"net/url"
 	"sync"
 
-	"errors"
 	"github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -209,13 +208,13 @@ func (d *keystone) reauthServiceUser() error {
 		d.seqErrors++
 		// clear token
 		viper.Set("keystone.token", "")
-		return fmt.Errorf("Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
+		return NewAuthenticationError(StatusNotAvailable, "Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
 	}
 	// read service catalog
 	catalog, err := result.ExtractServiceCatalog()
 
 	if err != nil {
-		return fmt.Errorf("cannot read service catalog: %v", err)
+		return NewAuthenticationError(StatusNotAvailable, "cannot read service catalog: %v", err)
 	}
 	d.serviceURL, err = openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
 
@@ -317,7 +316,7 @@ func authOpts2StringKey(authOpts *tokens.AuthOptions) string {
 
 // Authenticate authenticates a non-service user using available authOptionsFromRequest (username+password or token)
 // It returns the authorization context
-func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, string, error) {
+func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, string, AuthenticationError) {
 	return d.authenticate(authOpts, false)
 }
 
@@ -326,7 +325,7 @@ func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, 
 // If no supported authOptionsFromRequest could be found, the context is nil
 // If the authOptionsFromRequest are invalid or the authentication provider has issues, an error is returned
 // When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
-func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*policy.Context, error) {
+func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*policy.Context, AuthenticationError) {
 	authOpts, err := d.authOptionsFromRequest(r, guessScope)
 	if err != nil {
 		util.LogError(err.Error())
@@ -369,7 +368,7 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 // Format: <user>"|"<project> or <user>"|@"<domain>
 // user/project can either be a unique OpenStack ID or a qualified name with domain information, e.g. username"@"domain
 // When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
-func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*tokens.AuthOptions, error) {
+func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*tokens.AuthOptions, AuthenticationError) {
 	ba := tokens.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		AllowReauth:      false,
@@ -419,7 +418,7 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*to
 		// set password
 		ba.Password = password
 	} else {
-		return nil, errors.New("Authorization header missing")
+		return nil, NewAuthenticationError(StatusMissingCredentials, "Authorization header missing (no username/password or token)")
 	}
 
 	// check overriding project/domain via ULR param
@@ -441,21 +440,21 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*to
 	return &ba, nil
 }
 
-func (d *keystone) guessScope(ba *tokens.AuthOptions) error {
+func (d *keystone) guessScope(ba *tokens.AuthOptions) AuthenticationError {
 	// guess scope if it is missing
 	userID := ba.UserID
 	var err error
 	if userID == "" {
 		userID, err = d.UserID(ba.Username, ba.DomainName)
 		if err != nil {
-			return err
+			return NewAuthenticationError(StatusWrongCredentials, err.Error())
 		}
 	}
 	projects, err := d.UserProjects(userID)
 	if err != nil {
-		return err
+		return NewAuthenticationError(StatusNotAvailable, err.Error())
 	} else if len(projects) == 0 {
-		return fmt.Errorf("User %s (%s@%s) does not have monitoring authorization on any project in any domain (required roles: %s)", userID, ba.Username, ba.DomainName, viper.GetString("keystone.roles"))
+		return NewAuthenticationError(StatusNoPermission, "User %s (%s@%s) does not have monitoring authorization on any project in any domain (required roles: %s)", userID, ba.Username, ba.DomainName, viper.GetString("keystone.roles"))
 	}
 
 	// default to first project (note that redundant attributes are not copied here to aovid errors)
@@ -469,7 +468,7 @@ func (d *keystone) guessScope(ba *tokens.AuthOptions) error {
 
 // authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
 // It returns the authorization context
-func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool) (*policy.Context, string, error) {
+func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool) (*policy.Context, string, AuthenticationError) {
 	// check cache briefly
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found {
 		util.LogDebug("Token cache hit for %s", authOpts.TokenID)
@@ -484,7 +483,7 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 		util.LogDebug("verify token")
 		// get token from token-ID which is being verified on that occasion
 		if d.providerClient.TokenID == "" {
-			err := d.reauthServiceUser()
+			err := d.reauthServiceUser().(AuthenticationError)
 			if err != nil {
 				return nil, "", err
 			}
@@ -492,21 +491,21 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 		response := tokens.Get(d.providerClient, authOpts.TokenID)
 		if response.Err != nil {
 			//this includes 4xx responses, so after this point, we can be sure that the token is valid
-			return nil, "", response.Err
+			return nil, "", NewAuthenticationError(StatusWrongCredentials, response.Err.Error())
 		}
 		err := response.ExtractInto(&tokenData)
 		if err != nil {
-			return nil, "", err
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}
 		catalog, err = response.ExtractServiceCatalog()
 		if err != nil {
-			return nil, "", err
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}
 	} else {
 		util.LogDebug("authenticate %s%s with scope %s.", authOpts.Username, authOpts.UserID, authOpts.Scope)
 		client, err := newKeystoneClient()
 		if err != nil {
-			return nil, "", err
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}
 		// create new token from basic authentication credentials or token ID
 		response := tokens.Create(client, authOpts)
@@ -520,15 +519,15 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 			} else {
 				util.LogError("Login attempt with empty credentials")
 			}
-			return nil, "", response.Err
+			return nil, "", NewAuthenticationError(StatusWrongCredentials, response.Err.Error())
 		}
 		err = response.ExtractInto(&tokenData)
 		if err != nil {
-			return nil, "", err
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}
 		catalog, err = response.ExtractServiceCatalog()
 		if err != nil {
-			return nil, "", err
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}
 		// the token is passed separately
 		tokenData.Token = response.Header.Get("X-Subject-Token")
@@ -540,7 +539,7 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 	// service endpoint
 	endpointURL, err := openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
 	if err != nil {
-		return nil, "", err
+		return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 	}
 	// update the cache
 	ce := cacheEntry{

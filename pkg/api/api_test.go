@@ -94,12 +94,12 @@ func expectAuthByDefaults(keystoneMock *keystone.MockDriver) {
 
 func expectAuthAndFail(keystoneMock *keystone.MockDriver) {
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(nil, errors.New("negativetesterror"))
+	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(nil, keystone.NewAuthenticationError(keystone.StatusWrongCredentials, "negativetesterror"))
 }
 
 func expectPlainBasicAuthAndFail(keystoneMock *keystone.MockDriver) {
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(nil, errors.New("negativetesterror"))
+	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(nil, keystone.NewAuthenticationError(keystone.StatusWrongCredentials, "negativetesterror"))
 }
 
 func expectAuthAndDenyAuthorization(keystoneMock *keystone.MockDriver) {
