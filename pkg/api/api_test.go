@@ -189,7 +189,7 @@ func TestSeries(t *testing.T) {
 		Headers:          map[string]string{"X-Auth-Token": "someverylongtokenideed", "Accept": storage.JSON},
 		Method:           "GET",
 		Path:             "/api/v1/series?match[]={component!=%22%22}&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z",
-		ExpectStatusCode: 200,
+		ExpectStatusCode: http.StatusOK,
 		ExpectJSON:       "fixtures/series.json",
 	}.Check(t, router)
 }
@@ -239,7 +239,7 @@ func TestLabelValues(t *testing.T) {
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},
 		Method:           "GET",
 		Path:             "/api/v1/label/component/values",
-		ExpectStatusCode: 200,
+		ExpectStatusCode: http.StatusOK,
 		ExpectJSON:       "fixtures/label_values.json",
 	}.Check(t, router)
 }
@@ -257,7 +257,7 @@ func TestQuery(t *testing.T) {
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},
 		Method:           "GET",
 		Path:             "/api/v1/query?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22})&time=2017-07-01T20:10:30.781Z&timeout=24m",
-		ExpectStatusCode: 200,
+		ExpectStatusCode: http.StatusOK,
 		ExpectJSON:       "fixtures/query.json",
 	}.Check(t, router)
 }
@@ -292,7 +292,7 @@ func TestQueryRange(t *testing.T) {
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},
 		Method:           "GET",
 		Path:             "/api/v1/query_range?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22})&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z&step=5m&timeout=90s",
-		ExpectStatusCode: 200,
+		ExpectStatusCode: http.StatusOK,
 		ExpectJSON:       "fixtures/query_range.json",
 	}.Check(t, router)
 }
@@ -349,8 +349,34 @@ func TestGraph(t *testing.T) {
 
 	test.APIRequest{
 		Method:           "GET",
-		Path:             "/graph?project_id=" + projectContext.Auth["project_id"],
+		Path:             "/testdomain/graph?project_id=" + projectContext.Auth["project_id"],
 		ExpectStatusCode: http.StatusOK,
+	}.Check(t, router)
+}
+
+func TestRoot_redirect(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, _ := setupTest(t, ctrl)
+
+	test.APIRequest{
+		Method:           "GET",
+		Path:             "/" + projectContext.Auth["project_id"],
+		ExpectStatusCode: http.StatusFound,
+	}.Check(t, router)
+}
+
+func TestGraph_redirect(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _, _ := setupTest(t, ctrl)
+
+	test.APIRequest{
+		Method:           "GET",
+		Path:             "/graph?project_id=" + projectContext.Auth["project_id"],
+		ExpectStatusCode: http.StatusFound,
 	}.Check(t, router)
 }
 
