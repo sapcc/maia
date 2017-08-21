@@ -9,9 +9,10 @@ import:
 - package: github.com/gorilla/mux
   version: ~1.4.0
 - package: github.com/prometheus/client_golang
-  version: ~0.8.0
+  version: 94ff84a9a6ebb5e6eb9172897c221a64df3443bc 
   subpackages:
-  - api/prometheus
+  - api
+  - prometheus
 - package: github.com/prometheus/client_model
   subpackages:
   - go
@@ -20,7 +21,7 @@ import:
   - expfmt
   - model
 - package: github.com/prometheus/prometheus
-  version: ~1.7.0
+  version: ~1.7.1
   subpackages:
   - promql
   - storage/metric

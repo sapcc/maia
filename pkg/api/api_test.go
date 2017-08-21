@@ -28,6 +28,7 @@ import (
 	"github.com/databus23/goslo.policy"
 	"github.com/golang/mock/gomock"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
@@ -64,6 +65,7 @@ func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, *keys
 	keystone := keystone.NewMockDriver(controller)
 	storage := storage.NewMockDriver(controller)
 
+	prometheus.DefaultRegisterer = prometheus.NewPedanticRegistry()
 	router := setupRouter(keystone, storage)
 
 	return router, keystone, storage

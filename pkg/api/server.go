@@ -25,6 +25,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
@@ -64,7 +65,7 @@ func Server() error {
 	return http.ListenAndServe(bindAddress, handler)
 }
 
-func setupRouter(keystone keystone.Driver, storage storage.Driver) *mux.Router {
+func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler {
 	storageInstance = storage
 	keystoneInstance = keystone
 
@@ -86,14 +87,21 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) *mux.Router {
 
 	// other endpoints
 	// maia's federate endpoint
-	mainRouter.Methods(http.MethodGet).Path("/federate").HandlerFunc(authorizedHandlerFunc(Federate, false, "metric:show"))
+	mainRouter.Methods(http.MethodGet).Path("/federate").HandlerFunc(
+		authorize(
+			observeDuration(Federate, "maia_federate_duration_seconds", "Histogram of calls to the /federate endpoint"),
+			false, "metric:show"))
 	// expression browser
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
 	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(redirectRootPage)
-	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(authorizedHandlerFunc(graph, true, "metric:show"))
+	// instrumentation
+	mainRouter.Handle("/metrics", promhttp.Handler())
+
+	// domain-prefixed paths. Order is relevant! This implies that there must be no domain federate, static or graph :-)
+	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(authorize(graph, true, "metric:show"))
 	mainRouter.Methods(http.MethodGet).Path("/{domain}").HandlerFunc(redirectRootPage)
 
-	return mainRouter
+	return gaugeInflight(mainRouter)
 }
 
 func redirectRootPage(w http.ResponseWriter, r *http.Request) {
