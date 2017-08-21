@@ -63,7 +63,7 @@ const authTokenExpiryHeader = "X-Auth-Token-Expiry"
 var policyEnforcer *policy.Enforcer
 var authErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
 	Name: "maia_logon_errors_count", Help: "Number of logon errors occured in Maia"})
-var authFailuresCounter = prometheus.NewCounter(prometheus.CounterOpts{
+var authFailuresCounter prometheus.Counter = prometheus.NewCounter(prometheus.CounterOpts{
 	Name: "maia_logon_failures_count", Help: "Number of logon attempts failed due to wrong credentials"})
 
 func init() {
