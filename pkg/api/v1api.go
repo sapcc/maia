@@ -33,6 +33,7 @@ import (
 	"io/ioutil"
 	"sort"
 	"time"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // class for Prometheus v1 API provider implementation

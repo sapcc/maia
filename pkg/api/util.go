@@ -63,11 +63,13 @@ const authTokenExpiryHeader = "X-Auth-Token-Expiry"
 var policyEnforcer *policy.Enforcer
 var authErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
 	Name: "maia_logon_errors_count", Help: "Number of logon errors occured in Maia"})
-var authFailuresCounter prometheus.Counter = prometheus.NewCounter(prometheus.CounterOpts{
+var authFailuresCounter = prometheus.NewCounter(prometheus.CounterOpts{
 	Name: "maia_logon_failures_count", Help: "Number of logon attempts failed due to wrong credentials"})
+var promErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+	Name: "maia_tsdb_errors_count", Help: "Number of technical errors occured when accessing Maia's underlying TSDB (i.e. Prometheus)"})
 
 func init() {
-	prometheus.MustRegister(authErrorsCounter, authFailuresCounter)
+	prometheus.MustRegister(authErrorsCounter, authFailuresCounter, promErrorsCounter)
 }
 
 // provides version data
@@ -122,18 +124,20 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 
 //ReturnPromError produces a Prometheus error Response with HTTP Status code
 func ReturnPromError(w http.ResponseWriter, err error, code int) {
-	var errorType = storage.ErrorNone
+	if code >= 500 {
+		promErrorsCounter.Add(1)
+	}
+
+	var errorType storage.ErrorType
 	switch code {
 	case http.StatusBadRequest:
 		errorType = storage.ErrorBadData
 	case http.StatusUnprocessableEntity:
 		errorType = storage.ErrorExec
-	case http.StatusInternalServerError:
-		errorType = storage.ErrorInternal
 	case http.StatusServiceUnavailable:
 		errorType = storage.ErrorTimeout
 	default:
-		http.Error(w, err.Error(), code)
+		errorType = storage.ErrorInternal
 	}
 
 	jsonErr := storage.Response{Status: storage.StatusError, ErrorType: errorType, Error: err.Error()}
