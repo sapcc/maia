@@ -53,12 +53,18 @@ func NewV1Handler(keystone keystone.Driver, storage storage.Driver) http.Handler
 	}
 
 	// tenant-aware query
-	r.Methods(http.MethodGet).Path("/query").HandlerFunc(authorizedHandlerFunc(p.Query, false, "metric:show"))
-	r.Methods(http.MethodGet).Path("/query_range").HandlerFunc(authorizedHandlerFunc(p.QueryRange, false, "metric:show"))
+	r.Methods(http.MethodGet).Path("/query").HandlerFunc(authorize(
+		observeDuration(p.Query, "query"),
+		false,
+		"metric:show"))
+	r.Methods(http.MethodGet).Path("/query_range").HandlerFunc(authorize(
+		observeDuration(observeResponseSize(p.QueryRange, "query_range"), "query_range"),
+		false,
+		"metric:show"))
 	// tenant-aware label value lists
-	r.Methods(http.MethodGet).Path("/label/{name}/values").HandlerFunc(authorizedHandlerFunc(p.LabelValues, false, "metric:list"))
+	r.Methods(http.MethodGet).Path("/label/{name}/values").HandlerFunc(authorize(p.LabelValues, false, "metric:list"))
 	// tenant-aware series metadata
-	r.Methods(http.MethodGet).Path("/series").HandlerFunc(authorizedHandlerFunc(p.Series, false, "metric:list"))
+	r.Methods(http.MethodGet).Path("/series").HandlerFunc(authorize(p.Series, false, "metric:list"))
 
 	return r
 }

@@ -511,15 +511,16 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 		response := tokens.Create(client, authOpts)
 		// ugly copy & paste because the base-type of CreateResult and GetResult is private
 		if response.Err != nil {
+			statusCode := StatusWrongCredentials
 			//this includes 4xx responses, so after this point, we can be sure that the token is valid
 			if authOpts.Username != "" || authOpts.UserID != "" {
-				util.LogInfo("Failed login of user %s%s for scope %s: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, response.Err.Error())
+				util.LogInfo("Failed login of user %s@%s%s for scope %s: %s", authOpts.Username, authOpts.DomainName, authOpts.UserID, authOpts.Scope, response.Err.Error())
 			} else if authOpts.TokenID != "" {
-				util.LogInfo("Failed login of with token %s ... for scope %s: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, response.Err.Error())
+				util.LogInfo("Failed login of with token %s... for scope %s: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, response.Err.Error())
 			} else {
-				util.LogError("Login attempt with empty credentials")
+				statusCode = StatusMissingCredentials
 			}
-			return nil, "", NewAuthenticationError(StatusWrongCredentials, response.Err.Error())
+			return nil, "", NewAuthenticationError(statusCode, response.Err.Error())
 		}
 		err = response.ExtractInto(&tokenData)
 		if err != nil {
