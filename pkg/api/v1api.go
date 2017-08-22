@@ -54,7 +54,7 @@ func NewV1Handler(keystone keystone.Driver, storage storage.Driver) http.Handler
 
 	// tenant-aware query
 	r.Methods(http.MethodGet).Path("/query").HandlerFunc(authorize(
-		observeDuration(p.Query, "query"),
+		observeDuration(observeResponseSize(p.Query, "query"), "query"),
 		false,
 		"metric:show"))
 	r.Methods(http.MethodGet).Path("/query_range").HandlerFunc(authorize(
