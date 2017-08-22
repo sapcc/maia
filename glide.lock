@@ -1,5 +1,5 @@
-hash: 03e80e0373764de7e31b030bb39bd4c4bb60445dbf7c743a9ad4fca476716a8b
-updated: 2017-08-10T14:24:32.672126262+02:00
+hash: 294e488306a73402e7d5f48914c401bb940357d665c67f4caad631ccc8caa88f
+updated: 2017-08-22T10:18:26.40280047+02:00
 imports:
 - name: github.com/alecthomas/template
   version: a0175ee3bccc567396460bf5acd36800cb10c49c
@@ -16,17 +16,17 @@ imports:
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/golang/mock
-  version: 13f360950a79f5864a972c786a10a50e44b69541
+  version: 1df903b45f27b0b3685fa78609b653a54c7eead8
   subpackages:
   - gomock
 - name: github.com/golang/protobuf
-  version: 1909bc2f63dc92bb931deace8b8312c4db72d12f
+  version: ab9f9a6dab164b7d1246e0e688b0ab7b94d8553e
   subpackages:
   - proto
 - name: github.com/golang/snappy
   version: 553a641470496b2327abcac10b36396bd98e45c9
 - name: github.com/gophercloud/gophercloud
-  version: c0406a133c4a74a838baf0ddff3c2fab21155fba
+  version: 7b1de057e52e9cae660ed44f8cfe0c923ddb4c04
   subpackages:
   - internal
   - openstack
@@ -73,12 +73,13 @@ imports:
 - name: github.com/patrickmn/go-cache
   version: a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0
 - name: github.com/pelletier/go-toml
-  version: 69d355db5304c0f7f809a2edc054553e7142f016
+  version: 4692b8f9babfc93db58cc592ba2689d8736781de
 - name: github.com/prometheus/client_golang
-  version: c5b7fccd204277076155f10851dad72b76a49317
+  version: 94ff84a9a6ebb5e6eb9172897c221a64df3443bc
   subpackages:
-  - api/prometheus
+  - api
   - prometheus
+  - prometheus/promhttp
 - name: github.com/prometheus/client_model
   version: 6f3806018612930941127f2a7c6c453ba2c527d2
   subpackages:
@@ -111,7 +112,7 @@ imports:
 - name: github.com/rs/cors
   version: eabcc6af4bbe5ad3a949d36450326a2b0b9894b8
 - name: github.com/sirupsen/logrus
-  version: 181d419aa9e2223811b824e8f0b4af96f9ba9302
+  version: 68806b4b77355d6c8577a2c8bbc6d547a5272491
 - name: github.com/spf13/afero
   version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:
@@ -119,7 +120,7 @@ imports:
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: b26b538f693051ac6518e65672de3144ce3fbedc
+  version: cb731b898346822cc0c225c28550a8a29d93c732
 - name: github.com/spf13/jwalterweatherman
   version: 0efa5202c04663c757d84f90f5219c1250baf94f
 - name: github.com/spf13/pflag
@@ -150,21 +151,21 @@ imports:
   subpackages:
   - context
 - name: golang.org/x/sys
-  version: e42485b6e20ae7d2304ec72e535b103ed350cc02
+  version: 43e60d72a8e2bd92ee98319ba9a384a0e9837c08
   subpackages:
   - unix
   - windows
   - windows/registry
   - windows/svc/eventlog
 - name: golang.org/x/text
-  version: 3bd178b88a8180be2df394a1fbb81313916f0e7b
+  version: e56139fd9c5bc7244c76116c68e500765bb6db6b
   subpackages:
   - transform
   - unicode/norm
 - name: gopkg.in/alecthomas/kingpin.v2
   version: 1087e65c9441605df944fb12c33f0fe7072d18ca
 - name: gopkg.in/yaml.v2
-  version: 25c4ec802a7d637f88d584ab26798e94ad14c13b
+  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
 testImports:
 - name: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9

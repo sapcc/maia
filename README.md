@@ -425,8 +425,8 @@ to support existing clients like Grafana and federated Prometheus.
 
 The problem with basic authentication is that it lacks a standard way to express OpenStack domain information. Also there
  is no means to express OpenStack authorization scopes. Since neither Prometheus nor Grafana support adding custom
- header fields to the requests to Prometheus and thus Maia, we have to encode both the domain information and 
- into the username.
+ header fields to the requests to Prometheus and thus Maia, we have to encode both the domain information and the authorization
+ scope into the username.
  
  For the domain qualification, we could borrow "@" from e-mail. So when a user or a project is identified by name, you
   can add the domain in the form `username@domainname`. 
