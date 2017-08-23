@@ -29,15 +29,15 @@ import (
 
 const (
 	// StatusNotAvailable means that the user could not be authenticated because the identity service is not available
-	StatusNotAvailable = http.StatusServiceUnavailable
+	StatusNotAvailable = 1
 	// StatusMissingCredentials means that the user provided invalid credentials and thus cannot be authenticated
-	StatusMissingCredentials = http.StatusUnauthorized
+	StatusMissingCredentials = 2
 	// StatusWrongCredentials means that the user provided invalid credentials and thus cannot be authenticated
-	StatusWrongCredentials = http.StatusUnauthorized
+	StatusWrongCredentials = 3
 	// StatusNoPermission means that the user could be authenticated but does not have access to the requested scope (no roles)
-	StatusNoPermission = http.StatusForbidden
+	StatusNoPermission = 4
 	// StatusInternalError means that some internal error occured. Retry makes sense
-	StatusInternalError = http.StatusInternalServerError
+	StatusInternalError = 5
 )
 
 // AuthenticationError extends the error interface with a status code

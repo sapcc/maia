@@ -70,7 +70,7 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler 
 	keystoneInstance = keystone
 
 	mainRouter := mux.NewRouter()
-	mainRouter.Methods(http.MethodGet).Path("/").HandlerFunc(redirectRootPage)
+	mainRouter.Methods(http.MethodGet).Path("/").HandlerFunc(redirectToRootPage)
 
 	// the API is versioned, other paths are not
 	apiRouter := mainRouter.PathPrefix("/api/").Subrouter()
@@ -91,29 +91,34 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler 
 		authorize(observeDuration(Federate, "federate"), false, "metric:show"))
 	// expression browser
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
-	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(redirectRootPage)
+	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(redirectToRootPage)
 	// instrumentation
 	mainRouter.Handle("/metrics", promhttp.Handler())
 
 	// domain-prefixed paths. Order is relevant! This implies that there must be no domain federate, static or graph :-)
 	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(authorize(graph, true, "metric:show"))
-	mainRouter.Methods(http.MethodGet).Path("/{domain}").HandlerFunc(redirectRootPage)
+	mainRouter.Methods(http.MethodGet).Path("/{domain}").HandlerFunc(redirectToDomainRootPage)
 
 	return gaugeInflight(mainRouter)
 }
 
-func redirectRootPage(w http.ResponseWriter, r *http.Request) {
-	domain, ok := mux.Vars(r)["domain"]
-	if !ok {
-		username, _, ok := r.BasicAuth()
-		if ok && strings.Contains(strings.Split(username, "|")[0], "@") {
-			domain = strings.Split(username, "@")[1]
-			util.LogDebug("Username contains domain info. Redirecting to domain %s", domain)
-		} else {
-			domain = viper.GetString("keystone.default_user_domain_name")
-		}
+func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
+	domain, _ := mux.Vars(r)["domain"]
+	newPath := "/" + domain + "/graph"
+	util.LogDebug("Redirecting %s to %s", r.URL.Path, newPath)
+	http.Redirect(w, r, newPath, http.StatusFound)
+}
+
+func redirectToRootPage(w http.ResponseWriter, r *http.Request) {
+	domain := viper.GetString("keystone.default_user_domain_name")
+	username, _, ok := r.BasicAuth()
+	if ok && strings.Contains(strings.Split(username, "|")[0], "@") {
+		domain = strings.Split(username, "@")[1]
+		util.LogDebug("Username contains domain info. Redirecting to domain %s", domain)
 	}
-	http.Redirect(w, r, "/"+domain+"/graph", http.StatusFound)
+	newPath := "/" + domain + "/graph"
+	util.LogDebug("Redirecting to %s", newPath)
+	http.Redirect(w, r, newPath, http.StatusFound)
 }
 
 func serveStaticContent(w http.ResponseWriter, req *http.Request) {

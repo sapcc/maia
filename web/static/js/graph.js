@@ -196,8 +196,10 @@ Prometheus.Graph.prototype.populateInsertableMetrics = function() {
   var params = {
     "project_id": self.projectIDField.textContent  // Maia enhancement
   };
-  var headers = {
-    "X-Auth-Token": Cookies.get("X-Auth-Token")
+  var headers = {};
+  var token = Cookies.get("X-Auth-Token");
+  if (token) {
+      headers["X-Auth-Token"] = token
   };
   $.ajax({
       method: "GET",
@@ -387,8 +389,10 @@ Prometheus.Graph.prototype.submitQuery = function() {
     "query": self.expr.val(),
     "project_id": self.projectIDField.textContent   // Maia enhancement
   };
-  var headers = {
-    "X-Auth-Token": Cookies.get("X-Auth-Token")
+  var headers = {};
+  var token = Cookies.get("X-Auth-Token");
+  if (token) {
+    headers["X-Auth-Token"] = token
   };
   if (self.options.tab === 0) {
     params.start = endDate - rangeSeconds;

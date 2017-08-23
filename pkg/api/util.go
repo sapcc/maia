@@ -211,16 +211,19 @@ func isPlainBasicAuth(req *http.Request) bool {
 	return false
 }
 
-func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, rules []string) ([]string, keystone.AuthenticationError) {
+func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, rules []string) bool {
 	util.LogDebug("authenticate")
 	matchedRules := []string{}
 
 	domain, domainSet := mux.Vars(req)["domain"]
 
 	// 1. check cookies or user-domain override via path prefix
-	if cookie, err := req.Cookie(authTokenCookieName); err == nil && cookie.Value != "" && req.Header.Get(authTokenHeader) == "" {
+	cookie, cookieErr := req.Cookie(authTokenCookieName)
+	cookieSet := false
+	if cookieErr == nil && cookie.Value != "" && req.Header.Get(authTokenHeader) == "" {
 		util.LogDebug("found cookie: %s", cookie.String())
 		req.Header.Set(authTokenHeader, cookie.Value)
+		cookieSet = true
 	} else if domainSet && isPlainBasicAuth(req) {
 		util.LogDebug("setting user domain via URL: %s", domain)
 		req.Header.Set("X-User-Domain-Name", domain)
@@ -230,6 +233,7 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	context, err := keystoneInstance.AuthenticateRequest(req, guessScope)
 	if err != nil {
 		code := err.StatusCode()
+		httpCode := http.StatusUnauthorized
 		if code == keystone.StatusWrongCredentials {
 			authFailuresCounter.Add(1)
 			// expire the cookie and ask for new credentials if they are wrong
@@ -238,20 +242,35 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 				username = req.UserAgent()
 			}
 			util.LogInfo("Request with wrong credentials from %s: %s", username, err.Error())
-			util.LogDebug("expire cookie and request username/password input")
-			http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", MaxAge: -1, Secure: false})
-			w.Header().Set("WWW-Authenticate", "Basic")
-		} else if code != keystone.StatusNoPermission && code == keystone.StatusMissingCredentials {
+			requestReauthentication(w)
+		} else if code == keystone.StatusMissingCredentials {
+			requestReauthentication(w)
+		} else if code == keystone.StatusNoPermission {
+			httpCode = http.StatusForbidden
+		} else {
 			// warn of possible technical issues
 			util.LogWarning("Authentication error: %s", err.Error())
-		} else {
 			authErrorsCounter.Add(1)
+			httpCode = http.StatusInternalServerError
 		}
-		return nil, err
+		http.Error(w, err.Error(), httpCode)
+		return false
+	} else if domainSet && req.Header.Get("X-User-Domain-Name") != domain {
+		// authentication was successful, but do the credentials match the given domain or do they perhaps belong to another user? we could not know in advance
+		// either the basic authentication credentials or the cookie do not match the domain in the URL
+		if cookieSet {
+			// there is a cookie: clear it and ask for new credentials
+			util.LogDebug("User domain mismatch between %s (cookie with token) and %s (URL)", req.Header.Get("X-User-Domain-Name"), domain)
+			requestReauthentication(w)
+			http.Error(w, "User switch: please login again", http.StatusUnauthorized)
+		} else {
+			// redirect to the domain that fits the user credentials
+			redirectToDomainRootPage(w, req)
+		}
+		return false
 	}
 
 	// 3. authorize
-	// make sure policyEnforcer is available
 	pe := policyEngine()
 	for _, rule := range rules {
 		if pe.Enforce(rule, *context) {
@@ -260,62 +279,56 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	}
 
 	if len(matchedRules) == 0 {
-		return matchedRules, nil
+		// authenticated but not authorized
+		h := req.Header
+		username := h.Get("X-User-Name")
+		userDomain := h.Get("X-User-Domain-Name")
+		scopedDomain := h.Get("X-Domain-Name")
+		scopedProject := h.Get("X-Project-Name")
+		scopedProjectDomain := h.Get("X-Project-Domain-Name")
+		scope := scopedProject + " in domain " + scopedProjectDomain
+		if scopedProject == "" {
+			scope = scopedDomain
+		}
+		actRoles := h.Get("X-Roles")
+		reqRoles := viper.GetString("keystone.roles")
+		http.Error(w, fmt.Sprintf("User %s@%s does not have monitoring permissions on %s (actual roles: %s, required roles: %s)", username, userDomain, scope, actRoles, reqRoles), http.StatusForbidden)
+
+		return false
 	}
 
-	return matchedRules, nil
+	// set cookie
+	setAuthCookies(req, w)
+
+	return true
+}
+
+func requestReauthentication(w http.ResponseWriter) {
+	util.LogDebug("expire cookie and request username/password input")
+	http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: "", MaxAge: -1, Secure: false})
+	w.Header().Set("WWW-Authenticate", "Basic")
+}
+func setAuthCookies(req *http.Request, w http.ResponseWriter) {
+	util.LogDebug("Setting cookie: %s", req.Header.Get(authTokenHeader))
+	if req.Header.Get(authTokenHeader) == "" {
+		util.LogWarning("X-Auth-Token Header is empty!?")
+		return
+	}
+	expiryStr := req.Header.Get(authTokenExpiryHeader)
+	expiry, pErr := time.Parse(time.RFC3339Nano, expiryStr)
+	if pErr != nil {
+		util.LogWarning("Incompatible token format for expiry data: %s", expiryStr)
+		expiry = time.Now().UTC().Add(viper.GetDuration("keystone.token_cache_time"))
+	}
+	http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
+		Expires: expiry.UTC(), Secure: false})
 }
 
 func authorize(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), guessScope bool, rule string) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		matchedRules, err := authorizeRules(w, req, guessScope, []string{rule})
-		if err != nil {
-			if strings.HasPrefix(req.Header.Get("Accept"), storage.JSON) {
-				ReturnPromError(w, err, err.StatusCode())
-			} else {
-				http.Error(w, err.Error(), err.StatusCode())
-			}
-		} else if len(matchedRules) > 0 {
-			domain, domainSet := mux.Vars(req)["domain"]
-			if domainSet && req.Header.Get("X-User-Domain-Name") != domain {
-				// either the basic authentication credentials or the cookie do not match the domain in the URL
-				if cookie, err := req.Cookie("X-Auth-Token"); err == nil && cookie.Value != "" {
-					// there is a cookie: clear it and ask for new credentials
-					http.SetCookie(w, &http.Cookie{Name: "X-Auth-Token", Path: "/", MaxAge: -1, Secure: false})
-					w.Header().Set("WWW-Authenticate", "Basic")
-					http.Error(w, fmt.Sprintf("User domain changed from %s to %s. Please log on again.", req.Header.Get("X-User-Domain-Name"), domain), http.StatusUnauthorized)
-				} else {
-					// redirect to the domain that fits the user credentials
-					http.Redirect(w, req, strings.Replace(req.URL.Path, domain, req.Header.Get("X-User-Domain-Name"), 1), http.StatusFound)
-				}
-			}
-			// set cookie
-			util.LogDebug("Setting cookie: %s", req.Header.Get(authTokenHeader))
-			expiryStr := req.Header.Get(authTokenExpiryHeader)
-			expiry, err := time.Parse(time.RFC3339Nano, expiryStr)
-			if err != nil {
-				util.LogWarning("Incompatible token format for expiry data: %s", expiryStr)
-				expiry = time.Now().UTC().Add(viper.GetDuration("keystone.token_cache_time"))
-			}
-			http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
-				Expires: expiry.UTC(), Secure: false})
+		if authorizeRules(w, req, guessScope, []string{rule}) {
 			wrappedHandlerFunc(w, req)
-		} else {
-			// authenticated but not authorized
-			h := req.Header
-			username := h.Get("X-User-Name")
-			userDomain := h.Get("X-User-Domain-Name")
-			scopedDomain := h.Get("X-Domain-Name")
-			scopedProject := h.Get("X-Project-Name")
-			scopedProjectDomain := h.Get("X-Project-Domain-Name")
-			scope := scopedProject + " in domain " + scopedProjectDomain
-			if scopedProject == "" {
-				scope = scopedDomain
-			}
-			actRoles := h.Get("X-Roles")
-			reqRoles := viper.GetString("keystone.roles")
-			http.Error(w, fmt.Sprintf("User %s@%s does not have monitoring permissions on %s (actual roles: %s, required roles: %s)", username, userDomain, scope, actRoles, reqRoles), http.StatusForbidden)
 		}
 	}
 }
@@ -328,16 +341,16 @@ func gaugeInflight(handler http.Handler) http.Handler {
 }
 
 func observeDuration(handlerFunc http.HandlerFunc, handler string) http.HandlerFunc {
-	durationHistogram := prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{Name: "maia_request_duration_seconds", Help: "Duration/latency of a Maia request", Buckets: prometheus.DefBuckets, ConstLabels: prometheus.Labels{"handler": handler}}, nil)
-	prometheus.MustRegister(durationHistogram)
+	durationSummary := prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{Name: "maia_request_duration_seconds", Help: "Duration/latency of a Maia request", ConstLabels: prometheus.Labels{"handler": handler}}, nil)
+	prometheus.MustRegister(durationSummary)
 
-	return promhttp.InstrumentHandlerDuration(durationHistogram, handlerFunc)
+	return promhttp.InstrumentHandlerDuration(durationSummary, handlerFunc)
 }
 
 func observeResponseSize(handlerFunc http.HandlerFunc, handler string) http.HandlerFunc {
-	durationHistogram := prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "maia_response_size_bytes", Help: "Size of the Maia response (e.g. to a query)", Buckets: prometheus.DefBuckets, ConstLabels: prometheus.Labels{"handler": handler}}, nil)
-	prometheus.MustRegister(durationHistogram)
+	durationSummary := prometheus.NewSummaryVec(prometheus.SummaryOpts{Name: "maia_response_size_bytes", Help: "Size of the Maia response (e.g. to a query)", ConstLabels: prometheus.Labels{"handler": handler}}, nil)
+	prometheus.MustRegister(durationSummary)
 
-	return promhttp.InstrumentHandlerResponseSize(durationHistogram, http.HandlerFunc(handlerFunc)).ServeHTTP
+	return promhttp.InstrumentHandlerResponseSize(durationSummary, http.HandlerFunc(handlerFunc)).ServeHTTP
 }
