@@ -174,28 +174,39 @@ Note that stale series which did not receive measurements recently may not be co
 ### Query Metrics with PromQL
 
 Use the `query` command to perform an arbitrary [PromQL-query](https://prometheus.io/docs/querying/basics/) against Maia.
-It returns a single entry for each series.  
+It returns a single entry for each series. This is called an _instant query_.
 
 ```
 maia query 'vcenter_virtualDisk_totalWriteLatency_average{vmware_name:"win_cifs_13"}'
 ```
 
-Historical values can obtained by defining a start- and/or end-time for the query. In Prometheus terms, this is called a
-*range query*.
+Older values can be obtained using the `--time` parameter.
 
 ```
-maia query 'vcenter ...' --start 2017-07-01T05:10:51.781Z 
+maia query ... --time 2017-07-01T05:10:51.781Z
 ```
 
-Check `maia query --help` for more options. Timestamps can be specified in Unix or RFC3339 format. Durations are
-specififed as numbers with a unit suffix, such as "30s", "1.5h" or "2h45m". Valid time units are "ns", "us" (or "?s"),
-"ms", "s", "m", "h".
+Finally you can extract all values during a given timeframe by specifying a start- and end-date with the `--start` resp.
+`--end` parameters. This is called a _range query_.
+
+You should also specify the resolution using the `--stepsize` parameter. Otherwise
+Maia will choose defaults that may not always fit well. Timestamps can be specified in Unix or RC3339 format. Durations are
+specififed as numbers with a unit suffix, such as `30s`, `1.5h` or `2h45m`. Valid time units are `ns`, `us`,
+`ms`, `s`, `m`, `h`.
+
+```
+maia query ... --start 2017-07-01T05:10:51.781Z --end 2017-07-01T09:10:51.781Z --stepsize 300s
+```
+
+Also be aware that due to the sheer amount of data, range query results usually do not fit the width of a terminal screen.
+For that reason the default output format for _range queries_ is `json` and not `table`. Keep this in mind when you want to
+do a CSV export to a speadsheet. 
+
+Enter `maia query --help` for more options.
 
 ### Output Formatting
 
-By default maia prints results as unformatted text.
-
-Series data is formatted in raw tables without column alignment.
+By default maia prints results as unformatted text. Series data is formatted in raw tables without column alignment.
 Labels are used as columns (alphabetical sorting). There are three additional columns which do not refer
 to labels:
 
@@ -223,7 +234,7 @@ Use the `snapshot` command to get the latest values of all series in
 [textual form](https://prometheus.io/docs/instrumenting/exposition_formats/). 
 
 ```
-maia snapshot --maia-url http://localhost:9091
+maia snapshot
 ```
 
 The amount of data can be restricted using Prometheus label matchers, i.e. constraints on label values:

@@ -11,20 +11,20 @@ If you don't use OpenStack, you can still use Maia CLI as a feature-complete she
 
 ## Features
 
-[Maia Service](docs/operator.md)
+[Maia Service](docs/operators-guide.md)
 * OpenStack Identity v3 authentication and authorization
 * Project- and domain-level access control (scoping)
 * Compatible to Grafana's Prometheus data source 
 * Compatible to Prometheus API (read-only)
 * Supports secure federation to additional Prometheus instances
 
-[Maia UI](docs/user.md#using-the-maia-ui)
+[Maia UI](docs/users-guide.md#using-the-maia-ui)
 * Prometheus expression browser adapted to Maia
 * Browse projects and metrics
 * Perform ad-hoc PromQL queries
 * Graph metrics
  
-[Maia CLI](docs/user.md#using-the-maia-client)
+[Maia CLI](docs/users-guide.md#using-the-maia-client)
 * Feature-complete CLI supporting all API operations
 * JSON and Go-template-based output for reliable automation
 * Works with Prometheus, too (no OpenStack required)
@@ -55,5 +55,5 @@ Maia service from scratch and integrate with Prometheus.
 
 # Integrating and Extending Maia
 
-The [Maia developers guide](./docs/developer.md) describes how to use the Maia API. Also
+The [Maia developers guide](./docs/developers-guide.md) describes how to use the Maia API. Also
 it contains information how to contribute to the Maia development.
