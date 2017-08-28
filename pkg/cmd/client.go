@@ -421,6 +421,7 @@ func Series(cmd *cobra.Command, args []string) (ret error) {
 	defer recoverAll()
 
 	setDefaultOutputFormat("table")
+	starttime, endtime = defaultTimeRangeStr(starttime, endtime)
 
 	// pass the keystone token to Maia and ensure that the result is text
 	prometheus := storageInstance()
@@ -442,6 +443,26 @@ func MetricNames(cmd *cobra.Command, args []string) (ret error) {
 	setDefaultOutputFormat("value")
 
 	return LabelValues(cmd, []string{"__name__"})
+}
+
+func parseTime(timestamp string) time.Time {
+	t, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		t, err = time.Parse(time.UnixDate, timestamp)
+	}
+	return t
+}
+
+func defaultTimeRangeStr(start, end string) (string, string) {
+	s, e := start, end
+	if e == "" {
+		e = time.Now().Format(time.RFC3339)
+	}
+	if s == "" {
+		s = parseTime(e).Add(-3 * time.Hour).Format(time.RFC3339)
+	}
+
+	return s, e
 }
 
 // Query is just public because unit testing frameworks complains otherwise
@@ -475,7 +496,24 @@ func Query(cmd *cobra.Command, args []string) (ret error) {
 	// perform (range-)Query
 	var resp *http.Response
 	var err error
-	if starttime != "" && endtime != "" && stepsize != 0 {
+	if starttime != "" || endtime != "" {
+		starttime, endtime = defaultTimeRangeStr(starttime, endtime)
+		if stepStr == "" {
+			// default to max. of 10 values when stepsize has not been defined
+			sz := parseTime(endtime).Sub(parseTime(starttime)) / 10
+			sizes := []time.Duration{
+				15 * time.Second, 30 * time.Second, 60 * time.Second, 90 * time.Second,
+				2 * time.Minute, 3 * time.Minute, 5 * time.Minute, 10 * time.Minute, 15 * time.Minute, 20 * time.Minute, 30 * time.Minute,
+				1 * time.Hour, 2 * time.Hour, 3 * time.Hour, 8 * time.Hour, 12 * time.Hour, 24 * time.Hour,
+				2 * 24 * time.Hour, 3 * 24 * time.Hour, 7 * 24 * time.Hour, 14 * 24 * time.Hour, 30 * 24 * time.Hour}
+			for _, s := range sizes {
+				if s > sz {
+					sz = s
+					break
+				}
+			}
+			stepStr = fmt.Sprintf("%ds", int(sz.Seconds()))
+		}
 		resp, err = prometheus.QueryRange(queryExpr, starttime, endtime, stepStr, timeoutStr, storage.JSON)
 	} else {
 		resp, err = prometheus.Query(queryExpr, timestamp, timeoutStr, storage.JSON)
@@ -511,7 +549,7 @@ var snapshotCmd = &cobra.Command{
 }
 
 var seriesCmd = &cobra.Command{
-	Use:   "series [ --selector <vector-selector> ] [ --start <starttime> --end <endtime> ]",
+	Use:   "series [ --selector <vector-selector> ] [ [ --start <starttime> ] [ --end <endtime> ] ]",
 	Short: "List measurement Series for project/domain.",
 	Long:  "Lists all metric Series. The Series can filtered using vector-selectors (label constraints).",
 	RunE:  Series,
@@ -532,9 +570,9 @@ var metricNamesCmd = &cobra.Command{
 }
 
 var queryCmd = &cobra.Command{
-	Use:   "query <PromQL Query> [ --timestamp | --start <starttime> --end <endtime> --step <duration> ] [ --timeout <duration> ]",
+	Use:   "query <PromQL Query> [ --time | [ --start <starttime> ] [ --end <endtime> ] [ --step <duration> ] ] [ --timeout <duration> ]",
 	Short: "Perform a PromQL Query",
-	Long:  "Performs a PromQL Query against the metrics available for the project/domain in scope",
+	Long:  "Performs a PromQL query against the metrics available for the project/domain in scope",
 	RunE:  Query,
 }
 
@@ -579,15 +617,15 @@ func init() {
 
 	snapshotCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
 
-	queryCmd.Flags().StringVar(&starttime, "start", "", "Range Query: Start timestamp (RFC3339 or Unix format; default:earliest)")
-	queryCmd.Flags().StringVar(&endtime, "end", "", "Range Query: End timestamp (RFC3339 or Unix format; default: latest)")
-	queryCmd.Flags().StringVar(&timestamp, "timestamp", "", "Timestamp of measurement (RFC3339 or Unix format; default: latest)")
+	queryCmd.Flags().StringVar(&starttime, "start", "", "Range query: start timestamp (RFC3339 or Unix format; default: 3h before)")
+	queryCmd.Flags().StringVar(&endtime, "end", "", "Range query: end timestamp (RFC3339 or Unix format; default: now)")
+	queryCmd.Flags().StringVar(&timestamp, "time", "", "Instant query: timestamp of measurement (RFC3339 or Unix format; default: now)")
 	queryCmd.Flags().DurationVarP(&timeout, "timeout", "", 0, "Optional: Timeout for Query (e.g. 10m; default: server setting)")
-	queryCmd.Flags().DurationVarP(&stepsize, "step", "", 0, "Optional: Step size for range Query (e.g. 30s)")
+	queryCmd.Flags().DurationVarP(&stepsize, "step", "", 0, "Optional: Step size for range Query (e.g. 30s; default: sized to display 12 values)")
 
 	seriesCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
-	seriesCmd.Flags().StringVar(&starttime, "start", "", "Start timestamp (RFC3339 or Unix format; default:earliest)")
-	seriesCmd.Flags().StringVar(&endtime, "end", "", "End timestamp (RFC3339 or Unix format; default: latest)")
+	seriesCmd.Flags().StringVar(&starttime, "start", "", "Start timestamp (RFC3339 or Unix format; default: 3h before)")
+	seriesCmd.Flags().StringVar(&endtime, "end", "", "End timestamp (RFC3339 or Unix format; default: now)")
 }
 
 func setKeystoneInstance(keystone keystone.Driver) {
