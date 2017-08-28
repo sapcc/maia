@@ -42,12 +42,15 @@ Via Makefile
 
 Maia can be used via Web-UI or CLI.
 
-Please refer to the [Maia user guide](./docs/user.md) for instructions.
+Enter `maia --help` to see a list of commands and options.
+
+Please refer to the [Maia user guide](./docs/user.md) for more instructions.
 
 # Operating Maia
 
-The easiest way to deploy Maia as a service is Kubernetes. Feel free to reuse our
-[Maia helm chart](https://github.com/sapcc/maia/blob/master/openstack/maia)
+The easiest way to deploy Maia as a service is Kubernetes.
+
+Feel free to reuse our [Maia helm chart](https://github.com/sapcc/helm-charts/tree/master/openstack/maia)
 which includes Maia and Prometheus.
 
 Follow the [Maia operators guide](./docs/operators.md) to learn how to setup the 
