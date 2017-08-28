@@ -44,7 +44,7 @@ Maia can be used via Web-UI or CLI.
 
 Enter `maia --help` to see a list of commands and options.
 
-Please refer to the [Maia user guide](./docs/user.md) for more instructions.
+Please refer to the [Maia user guide](./docs/users-guide.md) for more instructions.
 
 # Operating Maia
 
@@ -53,7 +53,7 @@ The easiest way to deploy Maia as a service is Kubernetes.
 Feel free to reuse our [Maia helm chart](https://github.com/sapcc/helm-charts/tree/master/openstack/maia)
 which includes Maia and Prometheus.
 
-Follow the [Maia operators guide](./docs/operators.md) to learn how to setup the 
+Follow the [Maia operators guide](./docs/operators-guide.md) to learn how to setup the 
 Maia service from scratch and integrate with Prometheus.
 
 # Integrating and Extending Maia
