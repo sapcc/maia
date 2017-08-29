@@ -22,7 +22,7 @@ The service is configured using a TOML configuration file that is usually locate
 contains settings for the connection to Prometheus, the integration with OpenStack identity and technical configuration
 like the bind-address of the server process. You can always override the entries of this file using command line parameters.
 
-Use the example in the `etc` folder of this repo to get started. 
+Use the example in the `etc` folder of this repo to get started.
 
 The *maia* section contains Maia-specific options.
 
@@ -32,7 +32,7 @@ The *maia* section contains Maia-specific options.
 
 ### Connectivity
 
-First you need to decide which port the Maia service should listen to. 
+First you need to decide which port the Maia service should listen to.
 ```
 bind_address = "0.0.0.0:9091"
 ```
@@ -40,7 +40,7 @@ bind_address = "0.0.0.0:9091"
 ### Prometheus
 
 Any data served by Maia is served by the underlying Prometheus installation that acts as a TSDB and data collection layer.
- 
+
 To reach Prometheus, Maia needs to know the URL where it is running and optionally a proxy to get through.
 
 ```
@@ -60,12 +60,12 @@ and/or overload of your Prometheus backend. As a side-effect users of templated 
 confronted with stale series in the dropdown boxes.
 
 ```
-# ignore label values from series older than 2h 
+# ignore label values from series older than 2h
 label_value_ttl = "2h"
 ```
 
 ### Keystone Integration
- 
+
 The *keystone* section contains configuration settings for OpenStack authentication and authorization.
 
 ```
@@ -75,7 +75,7 @@ The *keystone* section contains configuration settings for OpenStack authenticat
 #### OpenStack Service User
 
 The maia service requires an OpenStack *service* user in order to authenticate and authorize clients.
- 
+
 ```
 # Identity service used to authenticate user credentials (create/verify tokens etc.)
 auth_url = "https://identity.mydomain.com/v3/"
@@ -135,20 +135,20 @@ maia serve
 ## Getting Data: Exporters
 
 Maia is useless without metrics. So you need Prometheus exporters that provide tenant-aware metrics. These exporters
-need to be scraped by the Prometheus instance that is configured as Maia's data source. 
+need to be scraped by the Prometheus instance that is configured as Maia's data source.
 
 Multi-tenant support is provided by means of dedicated _labels_ to specify OpenStack project and domain.
 These labels either have to be supplied by the exporters directly or they have to be mapped from other labels using the
 [Prometheus relabelling](https://prometheus.io/docs/operating/configuration/#relabel_config)
 capabilities.
- 
+
 The following labels have a special meaning in Maia. *Only metrics with these labels are visible through the Maia API.*
- 
+
  | Label Key  | Description  |
  |------------|--------------|
  | project_id | OpenStack project UUID |
  | domain_id  | OpenStack domain UUID |
- 
+
 Metrics without `project_id` will be omitted when project scope is used. Likewise, metrics without `domain_id` will not
 be available when authorized to domain scope.
 
@@ -156,7 +156,7 @@ Users authorized to a project will be able to access the metrics of all sub-proj
 
 The following exporters are known to produce suitible metrics:
 * [VCenter Exporter](https://github.com/sapcc/vcenter-exporter) provides project-specific metrics from an OpenStack-
-controlled VCenter. 
+controlled VCenter.
 * [SNMP Exporter](https://github.com/prometheus/snmp_exporter) can be configured to extract project IDs from
 SNMP variables into labels. Since most of the SNMP-enabled devices are shared, only a few metrics can be mapped to
 OpenStack projects or domains.
@@ -166,34 +166,5 @@ OpenStack projects or domains.
 Currently Maia only supports a single Prometheus backend as data source. Therefore scalability has to happen behind the
 Prometheus that is used by Maia.
 
-Availability can be improved by setting up multiple identical Prometheus instances and using a reverse proxy for failover. Maia itself 
+Availability can be improved by setting up multiple identical Prometheus instances and using a reverse proxy for failover. Maia itself
 is stateless, so multiple instances can be spawned without risking collisions.
-
-# Federating Tenant Metrics from Maia to another Prometheus
-
-To configure Prometheus to receive data from Maia, the following job configuration has to be applied.
-
-In the `basic_auth` section a valid user id, project id and password, corresponding to your OpenStack User and Project,
-has to be provided. For convenience you can always use the `user_name@user_domain_name` syntax instead of the technical IDs.
-
-The user is required to have the `metric:show` permission.
-
-```yaml
-scrape_configs:
-
-  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
-  - job_name: 'maia'
-    metrics_path: "/federate"
-    basic_auth:
-      # Corresponds to your OpenStack User and Project
-    username: <user_name>@<user_domain_name>|<project_name>@<project_domain_name>  # or <user_id>|<project_id>
-    password: <password>
-
-    static_configs:
-      - targets: ['maia.<region>.cloud.sap:443']
-  
-```
-
-Prometheus' targets page ( Status -> Targets ) should the new job and the endpoint with `State UP`. 
-The `Error` column should be empty. 
-It might indicate a failed authorization (`401 Unauthorized`).

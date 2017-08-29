@@ -5,7 +5,7 @@
 * Browse projects and metrics
 * Perform ad-hoc PromQL queries
 * Graph metrics
- 
+
 [Maia CLI](#using-the-maia-client)
 * Feature-complete CLI supporting all API operations
 * JSON and Go-template-based output for reliable automation
@@ -20,7 +20,7 @@ You can use it to discover metrics, series and perform ad-hoc queries leveraging
 
 ### Login
 
-Just log-on using your OpenStack credentials. 
+Just log-on using your OpenStack credentials.
 
 ```
 URL: https://maia.myopenstack.net/myUserDomain
@@ -47,7 +47,7 @@ Username: myUser
 ```
 
 You may also use the special username syntax described [here](#openstack-authentication-and-authorization)
-to log right into your target project. 
+to log right into your target project.
 
 ```
 Username: myUser@mydomain|myproject@mydomain
@@ -62,11 +62,11 @@ The Maia screen consists of three part:
 * Result area with two tabs:
   - Graph area for visualizing the query result
   - Console area listing the different _series_ produced by the query
-    
+
 ### Discover Metrics
 
 You can use the dropdown list or the auto-completion functionality of the PromQL input field to discover which
-metrics are known by the system. 
+metrics are known by the system.
 
 ```
 openstack_compute_instances_gauge
@@ -75,7 +75,7 @@ openstack_compute_instances_gauge
 Once you hit `<enter>`, Maia will provide you a list of all known time series for that metric in the `Console` area.
 
 Usually this list is quite long. So you should restrict your query further by adding constraints about the labels
-in curly braces. In Prometheus terminology, these constraints are called _selectors_ 
+in curly braces. In Prometheus terminology, these constraints are called _selectors_
 
 ```
 openstack_compute_instances_gauge{vm_state="active"}
@@ -85,7 +85,7 @@ openstack_compute_instances_gauge{vm_state="active"}
 
 Once you have restricted the number of series to a feasible amount, you may go ahead and graph them.
 
-For that you just click on the `Graph` tab left from the `Console` one. 
+For that you just click on the `Graph` tab left from the `Console` one.
 
 The displayed line graph shows the historical metric values within the selected timeframe.
 
@@ -118,11 +118,11 @@ Usually, you can reuse your existing RC-files. For performance reasons, you shou
 authentication whenever you make several calls to the Maia CLI.
 
 Use `openstack token issue` to generate a token and pass it to the Maia CLI in the `OS_TOKEN` variable.
- 
+
 ```
 export OS_TOKEN=$(openstack token issue -c id -f value)
 ```
- 
+
 If for some reason you want to use another Maia endpoint than the one registered in the OpenStack service catalog,
 then you can override its URL using the `--maia-url` option:
 
@@ -140,9 +140,9 @@ maia --help
 ```
 
 ### Show Known Measurement Series
- 
+
 Use the `series` command to get a list of all measurement series. You can restrict the timeframe using
-the parameters `--start` and `--end`. 
+the parameters `--start` and `--end`.
 
 ```
 maia series --selector "__name__=~'vc.*'" --start '2017-07-26T10:46:25+02:00'
@@ -152,7 +152,7 @@ The list of series can be filtered using Prometheus label matchers. Don't forget
 ```
 maia snapshot --selector 'job="endpoints"' ...
 ```
- 
+
 ### List Known Metric Names
 
 Use the `metric-names` command to obtain a list of metric names.
@@ -200,7 +200,7 @@ maia query ... --start 2017-07-01T05:10:51.781Z --end 2017-07-01T09:10:51.781Z -
 
 Also be aware that due to the sheer amount of data, range query results usually do not fit the width of a terminal screen.
 For that reason the default output format for _range queries_ is `json` and not `table`. Keep this in mind when you want to
-do a CSV export to a speadsheet. 
+do a CSV export to a speadsheet.
 
 Enter `maia query --help` for more options.
 
@@ -217,7 +217,7 @@ to labels:
 | \_\_value\_\_ | the value of a measurement |
 
 To enable automation, also JSON, plain values output and Go text-templates
-are supported. 
+are supported.
 
 The output is controlled via the parameters `--format`, `--columns`, `--separator`and `--template`.
 
@@ -226,12 +226,12 @@ The output is controlled via the parameters `--format`, `--columns`, `--separato
 | table | text output in tabular form | `--columns`: selects which metric-labels are displayed as columns<br>`--separator`: defines how columns are separated        |
 | value | output of plain values in lists or tables | like `table`                                          |
 | json     | JSON output of Maia/Prometheus server. Contains additional status/error information. See [Prometheus API doc.](https://prometheus.io/docs/querying/api/#expression-query-result-formats) | none |
-| template | Highly configurable output, applying [Go-templates](https://golang.org/pkg/text/template/) to the JSON response (see `json`format) | `--template`: Go-template expression |  
+| template | Highly configurable output, applying [Go-templates](https://golang.org/pkg/text/template/) to the JSON response (see `json`format) | `--template`: Go-template expression |
 
 ### Exporting Snapshots
 
 Use the `snapshot` command to get the latest values of all series in
-[textual form](https://prometheus.io/docs/instrumenting/exposition_formats/). 
+[textual form](https://prometheus.io/docs/instrumenting/exposition_formats/).
 
 ```
 maia snapshot
@@ -254,11 +254,14 @@ You can also use the maia client with a plain Prometheus (no authentication).
 maia snapshot --prometheus-url http://localhost:9090
 ```
 
-## Using the Prometheus Data Source in Grafana with Maia
- 
+## Using Maia with Grafana
+
+Due to its API-compatibility, the Prometheus data source in Grafana can be used for Maia as well. That means you can
+build elaborate dashboards around Maia metrics with your existing Grafana installation. No additional plugins needed!
+
 Configure the data source like with a regular Prometheus. Select `Basic Authentication` and enter the scoped
  user credentials.
- 
+
 There are several variants to express the project/domain scope:
 
 Project scoped user:
@@ -271,21 +274,50 @@ Project scoped user:
 Domain scoped user:
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
- 
-## Background: OpenStack Authentication and Authorization
 
-In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order 
-to support existing clients like Grafana and federated Prometheus. 
+### Background: OpenStack Authentication and Authorization
+
+In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order
+to support existing clients like Grafana and federated Prometheus.
 
 The problem with basic authentication is that it lacks a standard way to express OpenStack domain information. Also there
  is no means to express OpenStack authorization scopes. Since neither Prometheus nor Grafana support adding custom
  header fields to the requests to Prometheus and thus Maia, we have to encode both the domain information and the authorization
  scope into the username.
- 
+
  For the domain qualification, we could borrow "@" from e-mail. So when a user or a project is identified by name, you
-  can add the domain in the form `username@domainname`. 
-  
+  can add the domain in the form `username@domainname`.
+
  The authorization scope is separated from the qualified username with a vertical bar "|", splitting the username
  into a username and scope part: `user|scope`. Like with usernames, also the scoped project resp. domain can be
  denoted by name: `projectname@domainname`. To disambiguate scoping by project-id and domain-name, the domain is always prefixed
  with `@`.
+
+# Federating Maia to Prometheus
+
+To configure Prometheus to receive data from Maia, the following job configuration has to be applied.
+
+In the `basic_auth` section a valid user id, project id and password, corresponding to your OpenStack User and Project,
+has to be provided. For convenience you can always use the `user_name@user_domain_name` syntax instead of the technical IDs.
+
+The user is required to have the `metric:show` permission.
+
+```yaml
+scrape_configs:
+
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'maia'
+    metrics_path: "/federate"
+    basic_auth:
+      # Corresponds to your OpenStack User and Project
+    username: <user_name>@<user_domain_name>|<project_name>@<project_domain_name>  # or <user_id>|<project_id>
+    password: <password>
+
+    static_configs:
+      - targets: ['maia.<region>.cloud.sap:443']
+
+```
+
+Prometheus' targets page ( Status -> Targets ) should the new job and the endpoint with `State UP`.
+The `Error` column should be empty.
+It might indicate a failed authorization (`401 Unauthorized`).
