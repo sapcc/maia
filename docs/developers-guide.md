@@ -88,8 +88,8 @@ split the time-series for no good reason and are likely to confuse the consumer.
  | domain_id  | OpenStack domain UUID |
  | service    | OpenStack service key (e.g. `compute`) |
  | server_id  | OpenStack server ID |
- | _<resource-type>_\_id | OpenStack ID for _<resource-type>_\* |
- | _<resource-type>_\_name | OpenStack name for _<resource-type>_\* |
+ | _\<resource-type\>_\_id | OpenStack ID for _\<resource-type\>_\* |
+ | _\<resource-type\>_\_name | OpenStack name for _\<resource-type\>_\* |
  
 \* where _<resource-type>_ is one of `server`, `network`, `image`, `subnet_pool`, ... i.e. the OpenStack resource type
 name that prefixes any OpenStack CLI command.
