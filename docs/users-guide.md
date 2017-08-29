@@ -1,4 +1,4 @@
-# Maia
+# Maia Users Guide
 
 [Maia UI](#using-the-maia-ui)
 * Prometheus expression browser adapted to Maia
