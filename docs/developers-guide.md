@@ -73,8 +73,8 @@ Exporters for Maia are in fact exporters for Prometheus. So the same
 On top of this, as explained in the [concept](#concept) chapter, exporters need to provide the `project_id` label as
 a prerequisite. Otherwise their metrics are invisible to Maia.
 
-Another aspect that is specific to Maia is the employment of labels. Since Maia is solely used by consumers of metrics
-- which are unaware of the data collection process behind -, labels that are not related to the target of the metric should
+Another aspect that is specific to Maia is the employment of labels. Since Maia is solely used by consumers of metrics -
+which are unaware of the data collection process behind -, labels that are not related to the target of the metric should
 be omitted. Consequently, labels should be added as needed to qualify/partition the measurements from user
 perspective, i.e. specify the _target_ that the measured values relate to. Technical labels such as
 `pod_name` or `kubernetes_namespace` that relate only to the inner workings of the exporter should be avoided. They
