@@ -26,13 +26,13 @@ be available when authorized to domain scope.
 
 Users authorized to a project will be able to access the metrics of all sub-projects. Users authorized to a domain will be able to access the metrics of all projects in that domain that have been labelled for the domain.
 
-# Using the Maia API
+## Using the Maia API
 
 The Maia implements the consumer part of the [Prometheus API](https://prometheus.io/docs/querying/api) and adds
 OpenStack authentication and authorization on top. For security reasons, administrative operations of the API have not
 been added to Maia. 
 
-## OpenStack Authentication and Authorization
+### OpenStack Authentication and Authorization
 
 In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order 
 to support existing clients like Grafana and federated Prometheus. 
@@ -50,7 +50,7 @@ The problem with basic authentication is that it lacks a standard way to express
  denoted by name: `projectname@domainname`. To disambiguate scoping by project-id and domain-name, the domain is always prefixed
  with `@`.
  
-## Variants
+#### Variants
  
 This scheme expands into five variants to express username and authorization scope:
  
@@ -65,7 +65,40 @@ Domain scoped user:
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
  
-# Contributing
+## Building Exporters
+
+Exporters for Maia are in fact exporters for Prometheus. So the same
+[rules and best practises](https://prometheus.io/docs/instrumenting/writing_exporters) should be applied.
+
+On top of this, as explained in the [concept](#concept) chapter, exporters need to provide the `project_id` label as
+a prerequisite. Otherwise their metrics are invisible to Maia.
+
+Another aspect that is specific to Maia is the employment of labels. Since Maia is solely used by consumers of metrics
+- which are unaware of the data collection process behind -, labels that are not related to the target of the metric should
+be omitted. Consequently, labels should be added as needed to qualify/partition the measurements from user
+perspective, i.e. specify the _target_ that the measured values relate to. Technical labels such as
+`pod_name` or `kubernetes_namespace` that relate only to the inner workings of the exporter should be avoided. They
+split the time-series for no good reason and are likely to confuse the consumer.
+
+### Custom Labels
+
+ | Label Key  | Description  |
+ |------------|--------------|
+ | project_id | OpenStack project UUID |
+ | domain_id  | OpenStack domain UUID |
+ | service    | OpenStack service key (e.g. `compute`) |
+ | server_id  | OpenStack server ID |
+ | _<resource-type>_\_id | OpenStack ID for _<resource-type>_\* |
+ | _<resource-type>_\_name | OpenStack name for _<resource-type>_\* |
+ 
+\* where _<resource-type>_ is one of `server`, `network`, `image`, `subnet_pool`, ... i.e. the OpenStack resource type
+name that prefixes any OpenStack CLI command.
+
+Whenever possible standard labels should be used. Custom labels should be specific enough not to be confused with
+other labels from other metrics. Federation from Prometheus into the Maia-Prometheus is much easier when labels like
+`type`, `name` or `system` are avoided.
+
+## Contributing
 
 This project is open for external contributions. The issue list shows what is planned for upcoming releases.
 
