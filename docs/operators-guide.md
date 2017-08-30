@@ -100,6 +100,7 @@ roles = "monitoring_viewer,monitoring_admin"
 ```
 
 Maia distinguishes the following permissions
+
 * `metric:list`: List which metrics and measurement series are available for inspection
 * `metric:show`: Show actual measurement data (details)
 
@@ -144,10 +145,10 @@ capabilities.
 
 The following labels have a special meaning in Maia. *Only metrics with these labels are visible through the Maia API.*
 
- | Label Key  | Description  |
- |------------|--------------|
- | project_id | OpenStack project UUID |
- | domain_id  | OpenStack domain UUID |
+| Label Key  | Description  |
+|:------------:|:--------------:|
+| project_id | OpenStack project UUID |
+| domain_id  | OpenStack domain UUID |
 
 Metrics without `project_id` will be omitted when project scope is used. Likewise, metrics without `domain_id` will not
 be available when authorized to domain scope.
@@ -155,6 +156,7 @@ be available when authorized to domain scope.
 Users authorized to a project will be able to access the metrics of all sub-projects. Users authorized to a domain will be able to access the metrics of all projects in that domain that have been labelled for the domain.
 
 The following exporters are known to produce suitible metrics:
+
 * [VCenter Exporter](https://github.com/sapcc/vcenter-exporter) provides project-specific metrics from an OpenStack-
 controlled VCenter.
 * [SNMP Exporter](https://github.com/prometheus/snmp_exporter) can be configured to extract project IDs from

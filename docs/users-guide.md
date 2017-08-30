@@ -1,12 +1,14 @@
 # Maia Users Guide
 
 [Maia UI](#using-the-maia-ui)
+
 * Prometheus expression browser adapted to Maia
 * Browse projects and metrics
 * Perform ad-hoc PromQL queries
 * Graph metrics
 
 [Maia CLI](#using-the-maia-client)
+
 * Feature-complete CLI supporting all API operations
 * JSON and Go-template-based output for reliable automation
 * Works with Prometheus, too (no OpenStack required)
@@ -57,6 +59,7 @@ Password: ********
 ### The Maia Screen
 
 The Maia screen consists of three part:
+
 * Navigation area (top)
 * PromQL query input field with metrics dropdown list
 * Result area with two tabs:
@@ -90,8 +93,11 @@ For that you just click on the `Graph` tab left from the `Console` one.
 The displayed line graph shows the historical metric values within the selected timeframe.
 
 You can use the following controls to adjust the graph:
+
 * `-`/`+` can be used to reduce/extend the timeframe
+
 * `<<`/`>>`can be used to shift the timeframe back resp. forth in time
+
 * `Res. (s)` can be used to change the resolution i.e. adjust the size of a data point in seconds (e.g. enter `300s`
 to get one cumulative value for each 5 minute interval)
 
@@ -101,7 +107,7 @@ The `maia` command can also be used to retrieve metrics from the Maia service. I
  CLI, supporting the same command line options and environment variables for authentication:
 
 | Option | Environment Variable | Description |
-|--------|----------------------|-------------|
+|:--------:|:----------------------:|:-------------:|
 | --os-username | OS_USERNAME | OpenStack username, requires `os-user-domain-name` |
 | --os-user-id | OS_USER_ID | OpenStack user unique ID |
 | --os-password | OS_PASSWORD | Password |
@@ -127,7 +133,7 @@ If for some reason you want to use another Maia endpoint than the one registered
 then you can override its URL using the `--maia-url` option:
 
 | Option | Environment Variable | Description |
-|--------|----------------------|-------------|
+|:--------:|:----------------------:|:-------------:|
 | --maia-url | MAIA_URL | URL of the Maia service endpoint |
 
 In the examples below we assume that you have initialized the OS_* variables your shell environment properly and that
@@ -211,7 +217,7 @@ Labels are used as columns (alphabetical sorting). There are three additional co
 to labels:
 
 | Column Name | Meaning |
-|-------------|---------|
+|:-------------:|:---------:|
 | \_\_name\_\_ | the metric name |
 | \_\_timestamp\_\_ |  the timestamp of a measurement |
 | \_\_value\_\_ | the value of a measurement |
@@ -222,7 +228,7 @@ are supported.
 The output is controlled via the parameters `--format`, `--columns`, `--separator`and `--template`.
 
 | Format   | Description | Additional Options                                                              |
-|----------|-------------|---------------------------------------------------------------------------------|
+|:----------:|:-------------:|:---------------------------------------------------------------------------------:|
 | table | text output in tabular form | `--columns`: selects which metric-labels are displayed as columns<br>`--separator`: defines how columns are separated        |
 | value | output of plain values in lists or tables | like `table`                                          |
 | json     | JSON output of Maia/Prometheus server. Contains additional status/error information. See [Prometheus API doc.](https://prometheus.io/docs/querying/api/#expression-query-result-formats) | none |
@@ -265,6 +271,7 @@ Configure the data source like with a regular Prometheus. Select `Basic Authenti
 There are several variants to express the project/domain scope:
 
 Project scoped user:
+
 * `user_id|project_id`
 * `username@user_domain_name|project_id`
 * `user_id|project_name@project_domain_name`
@@ -272,6 +279,7 @@ Project scoped user:
 * `username@user_domain_name|project_name` (if project_domain_name = user_domain_name)
 
 Domain scoped user:
+
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
 

@@ -16,10 +16,10 @@ capabilities.
 
 The following labels have a special meaning in Maia. *Only metrics with these labels are visible through the Maia API.*
 
- | Label Key  | Description  |
- |------------|--------------|
- | project_id | OpenStack project UUID |
- | domain_id  | OpenStack domain UUID |
+| Label Key  | Description  |
+|:------------:|:--------------:|
+| project_id | OpenStack project UUID |
+| domain_id  | OpenStack domain UUID |
 
 Metrics without `project_id` will be omitted when project scope is used. Likewise, metrics without `domain_id` will not
 be available when authorized to domain scope.
@@ -33,6 +33,7 @@ OpenStack authentication and authorization on top. For security reasons, adminis
 been mirrored in Maia.
 
 The Maia API supports the following operations on a per-tenant basis:
+
 * `series`: List available time-series
 * `label-values`: List possible values for labels
 * `query`: Query time-series values delivered by a PromQL-query at a given instant (aka. instant query)
@@ -72,6 +73,7 @@ The problem with basic authentication is that it lacks a standard way to express
 This scheme expands into five variants to express username and authorization scope:
 
 Project scoped user:
+
 * `user_id|project_id`
 * `username@user_domain_name|project_id`
 * `user_id|project_name@project_domain_name`
@@ -79,6 +81,7 @@ Project scoped user:
 * `username@user_domain_name|project_name` (if project_domain_name = user_domain_name)
 
 Domain scoped user:
+
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
 
@@ -99,14 +102,14 @@ split the time-series for no good reason and are likely to confuse the consumer.
 
 ### Custom Labels
 
- | Label Key  | Description  |
- |------------|--------------|
- | project_id | OpenStack project UUID |
- | domain_id  | OpenStack domain UUID |
- | service    | OpenStack service key (e.g. `compute`) |
- | server_id  | OpenStack server ID |
- | _\<resource-type\>_\_id | OpenStack ID for _\<resource-type\>_\* |
- | _\<resource-type\>_\_name | OpenStack name for _\<resource-type\>_\* |
+| Label Key  | Description  |
+|:------------:|:--------------:|
+| project_id | OpenStack project UUID |
+| domain_id  | OpenStack domain UUID |
+| service    | OpenStack service key (e.g. `compute`) |
+| server_id  | OpenStack server ID |
+| _\<resource-type\>_\_id | OpenStack ID for _\<resource-type\>_\* |
+| _\<resource-type\>_\_name | OpenStack name for _\<resource-type\>_\* |
 
 \* where _\<resource-type\>_ is one of `server`, `network`, `image`, `subnet_pool`, ... i.e. the OpenStack resource type
 name that prefixes any OpenStack CLI command.
@@ -120,6 +123,7 @@ other labels from other metrics. Federation from Prometheus into the Maia-Promet
 This project is open for external contributions. The issue list shows what is planned for upcoming releases.
 
 Pull-requests are welcome as long as you follow a few rules:
+
 * Keep the API compatible to Prometheus
 * Do not degrade performance
 * Include unit tests for new or modified code
@@ -129,11 +133,13 @@ Pull-requests are welcome as long as you follow a few rules:
 ## Software Design
 
 Goals of the Maia service:
+
 * Add a multi-tenant security model to Prometheus non-intrusively
   - with OpenStack being the first _driver_ in an otherwise pluggable architecture
 * Maintain API compatibility to Prometheus to reuse clients
 
 Components/Packages
+
 * api: Implementation of the API
 * cmd: Implementation of the CLI
 * keystone: authentication plugin(s)
