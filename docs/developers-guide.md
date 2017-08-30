@@ -1,11 +1,11 @@
 # Maia Developer Guide
 
-Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers 
+Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers
 a [Prometheus-compatible](https://prometheus.io/docs/querying/api/) API and supports federation.
 
 This guide describes how to integrate with the Maia service from applications using the Maia API.
 
-Contributors will get an overview on Maia's design priciples and requirements to contributors. 
+Contributors will get an overview on Maia's design priciples and requirements to contributors.
 
 ## Concept
 
@@ -13,14 +13,14 @@ Maia adds multi-tenant support to an existing Prometheus installation by using d
 OpenStack projects and domains. These labels either have to be supplied by the exporters or they have to be
 mapped from other labels using the [Prometheus relabelling](https://prometheus.io/docs/operating/configuration/#relabel_config)
 capabilities.
- 
+
 The following labels have a special meaning in Maia. *Only metrics with these labels are visible through the Maia API.*
- 
+
  | Label Key  | Description  |
  |------------|--------------|
  | project_id | OpenStack project UUID |
  | domain_id  | OpenStack domain UUID |
- 
+
 Metrics without `project_id` will be omitted when project scope is used. Likewise, metrics without `domain_id` will not
 be available when authorized to domain scope.
 
@@ -28,32 +28,49 @@ Users authorized to a project will be able to access the metrics of all sub-proj
 
 ## Using the Maia API
 
-The Maia implements the consumer part of the [Prometheus API](https://prometheus.io/docs/querying/api) and adds
+The Maia implements the consumer part of the Prometheus API (v1) and adds
 OpenStack authentication and authorization on top. For security reasons, administrative operations of the API have not
-been added to Maia. 
+been mirrored in Maia.
+
+The Maia API supports the following operations on a per-tenant basis:
+* `series`: List available time-series
+* `label-values`: List possible values for labels
+* `query`: Query time-series values delivered by a PromQL-query at a given instant (aka. instant query)
+* `query_range`: Query all time-series values delivered by a PromQL-query within a time-frame (aka. range query)
+
+Visit the [Prometheus API documentation](https://prometheus.io/docs/querying/api) for an API description.
 
 ### OpenStack Authentication and Authorization
 
-In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order 
-to support existing clients like Grafana and federated Prometheus. 
+#### OpenStack Token Authentication
+
+Like other OpenStack services, Maia expects a valid and scoped Keystone token in the `X-Auth-Token` header field.
+
+Please refer to the [OpenStack API Quick-Start Guide](https://developer.openstack.org/api-guide/quick-start/api-quick-start.html)
+for detailled instructions.
+
+#### Basic Authentication
+
+In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order
+to support existing clients like Grafana and federated Prometheus.
 
 The problem with basic authentication is that it lacks a standard way to express OpenStack domain information. Also there
  is no means to express OpenStack authorization scopes. Since neither Prometheus nor Grafana support adding custom
  header fields to the requests to Prometheus and thus Maia, we have to encode both the domain information and the authorization
  scope into the username.
- 
+
  For the domain qualification, we could borrow "@" from e-mail. So when a user or a project is identified by name, you
-  can add the domain in the form `username@domainname`. 
-  
+  can add the domain in the form `username@domainname`.
+
  The authorization scope is separated from the qualified username with a vertical bar "|", splitting the username
  into a username and scope part: `user|scope`. Like with usernames, also the scoped project resp. domain can be
  denoted by name: `projectname@domainname`. To disambiguate scoping by project-id and domain-name, the domain is always prefixed
  with `@`.
- 
+
 #### Variants
- 
+
 This scheme expands into five variants to express username and authorization scope:
- 
+
 Project scoped user:
 * `user_id|project_id`
 * `username@user_domain_name|project_id`
@@ -64,7 +81,7 @@ Project scoped user:
 Domain scoped user:
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
- 
+
 ## Building Exporters
 
 Exporters for Maia are in fact exporters for Prometheus. So the same
@@ -90,7 +107,7 @@ split the time-series for no good reason and are likely to confuse the consumer.
  | server_id  | OpenStack server ID |
  | _\<resource-type\>_\_id | OpenStack ID for _\<resource-type\>_\* |
  | _\<resource-type\>_\_name | OpenStack name for _\<resource-type\>_\* |
- 
+
 \* where _\<resource-type\>_ is one of `server`, `network`, `image`, `subnet_pool`, ... i.e. the OpenStack resource type
 name that prefixes any OpenStack CLI command.
 
