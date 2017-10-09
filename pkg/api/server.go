@@ -91,6 +91,7 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler 
 		authorize(observeDuration(Federate, "federate"), false, "metric:show"))
 	// expression browser
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
+	mainRouter.Methods(http.MethodGet).PathPrefix("/favicon.ico").HandlerFunc(serveStaticContent)
 	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(redirectToRootPage)
 	// instrumentation
 	mainRouter.Handle("/metrics", promhttp.Handler())
@@ -123,6 +124,10 @@ func redirectToRootPage(w http.ResponseWriter, r *http.Request) {
 
 func serveStaticContent(w http.ResponseWriter, req *http.Request) {
 	fp := req.URL.Path
+	if fp == "/favicon.ico" {
+		// support favicon web standard
+		fp = filepath.Join("static", "img", fp)
+	}
 	fp = filepath.Join("web", fp)
 
 	info, err := ui.AssetInfo(fp)
