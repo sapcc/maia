@@ -35,6 +35,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/patrickmn/go-cache"
+	"github.com/pelletier/go-toml/query"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"math"
@@ -375,8 +376,12 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*to
 	}
 
 	// extract credentials
+	query := r.URL.Query()
 	if token := r.Header.Get("X-Auth-Token"); token != "" {
 		ba.TokenID = token
+	} else if token := query.Get("x-auth-token"); token != "" {
+		ba.TokenID = token
+		query.Del("x-auth-token")
 	} else if username, password, ok := r.BasicAuth(); ok {
 		usernameParts := strings.Split(username, "|")
 		userParts := strings.Split(usernameParts[0], "@")
@@ -422,7 +427,6 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*to
 	}
 
 	// check overriding project/domain via ULR param
-	query := r.URL.Query()
 	if projectID := query.Get("project_id"); projectID != "" {
 		ba.Scope.ProjectID = projectID
 		ba.Scope.ProjectName = ""
