@@ -35,7 +35,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/patrickmn/go-cache"
-	"github.com/pelletier/go-toml/query"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 	"math"
