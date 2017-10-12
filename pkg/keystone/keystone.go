@@ -497,6 +497,7 @@ func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool
 			return nil, "", NewAuthenticationError(StatusWrongCredentials, response.Err.Error())
 		}
 		err := response.ExtractInto(&tokenData)
+		tokenData.Token = authOpts.TokenID
 		if err != nil {
 			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}

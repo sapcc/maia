@@ -105,7 +105,7 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler 
 
 func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
 	domain, _ := mux.Vars(r)["domain"]
-	newPath := "/" + domain + "/graph"
+	newPath := "/" + domain + "/graph?" + r.URL.RawQuery // keep the query part since this is where the token might go
 	util.LogDebug("Redirecting %s to %s", r.URL.Path, newPath)
 	http.Redirect(w, r, newPath, http.StatusFound)
 }
