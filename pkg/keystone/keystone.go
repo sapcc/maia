@@ -39,6 +39,7 @@ import (
 	"github.com/spf13/viper"
 	"math"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -260,8 +261,9 @@ func (d *keystone) loadDomainsAndRoles() {
 	// get all known roles and match them with our own list to get the ID
 	for _, ar := range allRoles.Roles {
 		for _, name := range rolesNames {
-			if ar.Name == name {
+			if matched, _ := regexp.MatchString(name, ar.Name); matched {
 				d.monitoringRoles[ar.ID] = name
+				break
 			}
 		}
 	}

@@ -99,6 +99,8 @@ policy_file = "/etc/maia/policy.json"
 roles = "monitoring_viewer,monitoring_admin"
 ```
 
+You can also use regular expressions for role names, e.g. `.*` to check that a user has _some_ role.
+
 Maia distinguishes the following permissions
 
 * `metric:list`: List which metrics and measurement series are available for inspection
