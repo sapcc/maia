@@ -29,6 +29,6 @@ th.job_header {
 
 .scrollable-menu {
   height: auto;
-  max-height: 800px;
+  max-height: 80vh;
   overflow-x: hidden;
 }
