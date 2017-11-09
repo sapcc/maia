@@ -26,3 +26,9 @@ th.job_header {
   max-width: none;
   text-align: left;
 }
+
+.scrollable-menu {
+  height: auto;
+  max-height: 800px;
+  overflow-x: hidden;
+}

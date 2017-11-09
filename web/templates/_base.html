@@ -50,7 +50,7 @@
                 <li class="dropdown">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
                        aria-expanded="false">{{ projectName }}<span class="caret"></span></a>
-                    <ul class="dropdown-menu">
+                    <ul class="dropdown-menu scrollable-menu">
                         {{ range $key, $value := userProjects }}
                         <li><a href="{{ pathPrefix }}/{{ userDomainName }}/graph?project_id={{ $value }}">{{ $key }}</a></li>
                         {{ end }}
