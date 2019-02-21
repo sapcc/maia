@@ -114,8 +114,8 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
-		// TODO: @Arno, what is this good for?
-		// payload := bytes.Replace(playload, []byte("\\u0026"), []byte("&"), -1)
+		// restore "&" in links that are broken by the json.Marshaller
+		payload := bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
 		w.Write(payload)
 	} else {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

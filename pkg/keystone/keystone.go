@@ -26,7 +26,13 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/databus23/goslo.policy"
+	"math"
+	"math/rand"
+	"regexp"
+	"strings"
+	"time"
+
+	policy "github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -34,14 +40,9 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/patrickmn/go-cache"
+	cache "github.com/patrickmn/go-cache"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"math"
-	"math/rand"
-	"regexp"
-	"strings"
-	"time"
 )
 
 // Keystone creates a real keystone authentication and authorization driver
@@ -53,13 +54,13 @@ func Keystone() Driver {
 }
 
 type keystone struct {
-	// these locks are used to make sure the connection or token is altered while somebody is working on it
+	// these locks are used to make sure the connection or token is not altered while somebody is working on it
 	serviceConnMutex, serviceTokenMutex *sync.Mutex
 	// these caches are thread-safe, no need to lock because worst-case is duplicate processing efforts
-	tokenCache, projectTreeCache, userProjectsCache, userIDCache *cache.Cache
-	providerClient                                               *gophercloud.ServiceClient
-	seqErrors                                                    int
-	serviceURL                                                   string
+	tokenCache, projectTreeCache, userProjectsCache, userIDCache, projectScopeCache *cache.Cache
+	providerClient                                                                  *gophercloud.ServiceClient
+	seqErrors                                                                       int
+	serviceURL                                                                      string
 	// role-id --> role-name
 	monitoringRoles map[string]string
 	// domain-id --> domain-name
@@ -72,7 +73,8 @@ func (d *keystone) init() {
 	d.tokenCache = cache.New(viper.GetDuration("keystone.token_cache_time"), time.Minute)
 	d.projectTreeCache = cache.New(viper.GetDuration("keystone.token_cache_time"), time.Minute)
 	d.userProjectsCache = cache.New(viper.GetDuration("keystone.token_cache_time"), time.Minute)
-	d.userIDCache = cache.New(cache.NoExpiration, time.Minute)
+	d.userIDCache = cache.New(time.Hour*24, time.Hour)
+	d.projectScopeCache = cache.New(time.Hour*24, time.Hour)
 	d.serviceConnMutex = &sync.Mutex{}
 	d.serviceTokenMutex = &sync.Mutex{}
 	if viper.Get("keystone.username") != nil {
@@ -235,11 +237,7 @@ func (d *keystone) reauthServiceUser() error {
 
 func (d *keystone) loadDomainsAndRoles() {
 	// load all roles
-
-	// check if roles list already initialized
-	if len(d.monitoringRoles) > 0 {
-		return
-	}
+	util.LogInfo("Loading/refreshing global list of domains and roles")
 
 	allRoles := struct {
 		Roles []struct {
@@ -623,13 +621,17 @@ func (d *keystone) fetchUserProjects(userID string) ([]tokens.Scope, error) {
 		}
 		for _, ra := range slice {
 			if _, ok := d.monitoringRoles[ra.Role.ID]; ok && ra.Scope.Project.ID != "" {
-				project, err := projects.Get(d.providerClient, ra.Scope.Project.ID).Extract()
-				if err != nil {
-					return false, err
+				scope, ok := d.projectScopeCache.Get(ra.Scope.Project.ID)
+				if !ok {
+					project, err := projects.Get(d.providerClient, ra.Scope.Project.ID).Extract()
+					if err != nil {
+						return false, err
+					}
+					domainName := d.domainNames[project.DomainID] // this will panic if domains have been added
+					scope = tokens.Scope{ProjectID: ra.Scope.Project.ID, ProjectName: project.Name, DomainID: project.DomainID, DomainName: domainName}
+					d.projectScopeCache.Set(ra.Scope.Project.ID, scope, cache.DefaultExpiration)
 				}
-				domainName := d.domainNames[project.DomainID]
-				scopes = append(scopes, tokens.Scope{ProjectID: ra.Scope.Project.ID, ProjectName: project.Name,
-					DomainID: project.DomainID, DomainName: domainName})
+				scopes = append(scopes, scope.(tokens.Scope))
 			}
 		}
 		return true, nil
