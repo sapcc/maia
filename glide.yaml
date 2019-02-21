@@ -7,7 +7,7 @@ import:
   - openstack
   - openstack/identity/v3/tokens
 - package: github.com/gorilla/mux
-  version: ~1.4.0
+  version: ~1.7
 - package: github.com/prometheus/client_golang
   version: 94ff84a9a6ebb5e6eb9172897c221a64df3443bc 
   subpackages:
@@ -21,7 +21,7 @@ import:
   - expfmt
   - model
 - package: github.com/prometheus/prometheus
-  version: ~1.7.1
+  version: ~1.8
   subpackages:
   - promql
   - storage/metric
