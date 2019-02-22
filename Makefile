@@ -71,9 +71,9 @@ clean: FORCE
 build/docker.tar:
 	glide install -v
 ifeq ($(OS), Darwin)
-	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.10 env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
+	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.11-stretch env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 else
-	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
+	env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 endif
 	tar cf - ./maia_linux_amd64 > build/docker.tar
 
@@ -82,7 +82,7 @@ DOCKER_IMAGE := hub.global.cloud.sap/monsoon/maia
 DOCKER_TAG   := latest
 
 docker: build/docker.tar
-	$(DOCKER) build --build-arg https_proxy=$$(HTTP_PROXY) --build-arg http_proxy=$$(HTTP_PROXY) --build-arg HTTP_PROXY=$$(HTTP_PROXY) --build-arg HTTPS_PROXY=$$(HTTP_PROXY) -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
+	$(DOCKER) build -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
 
 vendor: FORCE
 	glide update -v
