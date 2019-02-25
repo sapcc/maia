@@ -21,7 +21,7 @@ all: clean dependencies build check
 
 # This target uses the incremental rebuild capabilities of the Go compiler to speed things up.
 # If no source files have changed, `go install` exits quickly without doing anything.
-generate: FORCE
+generate: dependencies FORCE
 	# generate mocks
 	mockgen --source pkg/storage/interface.go --destination pkg/storage/genmock.go --package storage
 	mockgen --source pkg/keystone/interface.go --destination pkg/keystone/genmock.go --package keystone
@@ -68,8 +68,7 @@ clean: FORCE
 	rm -f pkg/storage/genmock.go
 	rm -f pkg/keystone/genmock.go
 
-build/docker.tar:
-	glide install -v
+build/docker.tar: dependencies
 ifeq ($(OS), Darwin)
 	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.11-stretch env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 else
