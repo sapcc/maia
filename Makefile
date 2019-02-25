@@ -71,7 +71,7 @@ clean: FORCE
 build/docker.tar:
 	glide install -v
 ifeq ($(OS), Darwin)
-	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.11-stretch env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
+	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.11-stretch env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 else
 	env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 endif
