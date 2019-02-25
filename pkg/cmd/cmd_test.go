@@ -21,13 +21,14 @@ package cmd
 
 import (
 	"fmt"
+	"time"
+
 	policy "github.com/databus23/goslo.policy"
 	"github.com/golang/mock/gomock"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
-	"time"
 )
 
 type testReporter struct {
@@ -35,11 +36,11 @@ type testReporter struct {
 }
 
 func (r testReporter) Errorf(format string, args ...interface{}) {
-	panic(fmt.Errorf(format, args))
+	panic(fmt.Errorf(format, args...))
 }
 
 func (r testReporter) Fatalf(format string, args ...interface{}) {
-	panic(fmt.Errorf(format, args))
+	panic(fmt.Errorf(format, args...))
 }
 
 func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.MockDriver) {
