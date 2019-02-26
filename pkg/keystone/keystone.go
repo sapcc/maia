@@ -205,12 +205,13 @@ func (d *keystone) reauthServiceUser() error {
 	token, err := result.ExtractToken()
 
 	if err != nil {
-		// wait ~ (2^errors)/2, i.e. 0..1, 0..2, 0..4, ... increasing with every sequential error
-		r := rand.Intn(int(math.Exp2(float64(d.seqErrors))))
-		time.Sleep(time.Duration(r) * time.Second)
-		d.seqErrors++
 		// clear token
 		viper.Set("keystone.token", "")
+		// wait ~ (2^errors)/2, i.e. 0..1, 0..2, 0..4, ... increasing with every sequential error
+		r := rand.Intn(int(math.Exp2(float64(d.seqErrors))))
+		util.LogError("authentication of service user failed: %s, waiting %d secs.", err.Error, r)
+		time.Sleep(time.Duration(r) * time.Second)
+		d.seqErrors++
 		return NewAuthenticationError(StatusNotAvailable, "Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
 	}
 	// read service catalog
