@@ -203,8 +203,9 @@ func (d *keystone) reauthServiceUser() error {
 
 	result := tokens.Create(d.providerClient, authOpts)
 	token, err := result.ExtractToken()
-
-	if err != nil {
+	if err == nil {
+		util.LogDebug("token received, expires %s", token.ExpiresAt.String())
+	} else {
 		// clear token
 		viper.Set("keystone.token", "")
 		// wait ~ (2^errors)/2, i.e. 0..1, 0..2, 0..4, ... increasing with every sequential error
@@ -212,15 +213,18 @@ func (d *keystone) reauthServiceUser() error {
 		util.LogError("authentication of service user failed: %s, waiting %d secs.", err.Error, r)
 		time.Sleep(time.Duration(r) * time.Second)
 		d.seqErrors++
-		return NewAuthenticationError(StatusNotAvailable, "Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
+		return NewAuthenticationError(StatusNotAvailable, "cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
 	}
 	// read service catalog
-	catalog, err := result.ExtractServiceCatalog()
 
+	catalog, err := result.ExtractServiceCatalog()
 	if err != nil {
 		return NewAuthenticationError(StatusNotAvailable, "cannot read service catalog: %v", err)
 	}
 	d.serviceURL, err = openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
+	if err != nil {
+		return NewAuthenticationError(StatusNotAvailable, "cannot find metrics endpoint in catalog: %v", err)
+	}
 
 	// store token so that it is considered for next authentication attempt
 	viper.Set("keystone.token", token.ID)

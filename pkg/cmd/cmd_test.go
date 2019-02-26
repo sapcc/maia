@@ -72,9 +72,6 @@ func expectAuth(keystoneMock *keystone.MockDriver) {
 		"project_id": auth.Scope.ProjectID, "password": auth.Password}, Auth: map[string]string{"project_id": auth.Scope.ProjectID}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
 	// call this explicitly since the mocked storage does not
 	fetchToken()
-	//authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
-	//	"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
-	//keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
 }
 
 // HTTP based tests
