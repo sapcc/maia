@@ -21,10 +21,12 @@ package keystone
 
 import (
 	"fmt"
+	"net/http"
+
 	policy "github.com/databus23/goslo.policy"
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/spf13/viper"
-	"net/http"
 )
 
 const (
@@ -81,7 +83,7 @@ type Driver interface {
 
 	// Authenticate authenticates a user using the provided authOptions.
 	// It returns a context for policy evaluation and the public endpoint retrieved from the service catalog
-	Authenticate(options *tokens.AuthOptions) (*policy.Context, string, AuthenticationError)
+	Authenticate(options gophercloud.AuthOptions) (*policy.Context, string, AuthenticationError)
 
 	// ChildProjects returns the IDs of all child-projects of the project denoted by projectID
 	ChildProjects(projectID string) ([]string, error)
