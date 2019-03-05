@@ -59,6 +59,8 @@ func Server() error {
 	// enable CORS
 	c := cors.New(cors.Options{
 		AllowedHeaders: []string{"X-Auth-Token"},
+		AllowedOrigins: []string{"*"}, //this is an API, so it should be good to use from everywhere
+		AllowedMethods: []string{"GET", "HEAD"},
 	})
 	handler := c.Handler(mainRouter)
 
