@@ -22,13 +22,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
-	"github.com/prometheus/common/model"
-	"github.com/sapcc/maia/pkg/keystone"
-	"github.com/sapcc/maia/pkg/storage"
-	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -36,6 +29,14 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/gophercloud/gophercloud"
+	"github.com/prometheus/common/model"
+	"github.com/sapcc/maia/pkg/keystone"
+	"github.com/sapcc/maia/pkg/storage"
+	"github.com/sapcc/maia/pkg/util"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -45,7 +46,7 @@ const (
 
 var maiaURL string
 var selector string
-var auth tokens.AuthOptions
+var auth = gophercloud.AuthOptions{Scope: new(gophercloud.AuthScope)}
 var scopedDomain string
 var outputFormat string
 var jsonTemplate string
@@ -80,7 +81,7 @@ func fetchToken() {
 	if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
 		panic(fmt.Errorf("You must at least specify --os-username / --os-user-id and --os-password"))
 	}
-	context, url, err := keystoneInstance().Authenticate(&auth)
+	context, url, err := keystoneInstance().Authenticate(auth)
 	if err != nil {
 		panic(err)
 	}

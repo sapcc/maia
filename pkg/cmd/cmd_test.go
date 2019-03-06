@@ -25,7 +25,7 @@ import (
 
 	policy "github.com/databus23/goslo.policy"
 	"github.com/golang/mock/gomock"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
@@ -45,6 +45,8 @@ func (r testReporter) Fatalf(format string, args ...interface{}) {
 
 func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.MockDriver) {
 	// set mandatory parameters
+	auth.IdentityEndpoint = ""
+	auth.Username = "username"
 	auth.UserID = "user_id"
 	auth.Password = "testwd"
 	auth.Scope.ProjectID = "12345"
@@ -66,13 +68,10 @@ func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.Mo
 }
 
 func expectAuth(keystoneMock *keystone.MockDriver) {
-	keystoneMock.EXPECT().Authenticate(&tokens.AuthOptions{UserID: "user_id", Password: "testwd", Scope: tokens.Scope{ProjectID: "12345"}}).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
-		"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
+	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{IdentityEndpoint: auth.IdentityEndpoint, Username: auth.Username, UserID: auth.UserID, Password: auth.Password, DomainName: auth.DomainName, Scope: auth.Scope}).Return(&policy.Context{Request: map[string]string{"user_id": auth.UserID,
+		"project_id": auth.Scope.ProjectID, "password": auth.Password}, Auth: map[string]string{"project_id": auth.Scope.ProjectID}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
 	// call this explicitly since the mocked storage does not
 	fetchToken()
-	//authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher).Return(&policy.Context{Request: map[string]string{"user_id": "testuser",
-	//	"project_id": "12345", "password": "testwd"}, Auth: map[string]string{"project_id": "12345"}, Roles: []string{"monitoring_viewer"}}, nil)
-	//keystoneMock.EXPECT().ChildProjects("12345").Return([]string{}).After(authCall)
 }
 
 // HTTP based tests

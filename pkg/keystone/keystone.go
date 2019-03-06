@@ -26,8 +26,6 @@ import (
 	"net/url"
 	"sync"
 
-	"math"
-	"math/rand"
 	"regexp"
 	"strings"
 	"time"
@@ -44,6 +42,8 @@ import (
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
 )
+
+var metricsEndpointOpts = gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic}
 
 // Keystone creates a real keystone authentication and authorization driver
 func Keystone() Driver {
@@ -92,22 +92,22 @@ func (d *keystone) serviceKeystoneClient() (*gophercloud.ServiceClient, error) {
 
 	if d.providerClient == nil {
 		util.LogInfo("Setting up identity connection to %s", viper.GetString("keystone.auth_url"))
-		client, err := newKeystoneClient()
+		client, err := newKeystoneClient(authOptionsFromConfig())
 		if err != nil {
 			return nil, err
 		}
 		d.providerClient = client
-		if err := d.reauthServiceUser(); err != nil {
-			d.providerClient = nil
-			return nil, err
-		}
+		d.loadDomainsAndRoles()
 	}
 
 	return d.providerClient, nil
 }
 
-func newKeystoneClient() (*gophercloud.ServiceClient, error) {
-	provider, err := openstack.NewClient(viper.GetString("keystone.auth_url"))
+func newKeystoneClient(authOpts gophercloud.AuthOptions) (*gophercloud.ServiceClient, error) {
+	provider, err := openstack.AuthenticatedClient(authOpts)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize OpenStack service user provider client: %v", err)
+	}
 	if viper.IsSet("maia.proxy") {
 		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
 		if err != nil {
@@ -116,11 +116,9 @@ func newKeystoneClient() (*gophercloud.ServiceClient, error) {
 		}
 		provider.HTTPClient.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
 	}
-	client, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{
-		Region: "",
-	})
+	client, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("cannot initialize OpenStack client: %v", err)
+		return nil, fmt.Errorf("cannot initialize OpenStack service user identity V3 client: %v", err)
 	}
 
 	return client, nil
@@ -193,48 +191,6 @@ func (d *keystone) ServiceURL() string {
 	return d.serviceURL
 }
 
-// reauthServiceUser refreshes an expired keystone token
-func (d *keystone) reauthServiceUser() error {
-	d.serviceTokenMutex.Lock()
-	defer d.serviceTokenMutex.Unlock()
-
-	authOpts := authOptionsFromConfig()
-	util.LogInfo("Fetching token for service user %s%s@%s%s", authOpts.UserID, authOpts.Username, authOpts.DomainID, authOpts.DomainName)
-
-	result := tokens.Create(d.providerClient, authOpts)
-	token, err := result.ExtractToken()
-
-	if err != nil {
-		// wait ~ (2^errors)/2, i.e. 0..1, 0..2, 0..4, ... increasing with every sequential error
-		r := rand.Intn(int(math.Exp2(float64(d.seqErrors))))
-		time.Sleep(time.Duration(r) * time.Second)
-		d.seqErrors++
-		// clear token
-		viper.Set("keystone.token", "")
-		return NewAuthenticationError(StatusNotAvailable, "Cannot obtain token: %v (%d sequential errors)", err, d.seqErrors)
-	}
-	// read service catalog
-	catalog, err := result.ExtractServiceCatalog()
-
-	if err != nil {
-		return NewAuthenticationError(StatusNotAvailable, "cannot read service catalog: %v", err)
-	}
-	d.serviceURL, err = openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
-
-	// store token so that it is considered for next authentication attempt
-	viper.Set("keystone.token", token.ID)
-	d.providerClient.TokenID = token.ID
-	d.providerClient.ReauthFunc = d.reauthServiceUser
-	d.providerClient.EndpointLocator = func(opts gophercloud.EndpointOpts) (string, error) {
-		return openstack.V3EndpointURL(catalog, opts)
-	}
-
-	// get role-names from config and find the corresponding role-IDs
-	d.loadDomainsAndRoles()
-
-	return nil
-}
-
 func (d *keystone) loadDomainsAndRoles() {
 	// load all roles
 	util.LogInfo("Loading/refreshing global list of domains and roles")
@@ -286,25 +242,24 @@ func (d *keystone) loadDomainsAndRoles() {
 	}
 }
 
-func authOptionsFromConfig() *tokens.AuthOptions {
-	return &tokens.AuthOptions{
+func authOptionsFromConfig() gophercloud.AuthOptions {
+	return gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		TokenID:          viper.GetString("keystone.token"),
 		Username:         viper.GetString("keystone.username"),
 		Password:         viper.GetString("keystone.password"),
 		DomainName:       viper.GetString("keystone.user_domain_name"),
 		AllowReauth:      true,
-		Scope: tokens.Scope{
+		Scope: &gophercloud.AuthScope{
 			ProjectName: viper.GetString("keystone.project_name"),
 			DomainName:  viper.GetString("keystone.project_domain_name"),
 		},
 	}
 }
 
-func authOpts2StringKey(authOpts *tokens.AuthOptions) string {
+func authOpts2StringKey(authOpts gophercloud.AuthOptions) string {
 	if authOpts.TokenID != "" {
-		return authOpts.TokenID + authOpts.Scope.ProjectID + " " + authOpts.Scope.ProjectName + " " +
-			authOpts.Scope.DomainID + " " + authOpts.Scope.DomainName
+		return authOpts.TokenID
 	}
 
 	// build unique key by separating fields with blanks. Since blanks are not allowed in several of those
@@ -316,8 +271,8 @@ func authOpts2StringKey(authOpts *tokens.AuthOptions) string {
 
 // Authenticate authenticates a non-service user using available authOptionsFromRequest (username+password or token)
 // It returns the authorization context
-func (d *keystone) Authenticate(authOpts *tokens.AuthOptions) (*policy.Context, string, AuthenticationError) {
-	return d.authenticate(authOpts, false)
+func (d *keystone) Authenticate(authOpts gophercloud.AuthOptions) (*policy.Context, string, AuthenticationError) {
+	return d.authenticate(authOpts, false, false)
 }
 
 // AuthenticateRequest attempts to Authenticate a user using the request header contents
@@ -335,7 +290,7 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 	// if the request does not have a keystone token, then a new token has to be requested on behalf of the client
 	// this must not happen with the connection of the service otherwise wrong credentials will cause reauthentication
 	// of the service user
-	context, _, err := d.authenticate(authOpts, true)
+	context, _, err := d.authenticate(*authOpts, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -368,8 +323,8 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 // Format: <user>"|"<project> or <user>"|@"<domain>
 // user/project can either be a unique OpenStack ID or a qualified name with domain information, e.g. username"@"domain
 // When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
-func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*tokens.AuthOptions, AuthenticationError) {
-	ba := tokens.AuthOptions{
+func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*gophercloud.AuthOptions, AuthenticationError) {
+	ba := gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
 		AllowReauth:      false,
 	}
@@ -380,7 +335,9 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*to
 		ba.TokenID = token
 	} else if token := query.Get("x-auth-token"); token != "" {
 		ba.TokenID = token
+		// move to right place
 		query.Del("x-auth-token")
+		r.Header.Set("X-Auth-Token", ba.TokenID)
 	} else if username, password, ok := r.BasicAuth(); ok {
 		usernameParts := strings.Split(username, "|")
 		userParts := strings.Split(usernameParts[0], "@")
@@ -398,13 +355,15 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*to
 			ba.Username = userParts[0]
 			ba.DomainName = userParts[1]
 		} else if headerUserDomain := r.Header.Get("X-User-Domain-Name"); headerUserDomain != "" {
+			// if the domain is set in the header, an unqualified username is taken as a name and not an ID
 			ba.Username = userParts[0]
 			ba.DomainName = headerUserDomain
 		} else {
+			// TODO guess if this is a name of an ID
 			ba.UserID = userParts[0]
 		}
 
-		// parse scope part
+		ba.Scope = new(gophercloud.AuthScope)
 		if len(scopeParts) >= 2 {
 			// assume domains are always prefixed with @
 			if scopeParts[0] != "" {
@@ -427,23 +386,17 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*to
 
 	// check overriding project/domain via ULR param
 	if projectID := query.Get("project_id"); projectID != "" {
-		ba.Scope.ProjectID = projectID
-		ba.Scope.ProjectName = ""
-		ba.Scope.DomainID = ""
-		ba.Scope.DomainName = ""
+		ba.Scope = &gophercloud.AuthScope{ProjectID: projectID}
 		query.Del("project_id")
 	} else if domainID := query.Get("domain_id"); domainID != "" {
-		ba.Scope.DomainID = domainID
-		ba.Scope.DomainName = ""
-		ba.Scope.ProjectName = ""
-		ba.Scope.ProjectID = ""
+		ba.Scope = &gophercloud.AuthScope{DomainID: domainID}
 		query.Del("domain_id")
 	}
 
 	return &ba, nil
 }
 
-func (d *keystone) guessScope(ba *tokens.AuthOptions) AuthenticationError {
+func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 	// guess scope if it is missing
 	userID := ba.UserID
 	var err error
@@ -461,7 +414,7 @@ func (d *keystone) guessScope(ba *tokens.AuthOptions) AuthenticationError {
 	}
 
 	// default to first project (note that redundant attributes are not copied here to aovid errors)
-	ba.Scope.ProjectID = projects[0].ProjectID
+	ba.Scope = &gophercloud.AuthScope{ProjectID: projects[0].ProjectID}
 	if ba.Scope.ProjectID == "" {
 		ba.Scope.DomainID = projects[0].DomainID
 	}
@@ -471,86 +424,105 @@ func (d *keystone) guessScope(ba *tokens.AuthOptions) AuthenticationError {
 
 // authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
 // It returns the authorization context
-func (d *keystone) authenticate(authOpts *tokens.AuthOptions, asServiceUser bool) (*policy.Context, string, AuthenticationError) {
-	// check cache briefly
-	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found {
-		util.LogDebug("Token cache hit for %s", authOpts.TokenID)
+func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser bool, rescope bool) (*policy.Context, string, AuthenticationError) {
+	// check cache, which does not work if tokens are rescoped
+	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found && (authOpts.Scope == nil || authOpts.Scope.ProjectID == entry.(*cacheEntry).context.Auth["project_id"]) {
+		util.LogDebug("Token cache hit: token %s... for scope %+v", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope)
 		return entry.(*cacheEntry).context, entry.(*cacheEntry).endpointURL, nil
 	}
-
 	//use a custom token struct instead of tokens.Token which is way incomplete
 	var tokenData keystoneToken
-	var catalog *tokens.ServiceCatalog
-	emptyScope := tokens.Scope{}
-	if authOpts.TokenID != "" && authOpts.Scope == emptyScope && asServiceUser {
+	var endpointURL string
+	if authOpts.TokenID != "" && asServiceUser && !rescope {
+		// token passed, scope is empty since it is part of the token (no username password given)
 		util.LogDebug("verify token")
-		// get token from token-ID which is being verified on that occasion
-		if d.providerClient.TokenID == "" {
-			err := d.reauthServiceUser().(AuthenticationError)
-			if err != nil {
-				return nil, "", err
-			}
-		}
 		response := tokens.Get(d.providerClient, authOpts.TokenID)
 		if response.Err != nil {
 			//this includes 4xx responses, so after this point, we can be sure that the token is valid
 			return nil, "", NewAuthenticationError(StatusWrongCredentials, response.Err.Error())
 		}
 		err := response.ExtractInto(&tokenData)
-		tokenData.Token = authOpts.TokenID
 		if err != nil {
 			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}
-		catalog, err = response.ExtractServiceCatalog()
+		// detect rescoping
+		if authOpts.Scope != nil && authOpts.Scope.ProjectID != tokenData.ProjectScope.ID {
+			util.LogDebug("scope change detected")
+			return d.authenticate(authOpts, asServiceUser, true)
+		}
+		tokenInfo, _ := response.ExtractToken()
+		tokenData.Token = tokenInfo.ID
+		catalog, err := response.ExtractServiceCatalog()
+		if err != nil {
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
+		}
+		// service endpoint
+		endpointURL, err = openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
 		if err != nil {
 			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}
 	} else {
-		util.LogDebug("authenticate %s%s with scope %s.", authOpts.Username, authOpts.UserID, authOpts.Scope)
-		client, err := newKeystoneClient()
-		if err != nil {
-			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
-		}
+		// no token or changed scoped: need to authenticate user
+		util.LogDebug("authenticate user %s%s with scope %+v.", authOpts.Username, authOpts.UserID, authOpts.Scope)
 		// create new token from basic authentication credentials or token ID
-		response := tokens.Create(client, authOpts)
-		// ugly copy & paste because the base-type of CreateResult and GetResult is private
-		if response.Err != nil {
+		var tokenID string
+		client, err := openstack.AuthenticatedClient(authOpts)
+		if client != nil {
+			tokenID, err = client.GetAuthResult().ExtractTokenID()
+		}
+		if err != nil {
 			statusCode := StatusWrongCredentials
 			//this includes 4xx responses, so after this point, we can be sure that the token is valid
 			if authOpts.Username != "" || authOpts.UserID != "" {
-				util.LogInfo("Failed login of user %s@%s%s for scope %s: %s", authOpts.Username, authOpts.DomainName, authOpts.UserID, authOpts.Scope, response.Err.Error())
+				util.LogInfo("Failed login of user name %s%s for scope %+v: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, err.Error())
 			} else if authOpts.TokenID != "" {
-				util.LogInfo("Failed login of with token %s... for scope %s: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, response.Err.Error())
+				util.LogInfo("Failed login of with token %s... for scope %+v: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, err.Error())
 			} else {
 				statusCode = StatusMissingCredentials
 			}
-			return nil, "", NewAuthenticationError(statusCode, response.Err.Error())
+			return nil, "", NewAuthenticationError(statusCode, err.Error())
 		}
-		err = response.ExtractInto(&tokenData)
+		util.LogDebug("token creation/rescoping successful, authenticating with token")
+
+		if asServiceUser {
+			// recurse in order to obtain catalog entry; login in via token, to provide scope information
+			var ce cacheEntry
+			var authErr AuthenticationError
+			ce.context, ce.endpointURL, authErr = d.authenticate(gophercloud.AuthOptions{IdentityEndpoint: authOpts.IdentityEndpoint, TokenID: tokenID}, asServiceUser, false)
+			if authErr == nil && authOpts.TokenID == "" {
+				// cache basic authentication results in the same way as token validations
+				util.LogDebug("Add cache entry for username %s%s for scope %+v", authOpts.UserID, authOpts.Username, authOpts.Scope)
+				d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
+			}
+			return ce.context, ce.endpointURL, authErr
+		}
+		// else populate from input
+		tokenData.Token = tokenID
+		tokenData.User.ID = authOpts.UserID
+		tokenData.User.Name = authOpts.Username
+		tokenData.User.Domain.ID = authOpts.DomainID
+		tokenData.User.Domain.Name = authOpts.DomainName
+		tokenData.ProjectScope.ID = authOpts.Scope.ProjectID
+		tokenData.ProjectScope.Name = authOpts.Scope.ProjectName
+		tokenData.DomainScope.ID = authOpts.Scope.DomainID
+		tokenData.ProjectScope.Name = authOpts.Scope.DomainName
+
+		endpointURL, err = client.EndpointLocator(metricsEndpointOpts)
 		if err != nil {
 			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
 		}
-		catalog, err = response.ExtractServiceCatalog()
-		if err != nil {
-			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
-		}
-		// the token is passed separately
-		tokenData.Token = response.Header.Get("X-Subject-Token")
 	}
 
 	// authorization context
 	context := tokenData.ToContext()
 
-	// service endpoint
-	endpointURL, err := openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
-	if err != nil {
-		return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
-	}
 	// update the cache
 	ce := cacheEntry{
 		context:     &context,
 		endpointURL: endpointURL,
 	}
+
+	util.LogDebug("add token cache entry for token %s... for scope %+v", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope)
 	d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
 	return &context, endpointURL, nil
 }
@@ -562,7 +534,7 @@ func (d *keystone) ChildProjects(projectID string) ([]string, error) {
 
 	projects, err := d.fetchChildProjects(projectID)
 	if err != nil {
-		util.LogError("Unable to obtain project tree of project %s: %v", projectID, err)
+		util.LogError("Unable to obtain project tree of project %s: %s", projectID, err.Error)
 		return nil, err
 	}
 
@@ -615,6 +587,7 @@ func (d *keystone) fetchUserProjects(userID string) ([]tokens.Scope, error) {
 	scopes := []tokens.Scope{}
 	effectiveVal := true
 	err := roles.ListAssignments(d.providerClient, roles.ListAssignmentsOpts{UserID: userID, Effective: &effectiveVal}).EachPage(func(page pagination.Page) (bool, error) {
+		util.LogDebug("loading role assignment page")
 		slice, err := roles.ExtractRoleAssignments(page)
 		if err != nil {
 			return false, err
