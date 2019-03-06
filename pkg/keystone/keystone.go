@@ -463,7 +463,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 		}
 	} else {
 		// no token or changed scoped: need to authenticate user
-		util.LogDebug("authenticate %s%s with scope %+v.", authOpts.Username, authOpts.UserID, authOpts.Scope)
+		util.LogDebug("authenticate user %s%s with scope %+v.", authOpts.Username, authOpts.UserID, authOpts.Scope)
 		// create new token from basic authentication credentials or token ID
 		var tokenID string
 		client, err := openstack.AuthenticatedClient(authOpts)
@@ -474,7 +474,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 			statusCode := StatusWrongCredentials
 			//this includes 4xx responses, so after this point, we can be sure that the token is valid
 			if authOpts.Username != "" || authOpts.UserID != "" {
-				util.LogInfo("Failed login of user name %s@%s with ID %s for scope %+v: %s", authOpts.Username, authOpts.DomainName, authOpts.UserID, authOpts.Scope, err.Error())
+				util.LogInfo("Failed login of user name %s%s for scope %+v: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, err.Error())
 			} else if authOpts.TokenID != "" {
 				util.LogInfo("Failed login of with token %s... for scope %+v: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, err.Error())
 			} else {

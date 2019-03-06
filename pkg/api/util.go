@@ -322,11 +322,12 @@ func requestReauthentication(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", "Basic")
 }
 func setAuthCookies(req *http.Request, w http.ResponseWriter) {
-	util.LogDebug("Setting cookie: %s...", req.Header.Get(authTokenHeader)[1:len(req.Header.Get(authTokenHeader))/4])
-	if req.Header.Get(authTokenHeader) == "" {
+	token := req.Header.Get(authTokenHeader)
+	if token == "" {
 		util.LogWarning("X-Auth-Token Header is empty!?")
 		return
 	}
+	util.LogDebug("Setting cookie: %s...", token[1:len(token)/4])
 	expiryStr := req.Header.Get(authTokenExpiryHeader)
 	expiry, pErr := time.Parse(time.RFC3339Nano, expiryStr)
 	if pErr != nil {
@@ -334,7 +335,7 @@ func setAuthCookies(req *http.Request, w http.ResponseWriter) {
 		expiry = time.Now().UTC().Add(viper.GetDuration("keystone.token_cache_time"))
 	}
 	// set token cookie
-	http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
+	http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: token,
 		Expires: expiry.UTC(), Secure: false})
 	// remember domain as cookie so that reauthentication during Prometheus API calls (no domain prefix)
 	// works with plain username and password
