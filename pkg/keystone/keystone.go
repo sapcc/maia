@@ -427,7 +427,11 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser bool, rescope bool) (*policy.Context, string, AuthenticationError) {
 	// check cache, which does not work if tokens are rescoped
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found && (authOpts.Scope == nil || authOpts.Scope.ProjectID == entry.(*cacheEntry).context.Auth["project_id"]) {
-		util.LogDebug("Token cache hit: token %s... for scope %+v", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope)
+		if authOpts.TokenID != "" {
+			util.LogDebug("Token cache hit: token %s... for scope %+v", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope)
+		} else {
+			util.LogDebug("Token cache hit: user %s%s and password ***** for scope %+v", authOpts.Username, authOpts.UserID, authOpts.Scope)
+		}
 		return entry.(*cacheEntry).context, entry.(*cacheEntry).endpointURL, nil
 	}
 	//use a custom token struct instead of tokens.Token which is way incomplete
