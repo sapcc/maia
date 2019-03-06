@@ -24,6 +24,10 @@ import (
 
 	"bytes"
 	"fmt"
+	"io"
+	"path/filepath"
+	"strings"
+
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -32,9 +36,6 @@ import (
 	"github.com/sapcc/maia/pkg/ui"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"io"
-	"path/filepath"
-	"strings"
 )
 
 var storageInstance storage.Driver
@@ -104,7 +105,11 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler 
 }
 
 func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
-	domain, _ := mux.Vars(r)["domain"]
+	domain, ok := mux.Vars(r)["domain"]
+	if !ok {
+		redirectToRootPage(w, r)
+		return
+	}
 	newPath := "/" + domain + "/graph?" + r.URL.RawQuery // keep the query part since this is where the token might go
 	util.LogDebug("Redirecting %s to %s", r.URL.Path, newPath)
 	http.Redirect(w, r, newPath, http.StatusFound)

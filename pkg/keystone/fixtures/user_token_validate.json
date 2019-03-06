@@ -22,25 +22,11 @@
       {
         "endpoints": [
           {
-            "url": "https://identity-3.staging.cloud.sap:443/v3",
+            "url": "http://identity.local/v3",
             "interface": "public",
             "region": "staging",
             "region_id": "staging",
             "id": "7859f84c67d740b294c9a607d03c2991"
-          },
-          {
-            "url": "http://keystone.monsoon3.svc.kubernetes.staging.cloud.sap:5000/v3",
-            "interface": "internal",
-            "region": "staging",
-            "region_id": "staging",
-            "id": "a2cff5bcad944eb4a10c06e6c05140eb"
-          },
-          {
-            "url": "https://identity-admin-3.staging.cloud.sap:443/v3",
-            "interface": "admin",
-            "region": "staging",
-            "region_id": "staging",
-            "id": "5973c23918b8460886140c5ed6a5411b"
           }
         ],
         "type": "identity",
@@ -50,7 +36,7 @@
       {
         "endpoints": [
           {
-            "url": "https://maia.staging.cloud.sap:443/api/v1",
+            "url": "https://maia.local/api/v1",
             "interface": "public",
             "region": "staging",
             "region_id": "staging",

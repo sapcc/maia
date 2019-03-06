@@ -156,8 +156,9 @@ func TestAuthenticateRequest(t *testing.T) {
 	ks := setupTest(t)
 
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
-	req := httptest.NewRequest("GET", "http://maia/federate", nil)
+	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
 	req.SetBasicAuth("testuser@testdomain|testproject@testdomain", "testpw")
 	context, err := ks.AuthenticateRequest(req, false)
 
@@ -174,7 +175,7 @@ func TestAuthenticateRequest_token(t *testing.T) {
 
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
-	req := httptest.NewRequest("GET", "http://maia/federate", nil)
+	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
 	req.Header.Set("X-Auth-Token", userToken)
 	context, err := ks.AuthenticateRequest(req, false)
 
@@ -191,7 +192,7 @@ func TestAuthenticateRequest_failed(t *testing.T) {
 
 	gock.New(baseURL).Post("/v3/auth/tokens").Reply(http.StatusForbidden)
 
-	req := httptest.NewRequest("GET", "http://maia/federate", nil)
+	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
 	req.SetBasicAuth("testuser@testdomain|testproject@testdomain", "testpw")
 	_, err := ks.AuthenticateRequest(req, false)
 
@@ -209,8 +210,9 @@ func TestAuthenticateRequest_guessScope(t *testing.T) {
 	gock.New(baseURL).Get("/v3/role_assignments").MatchParams(map[string]string{"effective": "true", "user.id": "u00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser_roles.json").AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/projects/p00001").HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testproject.json").AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthScopeBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
-	req := httptest.NewRequest("GET", "http://maia/federate", nil)
+	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
 	req.SetBasicAuth("testuser@testdomain", "testpw")
 	context, err := ks.AuthenticateRequest(req, true)
 

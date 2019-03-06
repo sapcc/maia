@@ -24,7 +24,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/databus23/goslo.policy"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"strings"
+	"time"
+
+	policy "github.com/databus23/goslo.policy"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -32,11 +38,6 @@ import (
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"strings"
-	"time"
 )
 
 // utility functionality
@@ -57,7 +58,9 @@ type versionLinkData struct {
 }
 
 const authTokenCookieName = "X-Auth-Token"
+const userDomainCookieName = "X-User-Domain-Name"
 const authTokenHeader = "X-Auth-Token"
+const userDomainHeader = "X-User-Domain-Name"
 const authTokenExpiryHeader = "X-Auth-Token-Expiry"
 
 var policyEnforcer *policy.Enforcer
@@ -217,16 +220,26 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 
 	domain, domainSet := mux.Vars(req)["domain"]
 
-	// 1. check cookies or user-domain override via path prefix
+	// 1. check token cookies, then user-domain specified via path prefix or cookie
 	cookie, cookieErr := req.Cookie(authTokenCookieName)
 	cookieSet := false
 	if cookieErr == nil && cookie.Value != "" && req.Header.Get(authTokenHeader) == "" {
-		util.LogDebug("found cookie: %s", cookie.String())
+		util.LogDebug("found token cookie: %s...", cookie.String()[:1+len(cookie.String())/4])
 		req.Header.Set(authTokenHeader, cookie.Value)
 		cookieSet = true
-	} else if domainSet && isPlainBasicAuth(req) {
-		util.LogDebug("setting user domain via URL: %s", domain)
-		req.Header.Set("X-User-Domain-Name", domain)
+	} else if isPlainBasicAuth(req) {
+		// if username is not qualified and scoped we might need to cookie to interpret the username right
+		if !domainSet {
+			cookie, err := req.Cookie(userDomainCookieName)
+			if err == nil && cookie.Value != "" && req.Header.Get(userDomainHeader) == "" {
+				domain = cookie.Value
+				domainSet = true
+			}
+			util.LogDebug("setting user domain via cookie: %s", domain)
+		} else {
+			util.LogDebug("setting user domain via URL: %s", domain)
+		}
+		req.Header.Set(userDomainHeader, domain)
 	}
 
 	// 2. authenticate
@@ -309,7 +322,7 @@ func requestReauthentication(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", "Basic")
 }
 func setAuthCookies(req *http.Request, w http.ResponseWriter) {
-	util.LogDebug("Setting cookie: %s", req.Header.Get(authTokenHeader))
+	util.LogDebug("Setting cookie: %s...", req.Header.Get(authTokenHeader)[1:len(req.Header.Get(authTokenHeader))/4])
 	if req.Header.Get(authTokenHeader) == "" {
 		util.LogWarning("X-Auth-Token Header is empty!?")
 		return
@@ -320,8 +333,13 @@ func setAuthCookies(req *http.Request, w http.ResponseWriter) {
 		util.LogWarning("Incompatible token format for expiry data: %s", expiryStr)
 		expiry = time.Now().UTC().Add(viper.GetDuration("keystone.token_cache_time"))
 	}
+	// set token cookie
 	http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: req.Header.Get(authTokenHeader),
 		Expires: expiry.UTC(), Secure: false})
+	// remember domain as cookie so that reauthentication during Prometheus API calls (no domain prefix)
+	// works with plain username and password
+	http.SetCookie(w, &http.Cookie{Name: userDomainCookieName, Path: "/", Value: req.Header.Get(userDomainHeader),
+		MaxAge: 60 * 60 * 24, Secure: false})
 }
 
 func authorize(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), guessScope bool, rule string) func(w http.ResponseWriter, req *http.Request) {
