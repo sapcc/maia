@@ -110,7 +110,10 @@ func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
 		redirectToRootPage(w, r)
 		return
 	}
-	newPath := "/" + domain + "/graph?" + r.URL.RawQuery // keep the query part since this is where the token might go
+	newPath := "/" + domain + "/graph"
+	if r.URL.RawQuery != "" {
+		newPath += "?" + r.URL.RawQuery // keep the query part since this is where the token might go
+	}
 	util.LogDebug("Redirecting %s to %s", r.URL.Path, newPath)
 	http.Redirect(w, r, newPath, http.StatusFound)
 }
