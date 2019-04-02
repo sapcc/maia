@@ -3,6 +3,7 @@ sudo: false
 
 go:
     - 1.11
+    - 1.12
 
 install:
     - go get -u github.com/Masterminds/glide
