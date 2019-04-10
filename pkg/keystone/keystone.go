@@ -526,7 +526,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 		endpointURL: endpointURL,
 	}
 
-	util.LogDebug("add token cache entry for token %s... for scope %+v", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope)
+	util.LogDebug("add token cache entry for token %s... for scope %+v", tokenData.Token[:1+len(tokenData.Token)/4], authOpts.Scope)
 	d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
 	return &context, endpointURL, nil
 }
