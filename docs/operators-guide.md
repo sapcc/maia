@@ -165,7 +165,13 @@ controlled VCenter.
 SNMP variables into labels. Since most of the SNMP-enabled devices are shared, only a few metrics can be mapped to
 OpenStack projects or domains.
 
-# Notes on Scalability
+## Monitoring
+
+Maia offers a Prometheus scrape endpoint at the usual `/metrics` path.
+
+This endpoint includes documentation and type-information for each metric. Refer to the Prometheus web site for more information on [naming conventions](https://prometheus.io/docs/practices/naming/) and [metric types](https://prometheus.io/docs/concepts/metric_types).
+
+## Notes on Scalability
 
 Currently Maia only supports a single Prometheus backend as data source. Therefore scalability has to happen behind the
 Prometheus that is used by Maia.
