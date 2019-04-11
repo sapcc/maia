@@ -33,8 +33,22 @@ generate: dependencies FORCE
 
 build: generate FORCE
 	# build maia
-	go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external' 
+	go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external'
 	go install $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' '$(PKG)'
+
+build/platforms: build
+	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.12-stretch env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
+ifeq ($(OS), windows)
+	env CGO_ENABLED=1 go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external'
+else
+	echo "Windows build only supported on Windows"
+endif
+ifeq ($(OS), Darwin)
+	env CGO_ENABLED=1 go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external'
+else
+	echo "OS X build only supported on OS X"
+endif
+	chmod +x maia_*_amd64
 
 # down below, I need to substitute spaces with commas; because of the syntax,
 # I have to get these separators from variables
