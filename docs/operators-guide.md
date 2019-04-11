@@ -169,7 +169,7 @@ OpenStack projects or domains.
 
 Maia offers a Prometheus scrape endpoint at the usual `/metrics` path.
 
-This endpoint includes documentation and type-information for each metric. The Prometheus web site offers good documentation on [naming conventions](https://prometheus.io/docs/practices/naming/) and [metric types](https://prometheus.io/docs/concepts/metric_types).
+This endpoint includes documentation and type-information for each metric. Refer to the Prometheus web site for more information on [naming conventions](https://prometheus.io/docs/practices/naming/) and [metric types](https://prometheus.io/docs/concepts/metric_types).
 
 ## Notes on Scalability
 
