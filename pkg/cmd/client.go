@@ -47,6 +47,7 @@ const (
 var maiaURL string
 var selector string
 var auth = gophercloud.AuthOptions{Scope: new(gophercloud.AuthScope)}
+var authType string
 var scopedDomain string
 var outputFormat string
 var jsonTemplate string
@@ -78,8 +79,25 @@ func fetchToken() {
 	if auth.Password == "$OS_PASSWORD" {
 		auth.Password = os.Getenv("OS_PASSWORD")
 	}
-	if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
-		panic(fmt.Errorf("You must at least specify --os-username / --os-user-id and --os-password"))
+
+	if authType == "password" {
+		auth.TokenID = ""
+	} else if authType == "token" {
+		auth.Password = ""
+		auth.UserID = ""
+		auth.Username = ""
+		auth.DomainID = ""
+		auth.DomainName = ""
+	}
+
+	if auth.TokenID == "" {
+		if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
+			panic(fmt.Errorf("You must specify either --os-token or provide --os-username / --os-user-id and --os-password"))
+		}
+	}
+
+	if auth.TokenID != "" && auth.Password != "" {
+		panic(fmt.Errorf("--os-token and --os-password listed, can only use one. Setting --os-auth-type sets which authentication type to use"))
 	}
 	context, url, err := keystoneInstance().Authenticate(auth)
 	if err != nil {
@@ -606,6 +624,7 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&scopedDomain, "os-domain-name", os.Getenv("OS_DOMAIN_NAME"), "OpenStack domain name to scope to")
 	RootCmd.PersistentFlags().StringVar(&auth.Scope.DomainID, "os-domain-id", os.Getenv("OS_DOMAIN_ID"), "OpenStack domain ID to scope to")
 	RootCmd.PersistentFlags().StringVar(&auth.TokenID, "os-token", os.Getenv("OS_TOKEN"), "OpenStack keystone token")
+	RootCmd.PersistentFlags().StringVar(&authType, "os-auth-type", os.Getenv("OS_AUTH_TYPE"), "OpenStack authentication type ('basic' or 'token')")
 
 	RootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", "", "Specify output format: table, json, template or value")
 	RootCmd.PersistentFlags().StringVarP(&columns, "columns", "c", "", "Specify the columns to print (comma-separated; only when --format value is set)")
