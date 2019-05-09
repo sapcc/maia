@@ -1,5 +1,5 @@
 hash: 41b51e50a68d40aec31f2a199a0545e4375f8a96576c1adb6368c03870995c11
-updated: 2019-05-08T16:35:18.065727+02:00
+updated: 2019-05-09T12:44:09.246928+02:00
 imports:
 - name: github.com/alecthomas/template
   version: a0175ee3bccc567396460bf5acd36800cb10c49c
@@ -16,7 +16,7 @@ imports:
 - name: github.com/fsnotify/fsnotify
   version: 1485a34d5d5723fea214f5710708e19a831720e4
 - name: github.com/golang/mock
-  version: 937870445b8bddd7f05ea90e81c58ebe83681534
+  version: 9fa652df1129bef0e734c9cf9bf6dbae9ef3b9fa
   subpackages:
   - gomock
 - name: github.com/golang/protobuf
@@ -26,7 +26,7 @@ imports:
 - name: github.com/golang/snappy
   version: 2a8bb927dd31d8daada140a5d09578521ce5c36a
 - name: github.com/gophercloud/gophercloud
-  version: 6f9faf57fddcafd31b69d28122dce7bb5ce3bc5c
+  version: 7892efa714f10951c5483a28c7471d8051b12975
   subpackages:
   - internal
   - openstack
@@ -150,7 +150,7 @@ imports:
   subpackages:
   - context
 - name: golang.org/x/sys
-  version: 12bbe5a7a5209180b72cc7e3ed9da40442fe3246
+  version: 2d0786266e9cd132da844109aa05016f11f3df28
   subpackages:
   - unix
   - windows
