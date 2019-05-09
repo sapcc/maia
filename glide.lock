@@ -1,5 +1,5 @@
-hash: 9fdbeca9ae1cd09f8ce8cb1bd7d15611805202c7f1a385aee257ee46445b726b
-updated: 2019-04-11T09:21:16.111758+02:00
+hash: 41b51e50a68d40aec31f2a199a0545e4375f8a96576c1adb6368c03870995c11
+updated: 2019-05-08T16:35:18.065727+02:00
 imports:
 - name: github.com/alecthomas/template
   version: a0175ee3bccc567396460bf5acd36800cb10c49c
@@ -8,7 +8,7 @@ imports:
 - name: github.com/alecthomas/units
   version: 2efee857e7cfd4f3d0138cc3cbb1b4966962b93a
 - name: github.com/beorn7/perks
-  version: 3a771d992973f24aa725d07868b467d1ddfceafb
+  version: 4b2b341e8d7715fae06375aa633dbb6e91b3fb46
   subpackages:
   - quantile
 - name: github.com/databus23/goslo.policy
@@ -16,7 +16,7 @@ imports:
 - name: github.com/fsnotify/fsnotify
   version: 1485a34d5d5723fea214f5710708e19a831720e4
 - name: github.com/golang/mock
-  version: 73dc87cad333b55a02058f4b3d872dbbafddc2b0
+  version: 937870445b8bddd7f05ea90e81c58ebe83681534
   subpackages:
   - gomock
 - name: github.com/golang/protobuf
@@ -26,7 +26,7 @@ imports:
 - name: github.com/golang/snappy
   version: 2a8bb927dd31d8daada140a5d09578521ce5c36a
 - name: github.com/gophercloud/gophercloud
-  version: 2c55d17f707cc8333ca4f49690cb2970d12a25f6
+  version: 6f9faf57fddcafd31b69d28122dce7bb5ce3bc5c
   subpackages:
   - internal
   - openstack
@@ -42,7 +42,7 @@ imports:
 - name: github.com/gorilla/mux
   version: c5c6c98bc25355028a63748a498942a6398ccd22
 - name: github.com/hashicorp/hcl
-  version: 65a6292f0157eff210d03ed1bf6c59b190b8b906
+  version: 99e2f22d1c94b272184d97dd9d252866409100ab
   subpackages:
   - hcl/ast
   - hcl/parser
@@ -56,7 +56,7 @@ imports:
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/jteeuwen/go-bindata
-  version: 6025e8de665b31fa74ab1a66f2cddd8c0abf887e
+  version: bbd0c6e271208dce66d8fda4bc536453cd27fc4a
 - name: github.com/konsorten/go-windows-terminal-sequences
   version: f55edac94c9bbba5d6182a4be46d86a2c9b5b50e
 - name: github.com/magiconair/properties
@@ -74,9 +74,9 @@ imports:
   subpackages:
   - log
 - name: github.com/patrickmn/go-cache
-  version: 5633e0862627c011927fa39556acae8b1f1df58a
+  version: a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0
 - name: github.com/pelletier/go-toml
-  version: d95bfe020e0c72df368b4368a4bf61d95eb4416c
+  version: 728039f679cbcd4f6a54e080d2219a4c4928c546
 - name: github.com/prometheus/client_golang
   version: 94ff84a9a6ebb5e6eb9172897c221a64df3443bc
   subpackages:
@@ -88,14 +88,16 @@ imports:
   subpackages:
   - go
 - name: github.com/prometheus/common
-  version: a82f4c12f983cc2649298185f296632953e50d3e
+  version: 1ba88736f028e37bc17328369e94a537ae9e0234
   subpackages:
   - expfmt
   - internal/bitbucket.org/ww/goautoneg
   - log
   - model
 - name: github.com/prometheus/procfs
-  version: ea9eea63887261e4d8ed8315f4078e88d540c725
+  version: 5867b95ac084bbfee6ea16595c4e05ab009021da
+  subpackages:
+  - internal/fs
 - name: github.com/prometheus/prometheus
   version: 5211b96d4d1291c3dd1a569f711d3b301b635ecb
   subpackages:
@@ -113,7 +115,7 @@ imports:
 - name: github.com/rs/cors
   version: 76f58f330d76a55c5badc74f6212e8a15e742c77
 - name: github.com/sirupsen/logrus
-  version: 9b3cdde74fbe9443d704467498a7dcb61a79de9b
+  version: 5521996833c095f5ac75d99687cef8ad344ded12
 - name: github.com/spf13/afero
   version: 588a75ec4f32903aa5e39a2619ba6a4631e28424
   subpackages:
@@ -121,13 +123,13 @@ imports:
 - name: github.com/spf13/cast
   version: 8c9545af88b134710ab1cd196795e7f2388358d7
 - name: github.com/spf13/cobra
-  version: 67fc4837d267bc9bfd6e47f77783fcc3dffc68de
+  version: ef82de70bb3f60c65fb8eebacbb2d122ef517385
 - name: github.com/spf13/jwalterweatherman
   version: 94f6ae3ed3bceceafa716478c5fbf8d29ca601a1
 - name: github.com/spf13/pflag
   version: 24fa6976df40757dce6aea913e7b81ade90530e1
 - name: github.com/spf13/viper
-  version: 7a605a50e69cd1ea431c4a1e6eebe9b287ef6de4
+  version: 9e56dacc08fbbf8c9ee2dbc717553c758ce42bc9
 - name: github.com/syndtr/goleveldb
   version: c3a204f8e96543bb0cc090385c001078f184fc46
   subpackages:
@@ -144,18 +146,18 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: golang.org/x/net
-  version: eb5bcb51f2a31c7d5141d810b70815c05d9c9146
+  version: f4e77d36d62c17c2336347bb2670ddbd02d092b7
   subpackages:
   - context
 - name: golang.org/x/sys
-  version: 0ad05ae3009d6413d3363aa09b350b2ec37daf09
+  version: 12bbe5a7a5209180b72cc7e3ed9da40442fe3246
   subpackages:
   - unix
   - windows
   - windows/registry
   - windows/svc/eventlog
 - name: golang.org/x/text
-  version: f4905fbd45b6790792202848439271c74074bbfd
+  version: 342b2e1fbaa52c93f31447ad2c6abc048c63e475
   subpackages:
   - transform
   - unicode/norm
