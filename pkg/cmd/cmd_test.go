@@ -74,6 +74,48 @@ func expectAuth(keystoneMock *keystone.MockDriver) {
 	fetchToken()
 }
 
+// Authentication tests
+
+func ExampleAuthWithToken() {
+	// set mandatory parameters
+	auth.IdentityEndpoint = ""
+	auth.TokenID = "ABC"
+	auth.Username = "username"
+	auth.UserID = "user_id"
+	auth.Password = "testwd"
+	//authType = "token"
+	auth.Scope.ProjectID = "12345"
+	outputFormat = ""
+	starttime = ""
+	endtime = ""
+	stepsize = 0
+	columns = ""
+
+	t := testReporter{}
+	ctrl := gomock.NewController(&t)
+	defer ctrl.Finish()
+
+	// create dummy keystone and storage mock
+	keystoneMock := keystone.NewMockDriver(ctrl)
+	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{
+		IdentityEndpoint: auth.IdentityEndpoint,
+		Username:         auth.Username,
+		UserID:           auth.UserID,
+		Password:         auth.Password,
+		DomainName:       auth.DomainName,
+		Scope:            auth.Scope,
+	}).Return(&policy.Context{
+		Request: map[string]string{
+			"user_id":    auth.UserID,
+			"project_id": auth.Scope.ProjectID,
+			"password":   auth.Password},
+		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
+		Roles: []string{"monitoring_viewer"},
+	}, "http://localhost:9091", nil)
+	fetchToken()
+
+}
+
 // HTTP based tests
 
 func ExampleSnapshot() {
