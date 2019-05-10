@@ -33,7 +33,11 @@ If you don't use OpenStack, you can still use Maia CLI as a feature-complete she
 
 Maia can be built with Go 1.11 and 1.12. Older versions are not supported. Newer versions are not tested.
 
-Via Makefile
+## Binary Releases
+
+Binary releases for Linux and MacOS can be downloaded from the GitHub _releases_ area.
+
+## Installation with make
 
 * `make` to compile and run the binaries from the `build/` directory
 * `make && make install` to install to `/usr`
