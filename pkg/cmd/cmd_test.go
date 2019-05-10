@@ -21,6 +21,7 @@ package cmd
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	policy "github.com/databus23/goslo.policy"
@@ -76,7 +77,20 @@ func expectAuth(keystoneMock *keystone.MockDriver) {
 
 // Authentication tests
 
-func ExampleAuthWithToken() {
+func TestAuthenticate_authWithToken(t *testing.T) {
+	passed := false
+
+	defer func() {
+		if r := recover(); r != nil {
+			// test passes
+		}
+		passed = true
+	}()
+
+	tr := testReporter{}
+	ctrl := gomock.NewController(&tr)
+	defer ctrl.Finish()
+
 	// set mandatory parameters
 	auth.IdentityEndpoint = ""
 	auth.TokenID = "ABC"
@@ -91,12 +105,9 @@ func ExampleAuthWithToken() {
 	stepsize = 0
 	columns = ""
 
-	t := testReporter{}
-	ctrl := gomock.NewController(&t)
-	defer ctrl.Finish()
-
 	// create dummy keystone and storage mock
 	keystoneMock := keystone.NewMockDriver(ctrl)
+	setKeystoneInstance(keystoneMock)
 	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{
 		IdentityEndpoint: auth.IdentityEndpoint,
 		Username:         auth.Username,
@@ -112,8 +123,12 @@ func ExampleAuthWithToken() {
 		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
 		Roles: []string{"monitoring_viewer"},
 	}, "http://localhost:9091", nil)
+
 	fetchToken()
 
+	if !passed {
+		t.Fail()
+	}
 }
 
 // HTTP based tests
