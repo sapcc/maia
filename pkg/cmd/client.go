@@ -320,7 +320,13 @@ func printQueryResultAsTable(body []byte) {
 			}
 			rows = append(rows, columnValues)
 		}
-		allColumns = append(makeColumns(set), makeColumns(tsSet)...)
+		// have columns be set by user explicitly?
+		if columns != "" {
+			allColumns = strings.Split(columns, ",")
+		} else {
+			allColumns = makeColumns(set)
+		}
+		allColumns = append(allColumns, makeColumns(tsSet)...)
 	case model.ValVector:
 		matrix := valueObject.(model.Vector)
 		set := buildColumnSet(matrix)
@@ -334,12 +340,19 @@ func printQueryResultAsTable(body []byte) {
 			}
 			rows = append(rows, columnValues)
 		}
-		allColumns = append(makeColumns(set), []string{timestampKey, valueKey}...)
+		// have columns be set by user explicitly?
+		if columns != "" {
+			allColumns = strings.Split(columns, ",")
+		} else {
+			allColumns = makeColumns(set)
+		}
+		allColumns = append(allColumns, []string{timestampKey, valueKey}...)
 	case model.ValScalar:
 		scalarValue := valueObject.(*model.Scalar)
 		allColumns = []string{timestampKey, valueKey}
 		rows = []map[string]string{{timestampKey: scalarValue.Timestamp.Time().In(tzLocation).Format(time.RFC3339Nano), valueKey: scalarValue.String()}}
 	}
+
 	printHeader(allColumns)
 	for _, row := range rows {
 		printRow(allColumns, row)

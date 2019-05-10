@@ -277,6 +277,31 @@ func ExampleQuery_table() {
 	// 2017-07-03T07:26:23.997Z 0
 }
 
+func ExampleQuery_tableColumns() {
+	t := testReporter{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	keystoneMock, storageMock := setupTest(ctrl)
+
+	timestamp = "2019-05-09T12:00:10.724Z"
+	timeoutStr := "1440s"
+	timeout, _ = time.ParseDuration(timeoutStr)
+	query := "limes_domain_quota"
+	outputFormat = "TaBle"
+	columns = "domain"
+
+	expectAuth(keystoneMock)
+	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query2.json"), nil)
+
+	queryCmd.RunE(queryCmd, []string{query})
+
+	// Output:
+	// domain __timestamp__ __value__
+	// monsoon3 2019-05-09T12:00:10.724Z 54975581388800
+	// monsoon3 2019-05-09T12:00:10.724Z 11240
+}
+
 func ExampleQuery_rangeJSON() {
 	t := testReporter{}
 	ctrl := gomock.NewController(t)
@@ -371,6 +396,6 @@ func ExampleQuery_rangeSeriesTable() {
 	queryCmd.RunE(queryCmd, []string{query})
 
 	// Output:
-	// check instance region 2017-07-22T20:10:00Z 2017-07-22T20:15:00Z 2017-07-22T20:20:00Z
-	// keystone 100.64.0.102:9102 staging 0 1 0
+	// region check instance 2017-07-22T20:10:00Z 2017-07-22T20:15:00Z 2017-07-22T20:20:00Z
+	// staging keystone 100.64.0.102:9102 0 1 0
 }
