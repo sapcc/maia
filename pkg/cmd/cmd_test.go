@@ -443,10 +443,11 @@ func Test_Auth(t *testing.T) {
 		password    string
 		expectpanic bool
 	}{
-		{"tokenwithauthtype", "abc", "token", "", "", "", false},
-		{"tokenwithoutauthtype", "abc", "token", "", "", "", false},
-		{"tokenwithpasswithauthtype", "abc", "token", "testname", "testid", "testwd", false},
-		{"tokenwithpasswithoutauthtype", "abc", "", "testname", "testid", "testwd", true},
+		{"tokenwithauthtype", "ABC", "token", "", "", "", false},
+		{"tokenwithoutauthtype", "ABC", "token", "", "", "", false},
+		{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", false},
+		{"tokenwithpasswithoutauthtype", "ABC", "", "testname", "testid", "testwd", true},
+		{"passwithauthtype", "", "password", "testname", "testid", "testwd", false},
 	}
 
 	for _, tc := range tt {
@@ -465,9 +466,9 @@ func authentication(tokenid, authtype, username, userid, password string) (panic
 
 	defer func() {
 		if r := recover(); r != nil {
-			// test passes
+			paniced = true
 		}
-		paniced = true
+
 	}()
 
 	tr := testReporter{}
@@ -476,11 +477,11 @@ func authentication(tokenid, authtype, username, userid, password string) (panic
 
 	// set mandatory parameters
 	auth.IdentityEndpoint = ""
-	auth.TokenID = "ABC"
-	auth.Username = "username"
-	auth.UserID = "user_id"
-	auth.Password = "testwd"
-	//authType = "token"
+	auth.TokenID = tokenid
+	auth.Username = username
+	auth.UserID = userid
+	auth.Password = password
+	authType = authtype
 	auth.Scope.ProjectID = "12345"
 	outputFormat = ""
 	starttime = ""
