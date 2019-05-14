@@ -1,5 +1,5 @@
 hash: 41b51e50a68d40aec31f2a199a0545e4375f8a96576c1adb6368c03870995c11
-updated: 2019-05-09T12:44:09.246928+02:00
+updated: 2019-05-14T09:48:57.700905+02:00
 imports:
 - name: github.com/alecthomas/template
   version: a0175ee3bccc567396460bf5acd36800cb10c49c
@@ -16,7 +16,7 @@ imports:
 - name: github.com/fsnotify/fsnotify
   version: 1485a34d5d5723fea214f5710708e19a831720e4
 - name: github.com/golang/mock
-  version: 9fa652df1129bef0e734c9cf9bf6dbae9ef3b9fa
+  version: d74b93584564161b2de771089ee697f07d8bd5b5
   subpackages:
   - gomock
 - name: github.com/golang/protobuf
@@ -60,7 +60,7 @@ imports:
 - name: github.com/konsorten/go-windows-terminal-sequences
   version: f55edac94c9bbba5d6182a4be46d86a2c9b5b50e
 - name: github.com/magiconair/properties
-  version: 7757cc9fdb852f7579b24170bcacda2c7471bb6a
+  version: de8848e004dd33dc07a2947b3d76f618a7fc7ef1
 - name: github.com/matttproud/golang_protobuf_extensions
   version: c182affec369e30f25d3eb8cd8a478dee585ae7d
   subpackages:
@@ -115,7 +115,7 @@ imports:
 - name: github.com/rs/cors
   version: 76f58f330d76a55c5badc74f6212e8a15e742c77
 - name: github.com/sirupsen/logrus
-  version: 5521996833c095f5ac75d99687cef8ad344ded12
+  version: f0375eb5b588893ff556c71dee32d98e57a9b777
 - name: github.com/spf13/afero
   version: 588a75ec4f32903aa5e39a2619ba6a4631e28424
   subpackages:
@@ -146,11 +146,11 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: golang.org/x/net
-  version: f4e77d36d62c17c2336347bb2670ddbd02d092b7
+  version: a4d6f7feada510cc50e69a37b484cb0fdc6b7876
   subpackages:
   - context
 - name: golang.org/x/sys
-  version: 2d0786266e9cd132da844109aa05016f11f3df28
+  version: a5b02f93d862f065920dd6a40dddc66b60d0dec4
   subpackages:
   - unix
   - windows
