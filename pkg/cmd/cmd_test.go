@@ -404,60 +404,6 @@ func ExampleQuery_rangeSeriesTable() {
 
 // Authentication tests
 
-func TestAuthenticate_authWithTokenWithoutAuthtype(t *testing.T) {
-	passed := false
-
-	defer func() {
-		if r := recover(); r != nil {
-			// test passes
-		}
-		passed = true
-	}()
-
-	tr := testReporter{}
-	ctrl := gomock.NewController(&tr)
-	defer ctrl.Finish()
-
-	// set mandatory parameters
-	auth.IdentityEndpoint = ""
-	//auth.TokenID = "ABC"
-	auth.Username = "username"
-	auth.UserID = "user_id"
-	auth.Password = "testwd"
-	//authType = "token"
-	auth.Scope.ProjectID = "12345"
-	outputFormat = ""
-	starttime = ""
-	endtime = ""
-	stepsize = 0
-	columns = ""
-
-	// create dummy keystone and storage mock
-	keystoneMock := keystone.NewMockDriver(ctrl)
-	setKeystoneInstance(keystoneMock)
-	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{
-		IdentityEndpoint: auth.IdentityEndpoint,
-		Username:         auth.Username,
-		UserID:           auth.UserID,
-		Password:         auth.Password,
-		DomainName:       auth.DomainName,
-		Scope:            auth.Scope,
-	}).Return(&policy.Context{
-		Request: map[string]string{
-			"user_id":    auth.UserID,
-			"project_id": auth.Scope.ProjectID,
-			"password":   auth.Password},
-		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
-		Roles: []string{"monitoring_viewer"},
-	}, "http://localhost:9091", nil)
-
-	fetchToken()
-
-	if !passed {
-		t.Fail()
-	}
-}
-
 func Test_Auth(t *testing.T) {
 	tt := []struct {
 		name        string
@@ -470,7 +416,7 @@ func Test_Auth(t *testing.T) {
 	}{
 		{"passwithauthtype", "", "password", "username", "user_id", "testwd", false},
 		{"passwithoutauthtype", "", "", "testname", "testid", "testwd", false},
-		//{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", false},
+		{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", false},
 		{"tokenwithpasswithoutauthtype", "ABC", "", "testname", "testid", "testwd", true},
 	}
 
@@ -478,7 +424,7 @@ func Test_Auth(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			paniced := authentication(tc.tokenid, tc.authtype, tc.username, tc.userid, tc.password)
 			if paniced != tc.expectpanic {
-				t.Errorf("Panic does not match desired result for test: %s", tc.name)
+				t.Errorf("Panic does not match desired result for test: %v", tc)
 			}
 		})
 	}
@@ -505,13 +451,17 @@ func authentication(tokenid, authtype, username, userid, password string) (panic
 	auth.Username = username
 	auth.UserID = userid
 	auth.Password = password
-	authType = authtype
 	auth.Scope.ProjectID = "12345"
+
+	tzLocation = time.UTC
+	authType = authtype
 	outputFormat = ""
 	starttime = ""
 	endtime = ""
 	stepsize = 0
 	columns = ""
+	promURL = ""
+	maiaURL = ""
 
 	// create dummy keystone and storage mock
 	keystoneMock := keystone.NewMockDriver(ctrl)
@@ -523,11 +473,11 @@ func authentication(tokenid, authtype, username, userid, password string) (panic
 		Password:         auth.Password,
 		DomainName:       auth.DomainName,
 		Scope:            auth.Scope,
+		TokenID:          auth.TokenID,
 	}).Return(&policy.Context{
 		Request: map[string]string{
 			"user_id":    auth.UserID,
-			"project_id": auth.Scope.ProjectID,
-			"password":   auth.Password},
+			"project_id": auth.Scope.ProjectID},
 		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
 		Roles: []string{"monitoring_viewer"},
 	}, "http://localhost:9091", nil)
