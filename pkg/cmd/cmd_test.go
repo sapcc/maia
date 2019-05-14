@@ -395,7 +395,7 @@ func TestAuthenticate_authWithTokenWithoutAuthtype(t *testing.T) {
 
 	// set mandatory parameters
 	auth.IdentityEndpoint = ""
-	auth.TokenID = "ABC"
+	//auth.TokenID = "ABC"
 	auth.Username = "username"
 	auth.UserID = "user_id"
 	auth.Password = "testwd"
@@ -443,11 +443,10 @@ func Test_Auth(t *testing.T) {
 		password    string
 		expectpanic bool
 	}{
-		{"tokenwithauthtype", "ABC", "token", "", "", "", false},
-		{"tokenwithoutauthtype", "ABC", "token", "", "", "", false},
-		{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", false},
+		{"passwithauthtype", "", "password", "username", "user_id", "testwd", false},
+		{"passwithoutauthtype", "", "", "testname", "testid", "testwd", false},
+		//{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", false},
 		{"tokenwithpasswithoutauthtype", "ABC", "", "testname", "testid", "testwd", true},
-		{"passwithauthtype", "", "password", "testname", "testid", "testwd", false},
 	}
 
 	for _, tc := range tt {
@@ -507,7 +506,6 @@ func authentication(tokenid, authtype, username, userid, password string) (panic
 		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
 		Roles: []string{"monitoring_viewer"},
 	}, "http://localhost:9091", nil)
-
 	fetchToken()
 
 	return paniced
