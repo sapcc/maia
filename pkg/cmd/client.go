@@ -47,6 +47,7 @@ const (
 var maiaURL string
 var selector string
 var auth = gophercloud.AuthOptions{Scope: new(gophercloud.AuthScope)}
+var authType string
 var scopedDomain string
 var outputFormat string
 var jsonTemplate string
@@ -71,15 +72,38 @@ func fetchToken() {
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
 	}
-	// authenticate calls to Maia
-	if auth.TokenID != "" && maiaURL != "" {
-		return
-	}
+
+	// expand those default values that are passed indirectly to avoid they are shown when calling maia --help
 	if auth.Password == "$OS_PASSWORD" {
 		auth.Password = os.Getenv("OS_PASSWORD")
 	}
-	if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
-		panic(fmt.Errorf("You must at least specify --os-username / --os-user-id and --os-password"))
+	if auth.TokenID == "$OS_TOKEN" {
+		auth.TokenID = os.Getenv("OS_TOKEN")
+	}
+
+	// authenticate calls to Maia directly
+	if auth.TokenID != "" && maiaURL != "" {
+		return
+	}
+
+	if authType == "password" {
+		auth.TokenID = ""
+	} else if authType == "token" {
+		auth.Password = ""
+		auth.UserID = ""
+		auth.Username = ""
+		auth.DomainID = ""
+		auth.DomainName = ""
+	}
+
+	if auth.TokenID == "" {
+		if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
+			panic(fmt.Errorf("You must specify either --os-token or provide --os-username / --os-user-id and --os-password"))
+		}
+	}
+
+	if auth.TokenID != "" && auth.Password != "" {
+		panic(fmt.Errorf("--os-token and --os-password listed, can only use one. Setting --os-auth-type sets which authentication type to use"))
 	}
 	context, url, err := keystoneInstance().Authenticate(auth)
 	if err != nil {
@@ -100,7 +124,7 @@ func storageInstance() storage.Driver {
 			fetchToken()
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
 		} else {
-			panic(fmt.Errorf("Either --os-auth-url or --prometheus-url need to be specified (or OS_AUTH_URL resp. MAIA_PROMETHEUS_URL)"))
+			panic(fmt.Errorf("Either --os-auth-url or --prometheus-url need to be specified"))
 		}
 	}
 
@@ -610,7 +634,7 @@ func init() {
 
 	RootCmd.PersistentFlags().StringVar(&auth.Username, "os-username", os.Getenv("OS_USERNAME"), "OpenStack Username")
 	RootCmd.PersistentFlags().StringVar(&auth.UserID, "os-user-id", os.Getenv("OS_USER_ID"), "OpenStack Username")
-	RootCmd.PersistentFlags().StringVar(&auth.Password, "os-password", "$OS_PASSWORD", "OpenStack Password")
+	RootCmd.PersistentFlags().StringVar(&auth.Password, "os-password", "$OS_PASSWORD", "OpenStack Password") // avoid showing contents of $OS_PASSWORD as default value
 	RootCmd.PersistentFlags().StringVar(&auth.DomainName, "os-user-domain-name", os.Getenv("OS_USER_DOMAIN_NAME"), "OpenStack User's domain name")
 	RootCmd.PersistentFlags().StringVar(&auth.DomainID, "os-user-domain-id", os.Getenv("OS_USER_DOMAIN_ID"), "OpenStack User's domain ID")
 	RootCmd.PersistentFlags().StringVar(&auth.Scope.ProjectName, "os-project-name", os.Getenv("OS_PROJECT_NAME"), "OpenStack Project name to scope to")
@@ -618,7 +642,8 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&auth.Scope.DomainName, "os-project-domain-name", os.Getenv("OS_PROJECT_DOMAIN_NAME"), "OpenStack Project's domain name")
 	RootCmd.PersistentFlags().StringVar(&scopedDomain, "os-domain-name", os.Getenv("OS_DOMAIN_NAME"), "OpenStack domain name to scope to")
 	RootCmd.PersistentFlags().StringVar(&auth.Scope.DomainID, "os-domain-id", os.Getenv("OS_DOMAIN_ID"), "OpenStack domain ID to scope to")
-	RootCmd.PersistentFlags().StringVar(&auth.TokenID, "os-token", os.Getenv("OS_TOKEN"), "OpenStack keystone token")
+	RootCmd.PersistentFlags().StringVar(&auth.TokenID, "os-token", "$OS_TOKEN", "OpenStack keystone token") // avoid showing contents of $OS_TOKEN as default value
+	RootCmd.PersistentFlags().StringVar(&authType, "os-auth-type", os.Getenv("OS_AUTH_TYPE"), "OpenStack authentication type ('password' or 'token')")
 
 	RootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", "", "Specify output format: table, json, template or value")
 	RootCmd.PersistentFlags().StringVarP(&columns, "columns", "c", "", "Specify the columns to print (comma-separated; only when --format value is set)")

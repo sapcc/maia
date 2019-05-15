@@ -21,6 +21,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"testing"
 	"time"
 
 	policy "github.com/databus23/goslo.policy"
@@ -44,22 +46,29 @@ func (r testReporter) Fatalf(format string, args ...interface{}) {
 }
 
 func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.MockDriver) {
-	// set mandatory parameters
-	auth.IdentityEndpoint = ""
-	auth.Username = "username"
-	auth.UserID = "user_id"
-	auth.Password = "testwd"
-	auth.Scope.ProjectID = "12345"
+	// simulate command parameters
+	authType = ""
 	outputFormat = ""
 	starttime = ""
 	endtime = ""
+	tzLocation = time.UTC
 	stepsize = 0
 	columns = ""
+	maiaURL = ""
+	promURL = ""
+
+	// set mandatory parameters
+	auth = gophercloud.AuthOptions{
+		IdentityEndpoint: "",
+		Username:         "username",
+		UserID:           "user_id",
+		Password:         "testwd",
+		Scope: &gophercloud.AuthScope{
+			ProjectID: "12345"}}
 
 	// create dummy keystone and storage mock
 	keystone := keystone.NewMockDriver(controller)
 	storage := storage.NewMockDriver(controller)
-	tzLocation = time.UTC
 
 	setKeystoneInstance(keystone)
 	setStorageInstance(storage)
@@ -201,7 +210,6 @@ func ExampleMetricNames_values() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	maiaURL = "http://localhost:9091"
 	keystoneMock, storageMock := setupTest(ctrl)
 
 	outputFormat = "valuE"
@@ -398,4 +406,94 @@ func ExampleQuery_rangeSeriesTable() {
 	// Output:
 	// region check instance 2017-07-22T20:10:00Z 2017-07-22T20:15:00Z 2017-07-22T20:20:00Z
 	// staging keystone 100.64.0.102:9102 0 1 0
+}
+
+// Authentication tests
+
+func Test_Auth(t *testing.T) {
+	tt := []struct {
+		name        string
+		tokenid     string
+		authtype    string
+		username    string
+		userid      string
+		password    string
+		expectpanic bool
+	}{
+		{"passwithauthtype", "", "password", "testname", "testid", "testwd", false},
+		{"passwithoutauthtype", "", "", "testname", "testid", "testwd", false},
+		{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", false},
+		{"tokenwithpasswithoutauthtype", "ABC", "", "testname", "testid", "testwd", true},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			paniced := authentication(tc.tokenid, tc.authtype, tc.username, tc.userid, tc.password)
+			if paniced != tc.expectpanic {
+				t.Errorf("Panic does not match desired result for test: %v", tc)
+			}
+		})
+	}
+
+}
+
+func authentication(tokenid, authtype, username, userid, password string) (paniced bool) {
+	paniced = false
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintln(os.Stderr, r)
+			paniced = true
+		}
+
+	}()
+
+	tr := testReporter{}
+	ctrl := gomock.NewController(&tr)
+	defer ctrl.Finish()
+
+	// simulate command parameters
+	authType = authtype
+	outputFormat = ""
+	starttime = ""
+	endtime = ""
+	tzLocation = time.UTC
+	stepsize = 0
+	columns = ""
+	maiaURL = ""
+	promURL = ""
+
+	// set mandatory parameters
+	auth = gophercloud.AuthOptions{
+		IdentityEndpoint: "",
+		Username:         username,
+		UserID:           userid,
+		Password:         password,
+		TokenID:          tokenid,
+		Scope: &gophercloud.AuthScope{
+			ProjectID: "12345"}}
+	expectedAuth := auth
+	//if userid != "" {
+	//	expectedAuth.Username = ""
+	//}
+	if tokenid != "" {
+		expectedAuth.Password = ""
+		expectedAuth.UserID = ""
+		expectedAuth.Username = ""
+	}
+
+	// create dummy keystone and storage mock
+	keystoneMock := keystone.NewMockDriver(ctrl)
+	setKeystoneInstance(keystoneMock)
+	keystoneMock.EXPECT().Authenticate(expectedAuth).Return(&policy.Context{
+		Request: map[string]string{
+			"user_id":    auth.UserID,
+			"project_id": auth.Scope.ProjectID,
+			"password":   auth.Password},
+		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
+		Roles: []string{"monitoring_viewer"},
+	}, "http://localhost:9091", nil)
+	fetchToken()
+
+	return paniced
 }
