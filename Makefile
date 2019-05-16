@@ -39,9 +39,8 @@ build: generate FORCE
 build/platforms: build
 	docker run --rm -v "$$PWD":"/go/src/github.com/sapcc/maia" -w "/go/src/github.com/sapcc/maia" -e "GOPATH=/go" golang:1.12-stretch env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -ldflags '-s -w -linkmode external -extldflags -static' -o maia_linux_amd64
 ifeq ($(OS), windows)
-	env CGO_ENABLED=1 go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external'
-else
-	echo "Windows build only supported on Windows"
+	# env CGO_ENABLED=1 go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external'
+	env GOOS=windows CGO_ENABLED=1 go build -o ./maia.exe
 endif
 ifeq ($(OS), Darwin)
 	env CGO_ENABLED=1 go build $(GO_BUILDFLAGS) -ldflags '-s -w -linkmode external'
