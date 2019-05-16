@@ -1,8 +1,13 @@
 # build artifacts
-build/maia
-.gopath/pkg/
+bin
+maia
+.gopath
 build/install/
 build/docker.tar
+pkg/storage/genmock.go
+pkg/keystone/genmock.go
+pkg/ui/bindata.go
+pkg/ui/bindata.go.bak
 
 # test artifacts
 pkg/test/migrations/*.sql
