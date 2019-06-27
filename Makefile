@@ -97,7 +97,7 @@ clean: FORCE
 
 build/docker.tar: dependencies generate
 	GOOS=linux GOARCH=amd64 go build -a -ldflags '$(GO_LDFLAGS)' -o bin/maia_linux_amd64
-	tar --strip-components=1 -cf bin/maia_linux_amd64 > build/docker.tar
+	tar --strip-components=1 -cf - bin/maia_linux_amd64 > build/docker.tar
 
 docker: build/docker.tar
 	$(DOCKER) build -t "$(DOCKER_IMAGE):$(DOCKER_TAG)" .
