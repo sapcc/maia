@@ -66,11 +66,3 @@ Maia service from scratch and integrate with Prometheus.
 
 The [Maia developers guide](./docs/developers-guide.md) describes how to use the Maia API. Also
 it contains information how to contribute to the Maia development.
-
-# Build
-
-Build uses docker
-
-```sh
-$ make docker-build
-```

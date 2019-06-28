@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/h2non/gock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/h2non/gock.v1"
 )
 
 const (
