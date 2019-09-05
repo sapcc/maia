@@ -201,6 +201,20 @@ func TestAuthenticateRequest_failed(t *testing.T) {
 	assertDone(t)
 }
 
+func TestAuthenticateRequest_failedNoScope(t *testing.T) {
+	defer gock.Off()
+
+	ks := setupTest(t)
+
+	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
+	req.SetBasicAuth("testuser@testdomain", "testpw")
+	_, err := ks.AuthenticateRequest(req, false)
+
+	assert.NotNil(t, err, "AuthenticateRequest should fail with error when scope information is missing for /federate")
+
+	assertDone(t)
+}
+
 func TestAuthenticateRequest_guessScope(t *testing.T) {
 	defer gock.Off()
 
