@@ -323,6 +323,7 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 // Format: <user>"|"<project> or <user>"|@"<domain>
 // user/project can either be a unique OpenStack ID or a qualified name with domain information, e.g. username"@"domain
 // When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
+// Finally you can also specify the scope as URL query param
 func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*gophercloud.AuthOptions, AuthenticationError) {
 	ba := gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
@@ -332,13 +333,16 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 	// extract credentials
 	query := r.URL.Query()
 	if token := r.Header.Get("X-Auth-Token"); token != "" {
+		// perfect: we have a token and thus a authorization scope
 		ba.TokenID = token
 	} else if token := query.Get("x-auth-token"); token != "" {
+		// perfect: we have a token and thus a authorization scope (albeit in lower-case)
 		ba.TokenID = token
 		// move to right place
 		query.Del("x-auth-token")
 		r.Header.Set("X-Auth-Token", ba.TokenID)
 	} else if username, password, ok := r.BasicAuth(); ok {
+		// use extended basic auth. which means that the OpenStack scope is part of the username
 		usernameParts := strings.Split(username, "|")
 		userParts := strings.Split(usernameParts[0], "@")
 		var scopeParts []string
@@ -363,21 +367,19 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 			ba.UserID = userParts[0]
 		}
 
-		ba.Scope = new(gophercloud.AuthScope)
 		if len(scopeParts) >= 2 {
+			ba.Scope = new(gophercloud.AuthScope)
 			// assume domains are always prefixed with @
 			if scopeParts[0] != "" {
 				ba.Scope.ProjectName = scopeParts[0]
 			}
 			ba.Scope.DomainName = scopeParts[1]
 		} else if len(scopeParts) >= 1 {
-			ba.Scope.ProjectID = scopeParts[0]
+			ba.Scope = &gophercloud.AuthScope{ProjectID: scopeParts[0]}
 		} else if guessScope {
 			if err := d.guessScope(&ba); err != nil {
 				return nil, err
 			}
-		} else {
-			return nil, NewAuthenticationError(StatusMissingCredentials, "Basic authorization credentials missing OpenStack authorization scope part")
 		}
 
 		// set password
@@ -386,13 +388,16 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 		return nil, NewAuthenticationError(StatusMissingCredentials, "Authorization header missing (no username/password or token)")
 	}
 
-	// check overriding project/domain via ULR param
+	// check overriding project/domain via ULR param, so end-users can encode this in the URL
 	if projectID := query.Get("project_id"); projectID != "" {
 		ba.Scope = &gophercloud.AuthScope{ProjectID: projectID}
 		query.Del("project_id")
 	} else if domainID := query.Get("domain_id"); domainID != "" {
 		ba.Scope = &gophercloud.AuthScope{DomainID: domainID}
 		query.Del("domain_id")
+	} else if ba.TokenID == "" && ba.Scope == nil {
+		// fail if we end up with no scope
+		return nil, NewAuthenticationError(StatusMissingCredentials, "Basic authorization credentials missing OpenStack authorization scope part")
 	}
 
 	return &ba, nil
