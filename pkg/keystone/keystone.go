@@ -380,6 +380,8 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 			if err := d.guessScope(&ba); err != nil {
 				return nil, err
 			}
+		} else {
+			return nil, NewAuthenticationError(StatusMissingCredentials, "Basic authorization credentials missing OpenStack authorization scope part")
 		}
 
 		// set password
