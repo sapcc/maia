@@ -168,6 +168,24 @@ func TestAuthenticateRequest(t *testing.T) {
 	assertDone(t)
 }
 
+func TestAuthenticateRequest_urlScope(t *testing.T) {
+	defer gock.Off()
+
+	ks := setupTest(t)
+
+	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthScopeBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+
+	req := httptest.NewRequest("GET", "http://maia.local/testdomain/graph?project_id=p00001", nil)
+	req.SetBasicAuth("testuser@testdomain", "testpw")
+	context, err := ks.AuthenticateRequest(req, false)
+
+	assert.Nil(t, err, "AuthenticateRequest should not fail")
+	assert.EqualValues(t, []string{"monitoring_viewer"}, context.Roles, "AuthenticateRequest should return the right roles in the context")
+
+	assertDone(t)
+}
+
 func TestAuthenticateRequest_token(t *testing.T) {
 	defer gock.Off()
 
