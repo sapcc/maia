@@ -152,9 +152,9 @@ The _keystone_ and _storage_ package contain some preparational work to plug-in 
 
 ![Architecture diagram](./maia-architecture.png)
 
-## Build
+## Building
 
-Travis is used for building, static code checks and unit/component testing (build-verification tests). No real integration testing takes place here.
+Travis is used for building, static code checks and build-verification testing ([tutorial](https://docs.travis-ci.com/user/tutorial/)). No real integration testing takes place here.
 
 The _make_ file contains additional targets that can be used e.g. to build continuous deployment pipelines:
 * all: builds and tests the binary for the current platform from scratch
