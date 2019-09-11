@@ -24,15 +24,16 @@ import (
 
 	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"sort"
+	"time"
+
 	"github.com/gorilla/mux"
 	"github.com/prometheus/common/model"
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"io/ioutil"
-	"sort"
-	"time"
 )
 
 // class for Prometheus v1 API provider implementation
@@ -118,15 +119,19 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// build project_id constraint using project hierarchy
 	labelKey, labelValues := scopeToLabelConstraint(req, p.keystone)
-	selector, err := util.AddLabelConstraintToSelector("{"+string(name)+"!=\"\"}", labelKey, labelValues)
+	// make a broad range query and aggregate by requested label. Use count() as cheap aggregation function plus a step size that
+	// yields only a single data point in the entire time-window
+	query, err := util.AddLabelConstraintToExpression("count({"+string(name)+"!=\"\"}) BY ("+string(name)+")", labelKey, labelValues)
 	if err != nil {
 		ReturnPromError(w, err, http.StatusBadRequest)
 	}
 
 	start := time.Now().Add(-ttl)
 	end := time.Now()
-	resp, err := p.storage.Series([]string{selector}, start.Format(time.RFC3339), end.Format(time.RFC3339), req.Header.Get("Accept"))
+	step := viper.GetString("maia.label_value_ttl")
+	resp, err := p.storage.QueryRange(query, start.Format(time.RFC3339), end.Format(time.RFC3339), step, "", req.Header.Get("Accept"))
 	if err != nil {
 		ReturnPromError(w, err, http.StatusBadGateway)
 		return
@@ -140,23 +145,22 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var sr storage.SeriesResponse
+	var sr storage.QueryResponse
 	if err := json.Unmarshal(buf, &sr); err != nil {
 		ReturnPromError(w, err, http.StatusInternalServerError)
 		return
 	}
+	matrix := sr.Data.Value.(model.Matrix)
 	// collect unique values from 1000x bigger :( series list
-	unique := map[model.LabelValue]bool{}
-	for _, lset := range sr.Data {
-		v := lset[name]
-		unique[v] = true
-	}
 	// transform into expected result type
 	var result storage.LabelValuesResponse
 	result.Status = sr.Status
-	result.Data = model.LabelValues{}
-	for k := range unique {
-		result.Data = append(result.Data, k)
+	result.Data = make(model.LabelValues, 0, len(matrix))
+	for k := range matrix {
+		metric := matrix[k]
+		if metric != nil {
+			result.Data = append(result.Data, metric.Metric[name])
+		}
 	}
 	sort.Sort(result.Data)
 
