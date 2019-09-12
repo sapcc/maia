@@ -100,7 +100,7 @@ func fetchToken() {
 		auth.ApplicationCredentialName = ""
 		auth.ApplicationCredentialID = ""
 		auth.ApplicationCredentialSecret = ""
-	} else if authType == "applicationc_credential" {
+	} else if authType == "application_credential" {
 		auth.Password = ""
 		auth.UserID = ""
 		auth.DomainID = ""
