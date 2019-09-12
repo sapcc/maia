@@ -88,22 +88,37 @@ func fetchToken() {
 
 	if authType == "password" {
 		auth.TokenID = ""
+		auth.ApplicationCredentialName = ""
+		auth.ApplicationCredentialID = ""
+		auth.ApplicationCredentialSecret = ""
 	} else if authType == "token" {
 		auth.Password = ""
 		auth.UserID = ""
 		auth.Username = ""
 		auth.DomainID = ""
 		auth.DomainName = ""
+		auth.ApplicationCredentialName = ""
+		auth.ApplicationCredentialID = ""
+		auth.ApplicationCredentialSecret = ""
+	} else if authType == "applicationc_credential" {
+		auth.Password = ""
+		auth.UserID = ""
+		auth.DomainID = ""
+		auth.DomainName = ""
+		auth.TokenID = ""
 	}
 
 	if auth.TokenID == "" {
-		if (auth.Username == "" && auth.UserID == "") || auth.Password == "" {
-			panic(fmt.Errorf("You must specify either --os-token or provide --os-username / --os-user-id and --os-password"))
+		if ((auth.Username == "" && auth.UserID == "") || auth.Password == "") &&
+			(auth.ApplicationCredentialID == "" || auth.ApplicationCredentialSecret == "") {
+			panic(fmt.Errorf("You must specify either --os-token or provide --os-username / --os-user-id and --os-password " +
+				"or --os-application-credential-name / --os-application-credential-id and --os-application-credential-secret"))
 		}
 	}
 
-	if auth.TokenID != "" && auth.Password != "" {
-		panic(fmt.Errorf("--os-token and --os-password listed, can only use one. Setting --os-auth-type sets which authentication type to use"))
+	if auth.TokenID != "" && auth.Password != "" && auth.ApplicationCredentialSecret != "" {
+		panic(fmt.Errorf("Multiple authentications specified (--os-password, --os-token, --os-application-credential-secret), " +
+			"can only use one. Setting --os-auth-type sets which authentication type to use"))
 	}
 	context, url, err := keystoneInstance().Authenticate(auth)
 	if err != nil {
@@ -643,7 +658,10 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&scopedDomain, "os-domain-name", os.Getenv("OS_DOMAIN_NAME"), "OpenStack domain name to scope to")
 	RootCmd.PersistentFlags().StringVar(&auth.Scope.DomainID, "os-domain-id", os.Getenv("OS_DOMAIN_ID"), "OpenStack domain ID to scope to")
 	RootCmd.PersistentFlags().StringVar(&auth.TokenID, "os-token", "$OS_TOKEN", "OpenStack keystone token") // avoid showing contents of $OS_TOKEN as default value
-	RootCmd.PersistentFlags().StringVar(&authType, "os-auth-type", os.Getenv("OS_AUTH_TYPE"), "OpenStack authentication type ('password' or 'token')")
+	RootCmd.PersistentFlags().StringVar(&authType, "os-auth-type", os.Getenv("OS_AUTH_TYPE"), "OpenStack authentication type ('password' or 'token' or application_credential)")
+	RootCmd.PersistentFlags().StringVar(&auth.ApplicationCredentialName, "os-application-credential-name", os.Getenv("OS_APPLICATION_CREDENTIAL_NAME"), "OpenStack application credential name")
+	RootCmd.PersistentFlags().StringVar(&auth.ApplicationCredentialID, "os-application-credential-id", os.Getenv("OS_APPLICATION_CREDENTIAL_ID"), "OpenStack application credential id")
+	RootCmd.PersistentFlags().StringVar(&auth.ApplicationCredentialSecret, "os-application-credential-secret", "$OS_APPLICATION_CREDENTIAL_SECRET", "OpenStack application credential secret") // avoid showing contents of $OS_PASSWORD as default value
 
 	RootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", "", "Specify output format: table, json, template or value")
 	RootCmd.PersistentFlags().StringVarP(&columns, "columns", "c", "", "Specify the columns to print (comma-separated; only when --format value is set)")
