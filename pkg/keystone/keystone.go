@@ -273,11 +273,11 @@ func authOpts2StringKey(authOpts gophercloud.AuthOptions) string {
 		return authOpts.UserID + " " + authOpts.Username + " " + authOpts.Password + " " + authOpts.DomainID + " " +
 			authOpts.DomainName + " " + authOpts.ApplicationCredentialID + " " + authOpts.ApplicationCredentialName + " " +
 			authOpts.ApplicationCredentialSecret
-	} else {
-		return authOpts.UserID + " " + authOpts.Username + " " + authOpts.Password + " " + authOpts.DomainID + " " +
-			authOpts.DomainName + " " + authOpts.Scope.ProjectID + " " + authOpts.Scope.ProjectName + " " +
-			authOpts.Scope.DomainID + " " + authOpts.Scope.DomainName
 	}
+
+	return authOpts.UserID + " " + authOpts.Username + " " + authOpts.Password + " " + authOpts.DomainID + " " +
+		authOpts.DomainName + " " + authOpts.Scope.ProjectID + " " + authOpts.Scope.ProjectName + " " +
+		authOpts.Scope.DomainID + " " + authOpts.Scope.DomainName
 }
 
 // Authenticate authenticates a non-service user using available authOptionsFromRequest (username+password or token)
