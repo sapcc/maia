@@ -110,13 +110,14 @@ func fetchToken() {
 
 	if auth.TokenID == "" {
 		if ((auth.Username == "" && auth.UserID == "") || auth.Password == "") &&
-			(auth.ApplicationCredentialID == "" || auth.ApplicationCredentialSecret == "") {
+			(auth.ApplicationCredentialID == "" || auth.ApplicationCredentialSecret == "") &&
+			(auth.ApplicationCredentialName == "" || auth.Username == "") {
 			panic(fmt.Errorf("You must specify either --os-token or provide --os-username / --os-user-id and --os-password " +
-				"or --os-application-credential-name / --os-application-credential-id and --os-application-credential-secret"))
+				"or --os-application-credential-name and os-username or --os-application-credential-id and --os-application-credential-secret"))
 		}
 	}
 
-	if auth.TokenID != "" && auth.Password != "" && auth.ApplicationCredentialSecret != "" {
+	if (auth.TokenID != "" && auth.Password != "") || (auth.TokenID != "" && auth.ApplicationCredentialSecret != "") {
 		panic(fmt.Errorf("Multiple authentications specified (--os-password, --os-token, --os-application-credential-secret), " +
 			"can only use one. Setting --os-auth-type sets which authentication type to use"))
 	}
