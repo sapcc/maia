@@ -348,10 +348,10 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 	}
 
 	// Get application credentials from header
-	appcredid := r.Header.Get("X-Application-Credential-Id")
-	appcredsecret := r.Header.Get("X-Application-Credential-secret")
-	appcredname := r.Header.Get("X-Application-Credential-Name")
-	appcredusername := r.Header.Get("X-User-Name")
+	appCredId := r.Header.Get("X-Application-Credential-Id")
+	appCredSecret := r.Header.Get("X-Application-Credential-secret")
+	appCredName := r.Header.Get("X-Application-Credential-Name")
+	appCredUserName := r.Header.Get("X-User-Name")
 
 	// extract credentials
 	query := r.URL.Query()
@@ -408,11 +408,11 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 		// set password
 		ba.Password = password
 		// if application credentials are used, skip th basic auth checks below
-	} else if (appcredid != "" && appcredsecret != "") ||
-		(appcredname != "" && appcredusername != "") {
-		ba.ApplicationCredentialID = appcredid
-		ba.ApplicationCredentialName = appcredname
-		ba.ApplicationCredentialSecret = appcredsecret
+	} else if (appCredId != "" && appCredSecret != "") ||
+		(appCredName != "" && appCredUserName != "") {
+		ba.ApplicationCredentialID = appCredId
+		ba.ApplicationCredentialName = appCredName
+		ba.ApplicationCredentialSecret = appCredSecret
 		return &ba, nil
 	} else {
 		return nil, NewAuthenticationError(StatusMissingCredentials, "Authorization header missing (no username/password or token)")
