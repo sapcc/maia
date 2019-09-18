@@ -522,8 +522,11 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 				util.LogInfo("Failed login of user name %s%s for scope %+v: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, err.Error())
 			} else if authOpts.TokenID != "" {
 				util.LogInfo("Failed login of with token %s... for scope %+v: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, err.Error())
-			} else if authOpts.ApplicationCredentialID != "" || authOpts.ApplicationCredentialSecret != "" {
-				util.LogInfo("Failed login of application credentials %s%s: %s", authOpts.ApplicationCredentialID, authOpts.ApplicationCredentialName, err.Error())
+			} else if authOpts.ApplicationCredentialID != "" {
+				util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialID, err.Error())
+			} else if authOpts.ApplicationCredentialName != "" {
+	            util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialName, err.Error())			
+			}
 			} else {
 				statusCode = StatusMissingCredentials
 			}
