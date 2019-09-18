@@ -269,6 +269,8 @@ func authOpts2StringKey(authOpts gophercloud.AuthOptions) string {
 
 	// build unique key by separating fields with blanks. Since blanks are not allowed in several of those
 	// the result will be unique
+
+	// For Application Credentials there will be no scope so it can't be used to store the token
 	if authOpts.ApplicationCredentialID != "" || authOpts.ApplicationCredentialName != "" {
 		return authOpts.UserID + " " + authOpts.Username + " " + authOpts.Password + " " + authOpts.DomainID + " " +
 			authOpts.DomainName + " " + authOpts.ApplicationCredentialID + " " + authOpts.ApplicationCredentialName + " " +
