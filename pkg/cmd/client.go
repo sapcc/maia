@@ -80,6 +80,9 @@ func fetchToken() {
 	if auth.TokenID == "$OS_TOKEN" {
 		auth.TokenID = os.Getenv("OS_TOKEN")
 	}
+	if auth.ApplicationCredentialSecret == "$OS_APPLICATION_CREDENTIAL_SECRET" {
+		auth.ApplicationCredentialSecret = os.Getenv("OS_APPLICATION_CREDENTIAL_SECRET")
+	}
 
 	// authenticate calls to Maia directly
 	if auth.TokenID != "" && maiaURL != "" {
