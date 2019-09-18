@@ -68,6 +68,17 @@ The problem with basic authentication is that it lacks a standard way to express
  denoted by name: `projectname@domainname`. To disambiguate scoping by project-id and domain-name, the domain is always prefixed
  with `@`.
 
+ #### Application Credential Authentication
+
+ Maia also supports authentication with application credentials.  In order to use application credentials you must supply an application credential secret in conjunction with either an application credential ID, or an application credential name and an openstack username.  
+
+ The scope of the authentication for application credentials will be determined by the project in which the application credentials were created.
+
+ Application credential authentication is also supported through the following header fields:
+     'X-Application-Credential-Id'
+     'X-Application-Credential-Name'
+     'X-Application-Credential-Secret'
+
 #### Variants
 
 This scheme expands into five variants to express username and authorization scope:
