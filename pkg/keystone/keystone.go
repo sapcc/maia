@@ -459,13 +459,19 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 	return nil
 }
 
-// authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
+// authenticate authenticates a user using OpenStack credentials.
+// Those credentials can be username+password, token or application credentials.
+// The parameter asServiceUser controls the behaviour: as a service user the method will validate incoming tokens
+// in order to determine the user roles. As a non-service user it will merely request a token from the passed credentials
+// and obtain an endpoint for the Maia service. Both cases will create a token when username and password or OpenStack application
+// credentials are passed in. 
 // It returns the authorization context
 func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser bool, rescope bool) (*policy.Context, string, AuthenticationError) {
-	// check cache, which does not work if tokens are rescoped
+	// TODO: remove, otherwise some things may not work (e.g. caching)
 	if authOpts.ApplicationCredentialName != "" || authOpts.ApplicationCredentialID != "" {
 		asServiceUser = false
 	}
+	// check cache, which does not work if tokens are rescoped
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found && (authOpts.Scope == nil || authOpts.Scope.ProjectID == entry.(*cacheEntry).context.Auth["project_id"]) {
 		if authOpts.TokenID != "" {
 			util.LogDebug("Token cache hit: token %s... for scope %+v", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope)
@@ -540,7 +546,8 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 			var authErr AuthenticationError
 			ce.context, ce.endpointURL, authErr = d.authenticate(gophercloud.AuthOptions{IdentityEndpoint: authOpts.IdentityEndpoint, TokenID: tokenID}, asServiceUser, false)
 			if authErr == nil && authOpts.TokenID == "" {
-				// cache basic authentication results in the same way as token validations
+				// cache basic / application credential authentication results in the same way as token validations
+				// TODO: implement for application credential case
 				util.LogDebug("Add cache entry for username %s%s for scope %+v", authOpts.UserID, authOpts.Username, authOpts.Scope)
 				d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
 			}
