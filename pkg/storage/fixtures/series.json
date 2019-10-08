@@ -1,0 +1,16 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "__name__": "up",
+      "component": "objectstore",
+      "instance": "100.64.1.159:9102",
+      "job": "endpoints",
+      "kubernetes_name": "swift-proxy-cluster-3",
+      "kubernetes_namespace": "swift",
+      "os_cluster": "cluster-3",
+      "region": "staging",
+      "system": "openstack"
+    }
+  ]
+}
