@@ -25,15 +25,16 @@ import (
 	"net/url"
 
 	"fmt"
+	"io"
+
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"io"
 )
 
 type prometheusStorageClient struct {
-	httpClient    *http.Client
-	url           *url.URL
-	customHeaders map[string]string
+	httpClient       *http.Client
+	url, federateURL *url.URL
+	customHeaders    map[string]string
 }
 
 // Prometheus creates a storage driver for Prometheus/Maia
@@ -61,6 +62,17 @@ func (promCli *prometheusStorageClient) init() {
 		}
 	}
 	promCli.httpClient = &http.Client{}
+
+	// if federateURL is configured, this will direct /federate requests to another host URL
+	if viper.IsSet("maia.federate_url") {
+		parsedURL, err := url.Parse(viper.GetString("maia.federate_url"))
+		if err != nil {
+			panic(err)
+		}
+		promCli.federateURL = parsedURL
+	} else {
+		promCli.federateURL = promCli.url
+	}
 }
 
 func (promCli *prometheusStorageClient) Query(query, time, timeout string, acceptContentType string) (*http.Response, error) {
@@ -105,9 +117,13 @@ func (promCli *prometheusStorageClient) DelegateRequest(request *http.Request) (
 // buildURL is used to build the target URL of a Prometheus call
 func (promCli *prometheusStorageClient) buildURL(path string, params map[string]interface{}) url.URL {
 	promURL := *promCli.url
+	// treat federate special
+	if path == "federate" {
+		promURL = *promCli.federateURL
+	}
 
 	// change original request to point to our backing Prometheus
-	promURL.Path = path
+	promURL.Path += path
 	queryParams := url.Values{}
 	for k, v := range params {
 		if s, ok := v.(string); ok {

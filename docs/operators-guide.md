@@ -37,7 +37,7 @@ First you need to decide which port the Maia service should listen to.
 bind_address = "0.0.0.0:9091"
 ```
 
-### Prometheus
+### Prometheus/Thanos
 
 Any data served by Maia is served by the underlying Prometheus installation that acts as a TSDB and data collection layer.
 
@@ -45,6 +45,16 @@ To reach Prometheus, Maia needs to know the URL where it is running and optional
 
 ```
 prometheus_url = "http://myprometheus:9090"
+# proxy = proxy for reaching <prometheus_url>
+```
+
+If you use _Thanos_, you have to provide the Thanos _querier_ address in the `prometheus_url`. Since the _querier_ does not
+support the `federate` API [yet](https://github.com/thanos-io/thanos/pull/1546), you have specify another parameter `federate_url` which should point to an endpoint that supports it.
+Usually this will be a Prometheus that has recent datapoints for _all_ the series the _querier_ knows (except for stale ones).
+
+```
+prometheus_url = "http://mythanos:9090/thanos"
+federate_url = "http://myprometheus:9090"
 # proxy = proxy for reaching <prometheus_url>
 ```
 
