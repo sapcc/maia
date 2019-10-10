@@ -143,12 +143,28 @@ Components/Packages
 * api: Implementation of the API
 * cmd: Implementation of the CLI
 * keystone: authentication plugin(s)
-* prometheus: glue code to attach to a Prometheus as storage
+* storage: glue code to attach to a Prometheus as storage
+* test: helper classes for tests
+* ui: the Prometheus 1.x UI adapted to Maia 
+* util: helper classes
 
-The latter packages will probably be renamed if we decide to support additional user
-management services or other monitoring backends (e.g. project cortex).
+The _keystone_ and _storage_ package contain some preparational work to plug-in other backends for authentication and authorization as well as metric storage. This is good enough to plug-in dummy implementations for testing purposes and it helps preventing uncontrolled growths of dependency. For real pluggability of alternative backend services the currently level of abstraction is not enough though.
 
 ![Architecture diagram](./maia-architecture.png)
+
+## Building
+
+Travis is used for building, static code checks and build-verification testing ([tutorial](https://docs.travis-ci.com/user/tutorial/)). No real integration testing takes place here.
+
+The _make_ file contains additional targets that can be used e.g. to build continuous deployment pipelines:
+* all: builds and tests the binary for the current platform from scratch
+* clean: removes temporary files, vendored go packages dependencies and generated code
+* generate: recreates generated code (mocks, UI binding code)
+* build: builds the executable for the current platfrom
+* build/platforms: builds the executable for all supported platforms
+* build/docker: builds a docker image
+* vendor: updates the vendored go packages to latest (according to `glide.yaml`)
+* check: runs static source code checks and executes unit tests
 
 ## Links
 

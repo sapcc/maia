@@ -25,15 +25,16 @@ import (
 	"net/url"
 
 	"fmt"
+	"io"
+
 	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
-	"io"
 )
 
 type prometheusStorageClient struct {
-	httpClient    *http.Client
-	url           *url.URL
-	customHeaders map[string]string
+	httpClient       *http.Client
+	url, federateURL *url.URL
+	customHeaders    map[string]string
 }
 
 // Prometheus creates a storage driver for Prometheus/Maia
@@ -61,29 +62,40 @@ func (promCli *prometheusStorageClient) init() {
 		}
 	}
 	promCli.httpClient = &http.Client{}
+
+	// if federateURL is configured, this will direct /federate requests to another host URL
+	if viper.IsSet("maia.federate_url") {
+		parsedURL, err := url.Parse(viper.GetString("maia.federate_url"))
+		if err != nil {
+			panic(err)
+		}
+		promCli.federateURL = parsedURL
+	} else {
+		promCli.federateURL = promCli.url
+	}
 }
 
 func (promCli *prometheusStorageClient) Query(query, time, timeout string, acceptContentType string) (*http.Response, error) {
-	promURL := promCli.buildURL("api/v1/query", map[string]interface{}{"query": query, "time": time, "timeout": timeout})
+	promURL := promCli.buildURL("/api/v1/query", map[string]interface{}{"query": query, "time": time, "timeout": timeout})
 
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
 func (promCli *prometheusStorageClient) QueryRange(query, start, end, step, timeout string, acceptContentType string) (*http.Response, error) {
-	promURL := promCli.buildURL("api/v1/query_range", map[string]interface{}{"query": query, "start": start, "end": end,
+	promURL := promCli.buildURL("/api/v1/query_range", map[string]interface{}{"query": query, "start": start, "end": end,
 		"step": step, "timeout": timeout})
 
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
 func (promCli *prometheusStorageClient) Series(match []string, start, end string, acceptContentType string) (*http.Response, error) {
-	promURL := promCli.buildURL("api/v1/series", map[string]interface{}{"match[]": match, "start": start, "end": end})
+	promURL := promCli.buildURL("/api/v1/series", map[string]interface{}{"match[]": match, "start": start, "end": end})
 
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
 func (promCli *prometheusStorageClient) LabelValues(name string, acceptContentType string) (*http.Response, error) {
-	promURL := promCli.buildURL("api/v1/label/"+name+"/values", map[string]interface{}{})
+	promURL := promCli.buildURL("/api/v1/label/"+name+"/values", map[string]interface{}{})
 
 	res, err := promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 
@@ -91,7 +103,7 @@ func (promCli *prometheusStorageClient) LabelValues(name string, acceptContentTy
 }
 
 func (promCli *prometheusStorageClient) Federate(selectors []string, acceptContentType string) (*http.Response, error) {
-	promURL := promCli.buildURL("federate", map[string]interface{}{"match[]": selectors})
+	promURL := promCli.buildURL("/federate", map[string]interface{}{"match[]": selectors})
 
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
@@ -105,9 +117,13 @@ func (promCli *prometheusStorageClient) DelegateRequest(request *http.Request) (
 // buildURL is used to build the target URL of a Prometheus call
 func (promCli *prometheusStorageClient) buildURL(path string, params map[string]interface{}) url.URL {
 	promURL := *promCli.url
+	// treat federate special
+	if path == "/federate" {
+		promURL = *promCli.federateURL
+	}
 
 	// change original request to point to our backing Prometheus
-	promURL.Path = path
+	promURL.Path += path
 	queryParams := url.Values{}
 	for k, v := range params {
 		if s, ok := v.(string); ok {
