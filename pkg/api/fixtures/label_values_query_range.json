@@ -1,0 +1,101 @@
+{
+    "status": "success",
+    "data": {
+        "resultType": "matrix",
+        "result": [
+            {
+                "metric": {
+                    "service": "dns"
+                },
+                "values": [
+                    [
+                        1567641600,
+                        "20"
+                    ],
+                    [
+                        1568160000,
+                        "10"
+                    ]
+                ]
+            },
+            {
+                "metric": {
+                    "service": "barbican"
+                },
+                "values": [
+                    [
+                        1567641600,
+                        "5"
+                    ],
+                    [
+                        1568160000,
+                        "5"
+                    ]
+                ]
+            },
+            {
+                "metric": {
+                    "service": "nova"
+                },
+                "values": [
+                    [
+                        1567641600,
+                        "2"
+                    ]
+                ]
+            },
+            {
+                "metric": {
+                    "service": "neutron"
+                },
+                "values": [
+                    [
+                        1567641600,
+                        "105"
+                    ]
+                ]
+            },
+            {
+                "metric": {
+                    "service": "objectstore"
+                },
+                "values": [
+                    [
+                        1568160000,
+                        "105"
+                    ]
+                ]
+            },
+            {
+                "metric": {
+                    "service": "keystone"
+                },
+                "values": [
+                    [
+                        1567641600,
+                        "4"
+                    ],
+                    [
+                        1568160000,
+                        "4"
+                    ]
+                ]
+            },
+            {
+                "metric": {
+                    "service": "glance"
+                },
+                "values": [
+                    [
+                        1567641600,
+                        "1"
+                    ],
+                    [
+                        1568160000,
+                        "9"
+                    ]
+                ]
+            }
+        ]
+    }
+}
