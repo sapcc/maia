@@ -145,7 +145,7 @@ Components/Packages
 * keystone: authentication plugin(s)
 * storage: glue code to attach to a Prometheus as storage
 * test: helper classes for tests
-* ui: the Prometheus 1.x UI adapted to Maia 
+* ui: the Prometheus 1.x UI adapted to Maia
 * util: helper classes
 
 The _keystone_ and _storage_ package contain some preparational work to plug-in other backends for authentication and authorization as well as metric storage. This is good enough to plug-in dummy implementations for testing purposes and it helps preventing uncontrolled growths of dependency. For real pluggability of alternative backend services the currently level of abstraction is not enough though.
