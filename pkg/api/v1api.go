@@ -130,6 +130,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 
 	start := time.Now().Add(-ttl)
 	end := time.Now()
+	// choose step-size so long that only two values are returned
 	step := viper.GetString("maia.label_value_ttl")
 	resp, err := p.storage.QueryRange(query, start.Format(time.RFC3339), end.Format(time.RFC3339), step, "", req.Header.Get("Accept"))
 	if err != nil {
@@ -137,7 +138,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// extract label values from series
+	// extract label values from query result
 	defer resp.Body.Close()
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -151,8 +152,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	matrix := sr.Data.Value.(model.Matrix)
-	// collect unique values from 1000x bigger :( series list
-	// transform into expected result type
+	// take just the label values from the query result
 	var result storage.LabelValuesResponse
 	result.Status = sr.Status
 	result.Data = make(model.LabelValues, 0, len(matrix))
