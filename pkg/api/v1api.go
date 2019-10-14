@@ -130,7 +130,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 
 	start := time.Now().Add(-ttl)
 	end := time.Now()
-	// choose step-size so long that only two values are returned
+        // choose step-size so long that only two values are returned
         step := viper.GetString("maia.label_value_ttl")
 	resp, err := p.storage.QueryRange(query, start.Format(time.RFC3339), end.Format(time.RFC3339), step, "", req.Header.Get("Accept"))
 	if err != nil {
