@@ -25,7 +25,8 @@ import (
 	"testing"
 
 	"errors"
-	"github.com/databus23/goslo.policy"
+
+	policy "github.com/databus23/goslo.policy"
 	"github.com/golang/mock/gomock"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/prometheus/client_golang/prometheus"
@@ -235,12 +236,12 @@ func TestLabelValues(t *testing.T) {
 	expectAuthByProjectID(keystoneMock)
 	// Maia's label-values implementation uses the series API and a time-based filter stale series out. The exact start
 	// and end date of the filter cannot be predicted, therefore we accept anything that is a parsable date.
-	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=\"12345\"}"}, test.TimeStringMatcher{}, test.TimeStringMatcher{}, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
+	storageMock.EXPECT().QueryRange("count({project_id=\"12345\",service!=\"\"}) BY (service)", test.TimeStringMatcher{}, test.TimeStringMatcher{}, viper.Get("maia.label_value_ttl"), "", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/label_values_query_range.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},
 		Method:           "GET",
-		Path:             "/api/v1/label/component/values",
+		Path:             "/api/v1/label/service/values",
 		ExpectStatusCode: http.StatusOK,
 		ExpectJSON:       "fixtures/label_values.json",
 	}.Check(t, router)
