@@ -57,3 +57,17 @@ func TestFederate(t *testing.T) {
 
 	assertDone(t)
 }
+
+func TestLabelValues(t *testing.T) {
+	defer gock.Off()
+
+	ps := setupTest(t)
+
+	gock.New(prometheusURL).Get("/api/v1/label/service/values").Reply(http.StatusOK).File("fixtures/label_values.json").AddHeader("Content-Type", JSON)
+
+	_, err := ps.LabelValues("service", JSON)
+
+	assert.Nil(t, err, "label/.../values should not fail")
+
+	assertDone(t)
+}
