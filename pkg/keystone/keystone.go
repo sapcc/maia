@@ -348,7 +348,7 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 	}
 
 	// Get application credentials from header
-	appCredId := r.Header.Get("X-Application-Credential-Id")
+	appCredID := r.Header.Get("X-Application-Credential-Id")
 	appCredSecret := r.Header.Get("X-Application-Credential-secret")
 	appCredName := r.Header.Get("X-Application-Credential-Name")
 	appCredUserName := r.Header.Get("X-User-Name")
@@ -408,9 +408,9 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 		// set password
 		ba.Password = password
 		// if application credentials are used, skip th basic auth checks below
-	} else if (appCredId != "" && appCredSecret != "") ||
+	} else if (appCredID != "" && appCredSecret != "") ||
 		(appCredName != "" && appCredUserName != "") {
-		ba.ApplicationCredentialID = appCredId
+		ba.ApplicationCredentialID = appCredID
 		ba.ApplicationCredentialName = appCredName
 		ba.ApplicationCredentialSecret = appCredSecret
 		return &ba, nil
@@ -464,7 +464,7 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 // The parameter asServiceUser controls the behaviour: as a service user the method will validate incoming tokens
 // in order to determine the user roles. As a non-service user it will merely request a token from the passed credentials
 // and obtain an endpoint for the Maia service. Both cases will create a token when username and password or OpenStack application
-// credentials are passed in. 
+// credentials are passed in.
 // It returns the authorization context
 func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser bool, rescope bool) (*policy.Context, string, AuthenticationError) {
 	// TODO: remove, otherwise some things may not work (e.g. caching)
@@ -531,8 +531,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 			} else if authOpts.ApplicationCredentialID != "" {
 				util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialID, err.Error())
 			} else if authOpts.ApplicationCredentialName != "" {
-	            util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialName, err.Error())			
-			}
+				util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialName, err.Error())
 			} else {
 				statusCode = StatusMissingCredentials
 			}
