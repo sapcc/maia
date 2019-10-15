@@ -467,10 +467,6 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 // credentials are passed in.
 // It returns the authorization context
 func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser bool, rescope bool) (*policy.Context, string, AuthenticationError) {
-	// TODO: remove, otherwise some things may not work (e.g. caching)
-	if authOpts.ApplicationCredentialName != "" || authOpts.ApplicationCredentialID != "" {
-		asServiceUser = false
-	}
 	// check cache, which does not work if tokens are rescoped
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found && (authOpts.Scope == nil || authOpts.Scope.ProjectID == entry.(*cacheEntry).context.Auth["project_id"]) {
 		if authOpts.TokenID != "" {
