@@ -111,14 +111,18 @@ The `maia` command can also be used to retrieve metrics from the Maia service. I
 | --os-username | OS_USERNAME | OpenStack username, requires `os-user-domain-name` |
 | --os-user-id | OS_USER_ID | OpenStack user unique ID |
 | --os-password | OS_PASSWORD | Password |
+| --os-token | OS_TOKEN | Pregenerated Keystone token with authorization scope |
+| --os-application-credential-id | OS_APPLICATION_CREDENTIAL_ID | ID of an _application credential_ |
+| --os-application-credential-name | OS_APPLICATION_CREDENTIAL_NAME | name of an _application credential_, scoped by user |
+| --os-application-credential-secret | OS_APPLICATION_CREDENTIAL_SECRET | secret of an _application credential_ |
 | --os-user-domain-name | OS_USER_DOMAIN_NAME | domain name, qualifying the username (default: `Default`) |
 | --os-user-domain-id | OS_USER_DOMAIN_ID | domain unique ID, qualifying the username (default: `default`) |
 | --os-project-name | OS_PROJECT_NAME | OpenStack project name for authorization scoping to project, requires `os-project-domain-name` |
 | --os-project-id | OS_PROJECT_ID | OpenStack project unique ID |
 | --os-domain-name | OS_DOMAIN_NAME | OpenStack domain name for authorization scoping to domain |
 | --os-domain-id | OS_DOMAIN_ID | OpenStack domain unique ID for authorization scoping to domain |
-| --os-token | OS_TOKEN | Pregenerated Keystone token with authorization scope |
 | --os-auth-url | OS_AUTH_URL | Endpoint of the Identity v3 service. Needed to authentication and Maia endpoint lookup |
+| --os-auth-type | OS_AUTH_TYPE | Authentication method to use: one of `password`, `token`, `v3applicationcredential`|
 
 Usually, you can reuse your existing RC-files. For performance reasons, you should consider token-based
 authentication whenever you make several calls to the Maia CLI.

@@ -349,7 +349,7 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 
 	// Get application credentials from header
 	appCredID := r.Header.Get("X-Application-Credential-Id")
-	appCredSecret := r.Header.Get("X-Application-Credential-secret")
+	appCredSecret := r.Header.Get("X-Application-Credential-Secret")
 	appCredName := r.Header.Get("X-Application-Credential-Name")
 	appCredUserName := r.Header.Get("X-User-Name")
 
@@ -364,23 +364,56 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 		// move to right place
 		query.Del("x-auth-token")
 		r.Header.Set("X-Auth-Token", ba.TokenID)
+	} else if (appCredID != "" && appCredSecret != "") || (appCredName != "" && appCredUserName != "") {
+		ba.ApplicationCredentialID = appCredID
+		ba.ApplicationCredentialName = appCredName
+		ba.ApplicationCredentialSecret = appCredSecret
+		return &ba, nil
 	} else if username, password, ok := r.BasicAuth(); ok {
+		isAppCred := strings.HasPrefix(username, "*")
 		// use extended basic auth. which means that the OpenStack scope is part of the username
 		usernameParts := strings.Split(username, "|")
 		userParts := strings.Split(usernameParts[0], "@")
 		var scopeParts []string
-		if len(usernameParts) >= 2 {
-			scopeParts = strings.Split(usernameParts[1], "@")
+		if len(usernameParts) > 1 {
+			scopeParts = strings.Split(strings.Join(usernameParts[1:], "|"), "@")
 		} else {
 			// default to arbitrary project with sufficient roles after knowing the user
 			scopeParts = []string{}
 		}
 
-		// parse username part
+		// handle application credentials
+		if isAppCred {
+			// if the username is prefixed with '*', we assume these are application credentials
+			if len(userParts) == 1 {
+				// this is application credential ID (remove the leading '*')
+				ba.ApplicationCredentialID = string(userParts[0][1:])
+			} else if len(userParts) >= 2 {
+				// this is an application credential name qualified with a username
+				ba.ApplicationCredentialName = string(userParts[0][1:])
+				if len(userParts) > 2 {
+					// the username is qualified, too
+					ba.Username = userParts[1]
+					ba.DomainName = strings.Join(userParts[2:], "@")
+				} else if headerUserDomain := r.Header.Get("X-User-Domain-Name"); headerUserDomain != "" {
+					// if the domain is set in the header, an unqualified username is taken as a name and not an ID
+					ba.Username = userParts[1]
+					ba.DomainName = headerUserDomain
+				} else {
+					// guess this is an ID
+					ba.UserID = userParts[1]
+				}
+			}
+			ba.ApplicationCredentialSecret = password
+
+			return &ba, nil
+		}
+
+		// proceed with username password authentication
 		if len(userParts) > 1 {
-			// username + user-domain-name
+			// username@user-domain-name
 			ba.Username = userParts[0]
-			ba.DomainName = userParts[1]
+			ba.DomainName = strings.Join(userParts[1:], "@")
 		} else if headerUserDomain := r.Header.Get("X-User-Domain-Name"); headerUserDomain != "" {
 			// if the domain is set in the header, an unqualified username is taken as a name and not an ID
 			ba.Username = userParts[0]
@@ -404,16 +437,8 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 				return nil, err
 			}
 		}
-
 		// set password
 		ba.Password = password
-		// if application credentials are used, skip th basic auth checks below
-	} else if (appCredID != "" && appCredSecret != "") ||
-		(appCredName != "" && appCredUserName != "") {
-		ba.ApplicationCredentialID = appCredID
-		ba.ApplicationCredentialName = appCredName
-		ba.ApplicationCredentialSecret = appCredSecret
-		return &ba, nil
 	} else {
 		return nil, NewAuthenticationError(StatusMissingCredentials, "Authorization header missing (no username/password or token)")
 	}
@@ -559,8 +584,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 			tokenData.ProjectScope.Name = authOpts.Scope.ProjectName
 			tokenData.DomainScope.ID = authOpts.Scope.DomainID
 			tokenData.ProjectScope.Name = authOpts.Scope.DomainName
-		}
-		if authOpts.ApplicationCredentialName != "" || authOpts.ApplicationCredentialID != "" {
+		} else if authOpts.ApplicationCredentialName != "" || authOpts.ApplicationCredentialID != "" {
 			tokenData.Application.ID = authOpts.ApplicationCredentialID
 			tokenData.Application.Name = authOpts.ApplicationCredentialName
 		}

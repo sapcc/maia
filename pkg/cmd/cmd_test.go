@@ -59,13 +59,10 @@ func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.Mo
 
 	// set mandatory parameters
 	auth = gophercloud.AuthOptions{
-		IdentityEndpoint:            "",
-		Username:                    "username",
-		UserID:                      "user_id",
-		Password:                    "testwd",
-		ApplicationCredentialID:     "appcredid",
-		ApplicationCredentialName:   "appcredname",
-		ApplicationCredentialSecret: "appcredsecret",
+		IdentityEndpoint: "",
+		Username:         "username",
+		DomainName:       "domainname",
+		Password:         "testwd",
 		Scope: &gophercloud.AuthScope{
 			ProjectID: "12345"}}
 
@@ -80,9 +77,9 @@ func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.Mo
 }
 
 func expectAuth(keystoneMock *keystone.MockDriver) {
-	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{IdentityEndpoint: auth.IdentityEndpoint, Username: auth.Username, UserID: auth.UserID, Password: auth.Password, ApplicationCredentialID: auth.ApplicationCredentialID,
-		ApplicationCredentialName: auth.ApplicationCredentialName, ApplicationCredentialSecret: auth.ApplicationCredentialSecret, DomainName: auth.DomainName, Scope: auth.Scope}).Return(&policy.Context{Request: map[string]string{"user_id": auth.UserID,
-		"project_id": auth.Scope.ProjectID, "password": auth.Password, "application_credential_id": auth.ApplicationCredentialID, "application_credentail_name": auth.ApplicationCredentialName, "application_credential_secret": auth.ApplicationCredentialSecret},
+	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{IdentityEndpoint: auth.IdentityEndpoint, Username: auth.Username, UserID: auth.UserID,
+		Password: auth.Password, DomainName: auth.DomainName, Scope: auth.Scope}).Return(&policy.Context{Request: map[string]string{"username": auth.Username,
+		"password": auth.Password, "user_domain_name": "domainname", "project_id": auth.Scope.ProjectID},
 		Auth: map[string]string{"project_id": auth.Scope.ProjectID}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
 	// call this explicitly since the mocked storage does not
 	fetchToken()
@@ -428,14 +425,15 @@ func Test_Auth(t *testing.T) {
 		appcredsecret string
 		expectpanic   bool
 	}{
-		{"passwithauthtype", "", "password", "testname", "testid", "testwd", "", "", "", false},
-		{"passwithoutauthtype", "", "", "testname", "testid", "testwd", "", "", "", false},
+		{"passwithauthtype", "", "password", "", "testid", "testwd", "", "", "", false},
+		{"passwithoutauthtype", "", "", "testname", "", "testwd", "", "", "", false},
+		{"failusernameandid", "", "password", "testname", "testid", "testwd", "", "", "", true},
 		{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", "", "", "", false},
 		{"tokenwithpasswithoutauthtype", "ABC", "", "testname", "testid", "testwd", "", "", "", true},
-		{"appcredidwithsecret", "", "application_credential", "", "", "", "testappcredid", "", "testappcredsecret", false},
-		{"appcrednamewithusername", "", "application_credential", "testname", "", "", "", "testappcredname", "", false},
-		{"appcrednamewithoutusername", "", "application_credential", "", "", "", "", "testappcredname", "", true},
-		{"appcredidwithoutsecret", "", "application_credential", "testname", "", "", "testappcredid", "", "", true},
+		{"appcredidwithsecret", "", "v3applicationcredential", "", "", "", "testappcredid", "", "testappcredsecret", false},
+		{"appcrednamewithusername", "", "v3applicationcredential", "testname", "", "", "", "testappcredname", "testappcredsecret", false},
+		{"appcrednamewithoutusername", "", "v3applicationcredential", "", "", "", "", "testappcredname", "testappcredsecret", true},
+		{"appcredidwithoutsecret", "", "v3applicationcredential", "testname", "", "", "testappcredid", "", "", true},
 	}
 
 	for _, tc := range tt {
@@ -475,6 +473,9 @@ func authentication(tokenid, authtype, username, userid, password, appcredid, ap
 	maiaURL = ""
 	promURL = ""
 
+	scope := &gophercloud.AuthScope{
+		ProjectID: "12345"}
+
 	// set mandatory parameters
 	auth = gophercloud.AuthOptions{
 		IdentityEndpoint:            "",
@@ -485,19 +486,16 @@ func authentication(tokenid, authtype, username, userid, password, appcredid, ap
 		ApplicationCredentialName:   appcredname,
 		ApplicationCredentialSecret: appcredsecret,
 		TokenID:                     tokenid,
-		Scope: &gophercloud.AuthScope{
-			ProjectID: "12345"}}
+		Scope:                       scope}
 	expectedAuth := auth
-	//if userid != "" {
-	//	expectedAuth.Username = ""
-	//}
-	if tokenid != "" {
+	if authtype == "v3applicationcredential" {
+		expectedAuth.Scope = nil
+		expectedAuth.TokenID = ""
 		expectedAuth.Password = ""
-		expectedAuth.UserID = ""
+	} else if authtype == "token" {
 		expectedAuth.Username = ""
-		expectedAuth.ApplicationCredentialID = ""
-		expectedAuth.ApplicationCredentialName = ""
-		expectedAuth.ApplicationCredentialSecret = ""
+		expectedAuth.UserID = ""
+		expectedAuth.Password = ""
 	}
 
 	// create dummy keystone and storage mock
@@ -506,7 +504,7 @@ func authentication(tokenid, authtype, username, userid, password, appcredid, ap
 	keystoneMock.EXPECT().Authenticate(expectedAuth).Return(&policy.Context{
 		Request: map[string]string{
 			"user_id":                       auth.UserID,
-			"project_id":                    auth.Scope.ProjectID,
+			"project_id":                    "12345",
 			"password":                      auth.Password,
 			"application_credential_id":     auth.ApplicationCredentialID,
 			"application_credential_name":   auth.ApplicationCredentialName,
