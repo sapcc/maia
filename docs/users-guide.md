@@ -298,6 +298,12 @@ Domain scoped user:
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
 
+Application Credential
+
+* `*app_cred_id`
+* `*app_cred_name@user_id`
+* `*app_cred_name@user_name@user_domain_name`
+
 ### OpenStack Authentication and Authorization
 
 In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order
