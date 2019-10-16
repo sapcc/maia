@@ -52,8 +52,29 @@ You may also use the special username syntax described [here](#openstack-authent
 to log right into your target project.
 
 ```
-Username: myUser@mydomain|myproject@mydomain
+Username: myuser@mydomain|myproject@mydomain
 Password: ********
+```
+
+#### Login Using Application Credentials
+
+OpenStack _application credentials_ can also be used in place of username and password. With these credentials you are implicitly scoped
+to a single project (or domain), so there is no need to supply scope information as before.
+
+There are two ways to authenticate with application credentials:
+* ID-based: Use the application credential ID as username and put an asterisk (`*`) at the very beginning
+* Name-based: Use the application credential name and qualify it using the username or user ID
+
+In both cases you use the _secret_ of the application credential as password.
+
+Examples:
+```
+# this is an example of ID-based login
+username: *myappcredid
+password: myappcredsecret
+# this is an example of name-based login
+username: *myappcredname@myuser@mydomain
+password: myappcredsecret
 ```
 
 ### The Maia Screen
