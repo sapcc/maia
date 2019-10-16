@@ -48,7 +48,7 @@ URL: https://maia.myopenstack.net
 Username: myUser
 ```
 
-You may also use the special username syntax described [here](#openstack-authentication-and-authorization)
+You may also use the special username syntax described in more detail [here](#openstack-authentication-and-authorization)
 to log right into your target project.
 
 ```
@@ -56,18 +56,8 @@ Username: myuser@mydomain|myproject@mydomain
 Password: ********
 ```
 
-#### Login Using Application Credentials
+Or you use OpenStack _application credentials_:
 
-OpenStack _application credentials_ can also be used in place of username and password. With these credentials you are implicitly scoped
-to a single project (or domain), so there is no need to supply scope information as before.
-
-There are two ways to authenticate with application credentials:
-* ID-based: Use the application credential ID as username and put an asterisk (`*`) at the very beginning
-* Name-based: Use the application credential name and qualify it using the username or user ID
-
-In both cases you use the _secret_ of the application credential as password.
-
-Examples:
 ```
 # this is an example of ID-based login
 username: *myappcredid
@@ -308,7 +298,7 @@ Domain scoped user:
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
 
-### Background: OpenStack Authentication and Authorization
+### OpenStack Authentication and Authorization
 
 In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order
 to support existing clients like Grafana and federated Prometheus.
@@ -325,6 +315,18 @@ The problem with basic authentication is that it lacks a standard way to express
  into a username and scope part: `user|scope`. Like with usernames, also the scoped project resp. domain can be
  denoted by name: `projectname@domainname`. To disambiguate scoping by project-id and domain-name, the domain is always prefixed
  with `@`.
+
+Alternatively, OpenStack _application credentials_ can be used in place of username and password. With these credentials you are implicitly scoped
+to a single project (or domain), so there is no need to supply scope information as before.
+
+To tell Maia that the username and password fields are actually containing _application credentials_,
+you put an asterisk (`*`) in front of the username value.
+
+There are two ways to authenticate with application credentials:
+* ID-based: Use the application credential ID as username
+* Name-based: Use the application credential name and qualify it using the username or user ID
+
+In both cases you use the _secret_ of the application credential as password.
 
 # Federating Maia to Prometheus
 
