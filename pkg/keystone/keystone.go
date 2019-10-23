@@ -129,6 +129,7 @@ type keystoneToken struct {
 	ProjectScope keystoneTokenThingInDomain `json:"project"`
 	Roles        []keystoneTokenThing       `json:"roles"`
 	User         keystoneTokenThingInDomain `json:"user"`
+	Application  keystoneTokenThingInDomain `json:"application"`
 	Token        string
 	ExpiresAt    string `json:"expires_at"`
 }
@@ -147,23 +148,27 @@ func (t *keystoneToken) ToContext() policy.Context {
 	c := policy.Context{
 		Roles: make([]string, 0, len(t.Roles)),
 		Auth: map[string]string{
-			"user_id":             t.User.ID,
-			"user_name":           t.User.Name,
-			"user_domain_id":      t.User.Domain.ID,
-			"user_domain_name":    t.User.Domain.Name,
-			"domain_id":           t.DomainScope.ID,
-			"domain_name":         t.DomainScope.Name,
-			"project_id":          t.ProjectScope.ID,
-			"project_name":        t.ProjectScope.Name,
-			"project_domain_id":   t.ProjectScope.Domain.ID,
-			"project_domain_name": t.ProjectScope.Domain.Name,
-			"token":               t.Token,
-			"token-expiry":        t.ExpiresAt,
+			"user_id":                     t.User.ID,
+			"user_name":                   t.User.Name,
+			"user_domain_id":              t.User.Domain.ID,
+			"user_domain_name":            t.User.Domain.Name,
+			"application_credential_id":   t.Application.ID,
+			"application_credential_name": t.Application.Name,
+			"domain_id":                   t.DomainScope.ID,
+			"domain_name":                 t.DomainScope.Name,
+			"project_id":                  t.ProjectScope.ID,
+			"project_name":                t.ProjectScope.Name,
+			"project_domain_id":           t.ProjectScope.Domain.ID,
+			"project_domain_name":         t.ProjectScope.Domain.Name,
+			"token":                       t.Token,
+			"token-expiry":                t.ExpiresAt,
 		},
 		Request: map[string]string{
-			"user_id":    t.User.ID,
-			"domain_id":  t.DomainScope.ID,
-			"project_id": t.ProjectScope.ID,
+			"user_id":                     t.User.ID,
+			"domain_id":                   t.DomainScope.ID,
+			"project_id":                  t.ProjectScope.ID,
+			"application_credential_id":   t.Application.ID,
+			"application_credential_name": t.Application.Name,
 		},
 		Logger: util.LogDebug,
 	}
@@ -264,6 +269,14 @@ func authOpts2StringKey(authOpts gophercloud.AuthOptions) string {
 
 	// build unique key by separating fields with blanks. Since blanks are not allowed in several of those
 	// the result will be unique
+
+	// For Application Credentials there will be no scope so it can't be used to store the token
+	if authOpts.ApplicationCredentialID != "" || authOpts.ApplicationCredentialName != "" {
+		return authOpts.UserID + " " + authOpts.Username + " " + authOpts.Password + " " + authOpts.DomainID + " " +
+			authOpts.DomainName + " " + authOpts.ApplicationCredentialID + " " + authOpts.ApplicationCredentialName + " " +
+			authOpts.ApplicationCredentialSecret
+	}
+
 	return authOpts.UserID + " " + authOpts.Username + " " + authOpts.Password + " " + authOpts.DomainID + " " +
 		authOpts.DomainName + " " + authOpts.Scope.ProjectID + " " + authOpts.Scope.ProjectName + " " +
 		authOpts.Scope.DomainID + " " + authOpts.Scope.DomainName
@@ -300,6 +313,10 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 	r.Header.Set("X-User-Name", context.Auth["user_name"])
 	r.Header.Set("X-User-Domain-Id", context.Auth["user_domain_id"])
 	r.Header.Set("X-User-Domain-Name", context.Auth["user_domain_name"])
+	r.Header.Set("X-Application-Credential-Id", context.Auth["application_credential_id"])
+	r.Header.Set("X-Application-Credential-Name", context.Auth["application_credential_name"])
+	r.Header.Set("X-Application-Credential-Secret", context.Auth["application_credential_secret"])
+
 	if context.Auth["project_id"] != "" {
 		r.Header.Set("X-Project-Id", context.Auth["project_id"])
 		r.Header.Set("X-Project-Name", context.Auth["project_name"])
@@ -330,6 +347,12 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 		AllowReauth:      false,
 	}
 
+	// Get application credentials from header
+	appCredID := r.Header.Get("X-Application-Credential-Id")
+	appCredSecret := r.Header.Get("X-Application-Credential-Secret")
+	appCredName := r.Header.Get("X-Application-Credential-Name")
+	appCredUserName := r.Header.Get("X-User-Name")
+
 	// extract credentials
 	query := r.URL.Query()
 	if token := r.Header.Get("X-Auth-Token"); token != "" {
@@ -341,23 +364,56 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 		// move to right place
 		query.Del("x-auth-token")
 		r.Header.Set("X-Auth-Token", ba.TokenID)
+	} else if (appCredID != "" && appCredSecret != "") || (appCredName != "" && appCredUserName != "") {
+		ba.ApplicationCredentialID = appCredID
+		ba.ApplicationCredentialName = appCredName
+		ba.ApplicationCredentialSecret = appCredSecret
+		return &ba, nil
 	} else if username, password, ok := r.BasicAuth(); ok {
+		isAppCred := strings.HasPrefix(username, "*")
 		// use extended basic auth. which means that the OpenStack scope is part of the username
 		usernameParts := strings.Split(username, "|")
 		userParts := strings.Split(usernameParts[0], "@")
 		var scopeParts []string
-		if len(usernameParts) >= 2 {
-			scopeParts = strings.Split(usernameParts[1], "@")
+		if len(usernameParts) > 1 {
+			scopeParts = strings.Split(strings.Join(usernameParts[1:], "|"), "@")
 		} else {
 			// default to arbitrary project with sufficient roles after knowing the user
 			scopeParts = []string{}
 		}
 
-		// parse username part
+		// handle application credentials
+		if isAppCred {
+			// if the username is prefixed with '*', we assume these are application credentials
+			if len(userParts) == 1 {
+				// this is application credential ID (remove the leading '*')
+				ba.ApplicationCredentialID = string(userParts[0][1:])
+			} else if len(userParts) >= 2 {
+				// this is an application credential name qualified with a username
+				ba.ApplicationCredentialName = string(userParts[0][1:])
+				if len(userParts) > 2 {
+					// the username is qualified, too
+					ba.Username = userParts[1]
+					ba.DomainName = strings.Join(userParts[2:], "@")
+				} else if headerUserDomain := r.Header.Get("X-User-Domain-Name"); headerUserDomain != "" {
+					// if the domain is set in the header, an unqualified username is taken as a name and not an ID
+					ba.Username = userParts[1]
+					ba.DomainName = headerUserDomain
+				} else {
+					// guess this is an ID
+					ba.UserID = userParts[1]
+				}
+			}
+			ba.ApplicationCredentialSecret = password
+
+			return &ba, nil
+		}
+
+		// proceed with username password authentication
 		if len(userParts) > 1 {
-			// username + user-domain-name
+			// username@user-domain-name
 			ba.Username = userParts[0]
-			ba.DomainName = userParts[1]
+			ba.DomainName = strings.Join(userParts[1:], "@")
 		} else if headerUserDomain := r.Header.Get("X-User-Domain-Name"); headerUserDomain != "" {
 			// if the domain is set in the header, an unqualified username is taken as a name and not an ID
 			ba.Username = userParts[0]
@@ -381,7 +437,6 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 				return nil, err
 			}
 		}
-
 		// set password
 		ba.Password = password
 	} else {
@@ -429,7 +484,12 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 	return nil
 }
 
-// authenticate authenticates a user using available authOptionsFromRequest (username+password or token)
+// authenticate authenticates a user using OpenStack credentials.
+// Those credentials can be username+password, token or application credentials.
+// The parameter asServiceUser controls the behaviour: as a service user the method will validate incoming tokens
+// in order to determine the user roles. As a non-service user it will merely request a token from the passed credentials
+// and obtain an endpoint for the Maia service. Both cases will create a token when username and password or OpenStack application
+// credentials are passed in.
 // It returns the authorization context
 func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser bool, rescope bool) (*policy.Context, string, AuthenticationError) {
 	// check cache, which does not work if tokens are rescoped
@@ -441,6 +501,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 		}
 		return entry.(*cacheEntry).context, entry.(*cacheEntry).endpointURL, nil
 	}
+
 	//use a custom token struct instead of tokens.Token which is way incomplete
 	var tokenData keystoneToken
 	var endpointURL string
@@ -488,6 +549,10 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 				util.LogInfo("Failed login of user name %s%s for scope %+v: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, err.Error())
 			} else if authOpts.TokenID != "" {
 				util.LogInfo("Failed login of with token %s... for scope %+v: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, err.Error())
+			} else if authOpts.ApplicationCredentialID != "" {
+				util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialID, err.Error())
+			} else if authOpts.ApplicationCredentialName != "" {
+				util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialName, err.Error())
 			} else {
 				statusCode = StatusMissingCredentials
 			}
@@ -501,7 +566,8 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 			var authErr AuthenticationError
 			ce.context, ce.endpointURL, authErr = d.authenticate(gophercloud.AuthOptions{IdentityEndpoint: authOpts.IdentityEndpoint, TokenID: tokenID}, asServiceUser, false)
 			if authErr == nil && authOpts.TokenID == "" {
-				// cache basic authentication results in the same way as token validations
+				// cache basic / application credential authentication results in the same way as token validations
+				// TODO: implement for application credential case
 				util.LogDebug("Add cache entry for username %s%s for scope %+v", authOpts.UserID, authOpts.Username, authOpts.Scope)
 				d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
 			}
@@ -513,10 +579,15 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 		tokenData.User.Name = authOpts.Username
 		tokenData.User.Domain.ID = authOpts.DomainID
 		tokenData.User.Domain.Name = authOpts.DomainName
-		tokenData.ProjectScope.ID = authOpts.Scope.ProjectID
-		tokenData.ProjectScope.Name = authOpts.Scope.ProjectName
-		tokenData.DomainScope.ID = authOpts.Scope.DomainID
-		tokenData.ProjectScope.Name = authOpts.Scope.DomainName
+		if authOpts.Scope != nil {
+			tokenData.ProjectScope.ID = authOpts.Scope.ProjectID
+			tokenData.ProjectScope.Name = authOpts.Scope.ProjectName
+			tokenData.DomainScope.ID = authOpts.Scope.DomainID
+			tokenData.ProjectScope.Name = authOpts.Scope.DomainName
+		} else if authOpts.ApplicationCredentialName != "" || authOpts.ApplicationCredentialID != "" {
+			tokenData.Application.ID = authOpts.ApplicationCredentialID
+			tokenData.Application.Name = authOpts.ApplicationCredentialName
+		}
 
 		endpointURL, err = client.EndpointLocator(metricsEndpointOpts)
 		if err != nil {

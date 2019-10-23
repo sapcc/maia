@@ -48,12 +48,23 @@ URL: https://maia.myopenstack.net
 Username: myUser
 ```
 
-You may also use the special username syntax described [here](#openstack-authentication-and-authorization)
+You may also use the special username syntax described in more detail [here](#openstack-authentication-and-authorization)
 to log right into your target project.
 
 ```
-Username: myUser@mydomain|myproject@mydomain
+Username: myuser@mydomain|myproject@mydomain
 Password: ********
+```
+
+Or you use OpenStack _application credentials_:
+
+```
+# this is an example of ID-based login
+username: *myappcredid
+password: myappcredsecret
+# this is an example of name-based login
+username: *myappcredname@myuser@mydomain
+password: myappcredsecret
 ```
 
 ### The Maia Screen
@@ -111,14 +122,18 @@ The `maia` command can also be used to retrieve metrics from the Maia service. I
 | --os-username | OS_USERNAME | OpenStack username, requires `os-user-domain-name` |
 | --os-user-id | OS_USER_ID | OpenStack user unique ID |
 | --os-password | OS_PASSWORD | Password |
+| --os-token | OS_TOKEN | Pregenerated Keystone token with authorization scope |
+| --os-application-credential-id | OS_APPLICATION_CREDENTIAL_ID | ID of an _application credential_ |
+| --os-application-credential-name | OS_APPLICATION_CREDENTIAL_NAME | name of an _application credential_, scoped by user |
+| --os-application-credential-secret | OS_APPLICATION_CREDENTIAL_SECRET | secret of an _application credential_ |
 | --os-user-domain-name | OS_USER_DOMAIN_NAME | domain name, qualifying the username (default: `Default`) |
 | --os-user-domain-id | OS_USER_DOMAIN_ID | domain unique ID, qualifying the username (default: `default`) |
 | --os-project-name | OS_PROJECT_NAME | OpenStack project name for authorization scoping to project, requires `os-project-domain-name` |
 | --os-project-id | OS_PROJECT_ID | OpenStack project unique ID |
 | --os-domain-name | OS_DOMAIN_NAME | OpenStack domain name for authorization scoping to domain |
 | --os-domain-id | OS_DOMAIN_ID | OpenStack domain unique ID for authorization scoping to domain |
-| --os-token | OS_TOKEN | Pregenerated Keystone token with authorization scope |
 | --os-auth-url | OS_AUTH_URL | Endpoint of the Identity v3 service. Needed to authentication and Maia endpoint lookup |
+| --os-auth-type | OS_AUTH_TYPE | Authentication method to use: one of `password`, `token`, `v3applicationcredential`|
 
 Usually, you can reuse your existing RC-files. For performance reasons, you should consider token-based
 authentication whenever you make several calls to the Maia CLI.
@@ -283,7 +298,13 @@ Domain scoped user:
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
 
-### Background: OpenStack Authentication and Authorization
+Application Credential:
+
+* `*app_cred_id`
+* `*app_cred_name@user_id`
+* `*app_cred_name@user_name@user_domain_name`
+
+### OpenStack Authentication and Authorization
 
 In addition to 'native' OpenStack authentication using Keystone tokens, Maia supports basic authentication in order
 to support existing clients like Grafana and federated Prometheus.
@@ -300,6 +321,18 @@ The problem with basic authentication is that it lacks a standard way to express
  into a username and scope part: `user|scope`. Like with usernames, also the scoped project resp. domain can be
  denoted by name: `projectname@domainname`. To disambiguate scoping by project-id and domain-name, the domain is always prefixed
  with `@`.
+
+Alternatively, OpenStack _application credentials_ can be used in place of username and password. With these credentials you are implicitly scoped
+to a single project (or domain), so there is no need to supply scope information as before.
+
+To tell Maia that the username and password fields are actually containing _application credentials_,
+you put an asterisk (`*`) in front of the username value.
+
+There are two ways to authenticate with application credentials:
+* ID-based: Use the application credential ID as username
+* Name-based: Use the application credential name and qualify it using the username or user ID
+
+In both cases you use the _secret_ of the application credential as password.
 
 # Federating Maia to Prometheus
 

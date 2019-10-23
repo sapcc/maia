@@ -61,7 +61,7 @@ func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.Mo
 	auth = gophercloud.AuthOptions{
 		IdentityEndpoint: "",
 		Username:         "username",
-		UserID:           "user_id",
+		DomainName:       "domainname",
 		Password:         "testwd",
 		Scope: &gophercloud.AuthScope{
 			ProjectID: "12345"}}
@@ -77,8 +77,10 @@ func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.Mo
 }
 
 func expectAuth(keystoneMock *keystone.MockDriver) {
-	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{IdentityEndpoint: auth.IdentityEndpoint, Username: auth.Username, UserID: auth.UserID, Password: auth.Password, DomainName: auth.DomainName, Scope: auth.Scope}).Return(&policy.Context{Request: map[string]string{"user_id": auth.UserID,
-		"project_id": auth.Scope.ProjectID, "password": auth.Password}, Auth: map[string]string{"project_id": auth.Scope.ProjectID}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
+	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{IdentityEndpoint: auth.IdentityEndpoint, Username: auth.Username, UserID: auth.UserID,
+		Password: auth.Password, DomainName: auth.DomainName, Scope: auth.Scope}).Return(&policy.Context{Request: map[string]string{"username": auth.Username,
+		"password": auth.Password, "user_domain_name": "domainname", "project_id": auth.Scope.ProjectID},
+		Auth: map[string]string{"project_id": auth.Scope.ProjectID}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
 	// call this explicitly since the mocked storage does not
 	fetchToken()
 }
@@ -412,23 +414,31 @@ func ExampleQuery_rangeSeriesTable() {
 
 func Test_Auth(t *testing.T) {
 	tt := []struct {
-		name        string
-		tokenid     string
-		authtype    string
-		username    string
-		userid      string
-		password    string
-		expectpanic bool
+		name          string
+		tokenid       string
+		authtype      string
+		username      string
+		userid        string
+		password      string
+		appcredid     string
+		appcredname   string
+		appcredsecret string
+		expectpanic   bool
 	}{
-		{"passwithauthtype", "", "password", "testname", "testid", "testwd", false},
-		{"passwithoutauthtype", "", "", "testname", "testid", "testwd", false},
-		{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", false},
-		{"tokenwithpasswithoutauthtype", "ABC", "", "testname", "testid", "testwd", true},
+		{"passwithauthtype", "", "password", "", "testid", "testwd", "", "", "", false},
+		{"passwithoutauthtype", "", "", "testname", "", "testwd", "", "", "", false},
+		{"failusernameandid", "", "password", "testname", "testid", "testwd", "", "", "", true},
+		{"tokenwithpasswithauthtype", "ABC", "token", "testname", "testid", "testwd", "", "", "", false},
+		{"tokenwithpasswithoutauthtype", "ABC", "", "testname", "testid", "testwd", "", "", "", true},
+		{"appcredidwithsecret", "", "v3applicationcredential", "", "", "", "testappcredid", "", "testappcredsecret", false},
+		{"appcrednamewithusername", "", "v3applicationcredential", "testname", "", "", "", "testappcredname", "testappcredsecret", false},
+		{"appcrednamewithoutusername", "", "v3applicationcredential", "", "", "", "", "testappcredname", "testappcredsecret", true},
+		{"appcredidwithoutsecret", "", "v3applicationcredential", "testname", "", "", "testappcredid", "", "", true},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			paniced := authentication(tc.tokenid, tc.authtype, tc.username, tc.userid, tc.password)
+			paniced := authentication(tc.tokenid, tc.authtype, tc.username, tc.userid, tc.password, tc.appcredid, tc.appcredname, tc.appcredsecret)
 			if paniced != tc.expectpanic {
 				t.Errorf("Panic does not match desired result for test: %v", tc)
 			}
@@ -437,7 +447,7 @@ func Test_Auth(t *testing.T) {
 
 }
 
-func authentication(tokenid, authtype, username, userid, password string) (paniced bool) {
+func authentication(tokenid, authtype, username, userid, password, appcredid, appcredname, appcredsecret string) (paniced bool) {
 	paniced = false
 
 	defer func() {
@@ -463,23 +473,29 @@ func authentication(tokenid, authtype, username, userid, password string) (panic
 	maiaURL = ""
 	promURL = ""
 
+	scope := &gophercloud.AuthScope{
+		ProjectID: "12345"}
+
 	// set mandatory parameters
 	auth = gophercloud.AuthOptions{
-		IdentityEndpoint: "",
-		Username:         username,
-		UserID:           userid,
-		Password:         password,
-		TokenID:          tokenid,
-		Scope: &gophercloud.AuthScope{
-			ProjectID: "12345"}}
+		IdentityEndpoint:            "",
+		Username:                    username,
+		UserID:                      userid,
+		Password:                    password,
+		ApplicationCredentialID:     appcredid,
+		ApplicationCredentialName:   appcredname,
+		ApplicationCredentialSecret: appcredsecret,
+		TokenID:                     tokenid,
+		Scope:                       scope}
 	expectedAuth := auth
-	//if userid != "" {
-	//	expectedAuth.Username = ""
-	//}
-	if tokenid != "" {
+	if authtype == "v3applicationcredential" {
+		expectedAuth.Scope = nil
+		expectedAuth.TokenID = ""
 		expectedAuth.Password = ""
-		expectedAuth.UserID = ""
+	} else if authtype == "token" {
 		expectedAuth.Username = ""
+		expectedAuth.UserID = ""
+		expectedAuth.Password = ""
 	}
 
 	// create dummy keystone and storage mock
@@ -487,9 +503,12 @@ func authentication(tokenid, authtype, username, userid, password string) (panic
 	setKeystoneInstance(keystoneMock)
 	keystoneMock.EXPECT().Authenticate(expectedAuth).Return(&policy.Context{
 		Request: map[string]string{
-			"user_id":    auth.UserID,
-			"project_id": auth.Scope.ProjectID,
-			"password":   auth.Password},
+			"user_id":                       auth.UserID,
+			"project_id":                    "12345",
+			"password":                      auth.Password,
+			"application_credential_id":     auth.ApplicationCredentialID,
+			"application_credential_name":   auth.ApplicationCredentialName,
+			"application_credential_secret": auth.ApplicationCredentialSecret},
 		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
 		Roles: []string{"monitoring_viewer"},
 	}, "http://localhost:9091", nil)
