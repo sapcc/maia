@@ -298,7 +298,7 @@ Domain scoped user:
 * `user_id|@domain_name`
 * `user_name@user_domain_name|@domain_name`
 
-Application Credential
+Application Credential:
 
 * `*app_cred_id`
 * `*app_cred_name@user_id`
