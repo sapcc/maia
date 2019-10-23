@@ -344,7 +344,7 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*gophercloud.AuthOptions, AuthenticationError) {
 	ba := gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		AllowReauth:      false,
+		AllowReauth:      true,
 	}
 
 	// Get application credentials from header
@@ -419,7 +419,7 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 			ba.Username = userParts[0]
 			ba.DomainName = headerUserDomain
 		} else {
-			// TODO guess if this is a name of an ID
+			// idea: guess if this is a name of an ID
 			ba.UserID = userParts[0]
 		}
 
@@ -567,7 +567,6 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 			ce.context, ce.endpointURL, authErr = d.authenticate(gophercloud.AuthOptions{IdentityEndpoint: authOpts.IdentityEndpoint, TokenID: tokenID}, asServiceUser, false)
 			if authErr == nil && authOpts.TokenID == "" {
 				// cache basic / application credential authentication results in the same way as token validations
-				// TODO: implement for application credential case
 				util.LogDebug("Add cache entry for username %s%s for scope %+v", authOpts.UserID, authOpts.Username, authOpts.Scope)
 				d.tokenCache.Set(authOpts2StringKey(authOpts), &ce, cache.DefaultExpiration)
 			}
