@@ -5,13 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch CLI",
+            "name": "Launch CLI (password)",
             "type": "go",
             "request": "launch",
             "args": ["query", "--format", "table", "--columns", "domain", "limes_project_quota"],
             "mode": "debug",
             "program": "${workspaceFolder}/main.go",
             "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "Launch CLI (app-cred)",
+            "type": "go",
+            "request": "launch",
+            "args": ["query", "--format", "table", "--columns", "domain", "limes_project_quota"],
+            "mode": "debug",
+            "program": "${workspaceFolder}/main.go",
+            "envFile": "${workspaceFolder}/.env-ac"
         },
         {
             "name": "Launch test package",

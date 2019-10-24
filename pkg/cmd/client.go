@@ -124,10 +124,13 @@ func fetchToken() {
 			panic(fmt.Errorf("You must specify --os-username or --os-user-id when using" +
 				" --os-application-credential-name"))
 		}
+		if auth.ApplicationCredentialID != "" {
+			auth.UserID = ""
+			auth.Username = ""
+			auth.DomainID = ""
+			auth.DomainName = ""
+		}
 		auth.Password = ""
-		auth.UserID = ""
-		auth.DomainID = ""
-		auth.DomainName = ""
 		auth.TokenID = ""
 		auth.Scope = nil
 	}
