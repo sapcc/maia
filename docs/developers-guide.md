@@ -70,7 +70,7 @@ The problem with basic authentication is that it lacks a standard way to express
 
  #### Application Credential Authentication
 
- Maia also supports authentication with application credentials.  In order to use application credentials you must supply an application credential secret in conjunction with either an application credential ID, or an application credential name and an openstack username.  
+ Maia also supports authentication with [application credentials](https://docs.openstack.org/python-openstackclient/rocky/cli/command-objects/application-credentials.html).  In order to use application credentials you must supply an application credential secret in conjunction with either an application credential ID, or an application credential name and an openstack username.  
 
  The scope of the authentication for application credentials will be determined by the project in which the application credentials were created.
 
