@@ -49,11 +49,10 @@ func Server() error {
 		panic(fmt.Errorf("Prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
 	}
 
+	// the main router dispatches all incoming requests
 	mainRouter := setupRouter(keystone.NewKeystoneDriver(), storage.NewPrometheusDriver(prometheusAPIURL, map[string]string{}))
-
 	http.Handle("/", mainRouter)
 
-	//start HTTP server
 	bindAddress := viper.GetString("maia.bind_address")
 	util.LogInfo("listening on %s", bindAddress)
 
@@ -63,9 +62,11 @@ func Server() error {
 	})
 	handler := c.Handler(mainRouter)
 
+	//start HTTP server and block
 	return http.ListenAndServe(bindAddress, handler)
 }
 
+// setupRouter initializes the main http router
 func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler {
 	storageInstance = storage
 	keystoneInstance = keystone
@@ -94,16 +95,18 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler 
 	mainRouter.Methods(http.MethodGet).PathPrefix("/static/").HandlerFunc(serveStaticContent)
 	mainRouter.Methods(http.MethodGet).PathPrefix("/favicon.ico").HandlerFunc(serveStaticContent)
 	mainRouter.Methods(http.MethodGet).Path("/graph").HandlerFunc(redirectToRootPage)
-	// instrumentation
+	// scrape endpoint for Prometheus
 	mainRouter.Handle("/metrics", promhttp.Handler())
 
 	// domain-prefixed paths. Order is relevant! This implies that there must be no domain federate, static or graph :-)
 	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(authorize(graph, true, "metric:show"))
 	mainRouter.Methods(http.MethodGet).Path("/{domain}").HandlerFunc(redirectToDomainRootPage)
 
+	// provide the inflight metrics for all paths
 	return gaugeInflight(mainRouter)
 }
 
+// redirectToDomainRootPage will redirect users to the UI start page for their domain
 func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
 	domain, ok := mux.Vars(r)["domain"]
 	if !ok {
@@ -118,6 +121,7 @@ func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, newPath, http.StatusFound)
 }
 
+// redirectToRootPage will redirect users to the global start page
 func redirectToRootPage(w http.ResponseWriter, r *http.Request) {
 	domain := viper.GetString("keystone.default_user_domain_name")
 	username, _, ok := r.BasicAuth()
@@ -130,6 +134,7 @@ func redirectToRootPage(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, newPath, http.StatusFound)
 }
 
+// serveStaticContent serves all the static assets of the web UI (pages, js, images)
 func serveStaticContent(w http.ResponseWriter, req *http.Request) {
 	fp := req.URL.Path
 	if fp == "/favicon.ico" {
@@ -175,19 +180,7 @@ func Federate(w http.ResponseWriter, req *http.Request) {
 	ReturnResponse(w, response)
 }
 
+// graph returns the Prometheus UI page
 func graph(w http.ResponseWriter, req *http.Request) {
 	ui.ExecuteTemplate(w, req, "graph.html", keystoneInstance, nil)
 }
-
-/*
-func forwardRequest(w http.ResponseWriter, req *http.Request) {
-	resp, err := storageInstance.DelegateRequest(req)
-
-	if err != nil {
-		ReturnPromError(w, err, http.StatusBadGateway)
-		return
-	}
-
-	ReturnResponse(w, resp)
-}
-*/

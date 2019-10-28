@@ -78,7 +78,8 @@ func (d *keystone) init() {
 	d.serviceConnMutex = &sync.Mutex{}
 	d.serviceTokenMutex = &sync.Mutex{}
 	if viper.Get("keystone.username") != nil {
-		// force service logon
+		// force service logon to check validity early
+		// this will set d.providerClient
 		_, err := d.serviceKeystoneClient()
 		if err != nil {
 			panic(err)
@@ -86,6 +87,7 @@ func (d *keystone) init() {
 	}
 }
 
+// serviceKeystoneClient creates and returns the keystone connection used by the running service
 func (d *keystone) serviceKeystoneClient() (*gophercloud.ServiceClient, error) {
 	d.serviceConnMutex.Lock()
 	defer d.serviceConnMutex.Unlock()
@@ -97,12 +99,15 @@ func (d *keystone) serviceKeystoneClient() (*gophercloud.ServiceClient, error) {
 			return nil, err
 		}
 		d.providerClient = client
+		// load the list of all known domains and roles to avoid frequent API calls
+		// changes will not be recognized at runtime
 		d.loadDomainsAndRoles()
 	}
 
 	return d.providerClient, nil
 }
 
+// newKeystoneClient creates a new keystone-connection
 func newKeystoneClient(authOpts gophercloud.AuthOptions) (*gophercloud.ServiceClient, error) {
 	provider, err := openstack.AuthenticatedClient(authOpts)
 	if err != nil {
@@ -124,6 +129,10 @@ func newKeystoneClient(authOpts gophercloud.AuthOptions) (*gophercloud.ServiceCl
 	return client, nil
 }
 
+// keystoneToken combines all parts of a get-token result into a single struct.
+// It is a replacement for the somewhat annoying need to call
+// various Extract...() methods on a GetResult to collect all
+// the bits and pieces
 type keystoneToken struct {
 	DomainScope  keystoneTokenThing         `json:"domain"`
 	ProjectScope keystoneTokenThingInDomain `json:"project"`
@@ -134,16 +143,20 @@ type keystoneToken struct {
 	ExpiresAt    string `json:"expires_at"`
 }
 
+// keystoneTokenThing is an OpenStack resource identifier
 type keystoneTokenThing struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
+// keystoneTokenThingInDomain is a qualified resource identifier
 type keystoneTokenThingInDomain struct {
 	keystoneTokenThing
 	Domain keystoneTokenThing `json:"domain"`
 }
 
+// ToContext transforms our custom keystoneToken structure
+// into a databus23 policy context
 func (t *keystoneToken) ToContext() policy.Context {
 	c := policy.Context{
 		Roles: make([]string, 0, len(t.Roles)),
@@ -184,6 +197,8 @@ func (t *keystoneToken) ToContext() policy.Context {
 	return c
 }
 
+// cacheEntry contains the result of a get-token call to Keystone
+// so instead of a call to Keystone the cache can be consulted
 type cacheEntry struct {
 	context     *policy.Context
 	endpointURL string
@@ -196,8 +211,9 @@ func (d *keystone) ServiceURL() string {
 	return d.serviceURL
 }
 
+// loadDomainsAndRoles builds an "index" for roles and domains
+// to avoid frequent calls to Keystone
 func (d *keystone) loadDomainsAndRoles() {
-	// load all roles
 	util.LogInfo("Loading/refreshing global list of domains and roles")
 
 	allRoles := struct {
@@ -247,6 +263,7 @@ func (d *keystone) loadDomainsAndRoles() {
 	}
 }
 
+// authOptionsFromConfig builds the AuthOptions struct for the service user from the configuration
 func authOptionsFromConfig() gophercloud.AuthOptions {
 	return gophercloud.AuthOptions{
 		IdentityEndpoint: viper.GetString("keystone.auth_url"),
@@ -262,7 +279,9 @@ func authOptionsFromConfig() gophercloud.AuthOptions {
 	}
 }
 
+// authOpts2StringKey builds a key from an AuthOptions struct for use with the token cache
 func authOpts2StringKey(authOpts gophercloud.AuthOptions) string {
+	// the key of a token is the token itself
 	if authOpts.TokenID != "" {
 		return authOpts.TokenID
 	}
@@ -270,13 +289,14 @@ func authOpts2StringKey(authOpts gophercloud.AuthOptions) string {
 	// build unique key by separating fields with blanks. Since blanks are not allowed in several of those
 	// the result will be unique
 
-	// For Application Credentials there will be no scope so it can't be used to store the token
+	// for Application Credentials there will be no scope so it can't be used to store the token
 	if authOpts.ApplicationCredentialID != "" || authOpts.ApplicationCredentialName != "" {
 		return authOpts.UserID + " " + authOpts.Username + " " + authOpts.Password + " " + authOpts.DomainID + " " +
 			authOpts.DomainName + " " + authOpts.ApplicationCredentialID + " " + authOpts.ApplicationCredentialName + " " +
 			authOpts.ApplicationCredentialSecret
 	}
 
+	// for basic authentiation credentials we need to take into account the scoping information as well
 	return authOpts.UserID + " " + authOpts.Username + " " + authOpts.Password + " " + authOpts.DomainID + " " +
 		authOpts.DomainName + " " + authOpts.Scope.ProjectID + " " + authOpts.Scope.ProjectName + " " +
 		authOpts.Scope.DomainID + " " + authOpts.Scope.DomainName
@@ -308,7 +328,8 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 		return nil, err
 	}
 
-	// write this to request header (compatible with databus23/keystone)
+	// the resulting policy Context structure is copied into header fields
+	// so that we do not have to add an extra parameter to every function.
 	r.Header.Set("X-User-Id", context.Auth["user_id"])
 	r.Header.Set("X-User-Name", context.Auth["user_name"])
 	r.Header.Set("X-User-Domain-Id", context.Auth["user_domain_id"])
@@ -318,14 +339,17 @@ func (d *keystone) AuthenticateRequest(r *http.Request, guessScope bool) (*polic
 	r.Header.Set("X-Application-Credential-Secret", context.Auth["application_credential_secret"])
 
 	if context.Auth["project_id"] != "" {
+		// user is scoped to project
 		r.Header.Set("X-Project-Id", context.Auth["project_id"])
 		r.Header.Set("X-Project-Name", context.Auth["project_name"])
 		r.Header.Set("X-Project-Domain-Id", context.Auth["project_domain_id"])
 		r.Header.Set("X-Project-Domain-Name", context.Auth["project_domain_name"])
 	} else {
+		// user is scoped to domain
 		r.Header.Set("X-Domain-Id", context.Auth["domain_id"])
 		r.Header.Set("X-Domain-Name", context.Auth["domain_name"])
 	}
+	// add each role as well (Add will queue up the items passed in)
 	for _, role := range context.Roles {
 		r.Header.Add("X-Roles", role)
 	}
@@ -370,8 +394,8 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 		ba.ApplicationCredentialSecret = appCredSecret
 		return &ba, nil
 	} else if username, password, ok := r.BasicAuth(); ok {
+		// use our own flavour of basic auth. where the username is used for scoping or application credentials, too
 		isAppCred := strings.HasPrefix(username, "*")
-		// use extended basic auth. which means that the OpenStack scope is part of the username
 		usernameParts := strings.Split(username, "|")
 		userParts := strings.Split(usernameParts[0], "@")
 		var scopeParts []string
@@ -423,7 +447,9 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 			ba.UserID = userParts[0]
 		}
 
+		// check if the scope is defined by qualified project name or by unique project ID
 		if len(scopeParts) >= 2 {
+			// project-name@project-domain-name
 			ba.Scope = new(gophercloud.AuthScope)
 			// assume domains are always prefixed with @
 			if scopeParts[0] != "" {
@@ -431,19 +457,22 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 			}
 			ba.Scope.DomainName = scopeParts[1]
 		} else if len(scopeParts) >= 1 {
+			// project-id
 			ba.Scope = &gophercloud.AuthScope{ProjectID: scopeParts[0]}
 		} else if guessScope {
+			// not defined: choose an arbitrary project where the user has access (needed for UX reasons)
 			if err := d.guessScope(&ba); err != nil {
 				return nil, err
 			}
 		}
-		// set password
+
+		// finall set the password
 		ba.Password = password
 	} else {
 		return nil, NewAuthenticationError(StatusMissingCredentials, "Authorization header missing (no username/password or token)")
 	}
 
-	// check overriding project/domain via ULR param, so end-users can encode this in the URL
+	// check overriding project/domain via ULR param, so end-users can encode this in the URL (e.g. for bookmarks)
 	if projectID := query.Get("project_id"); projectID != "" {
 		ba.Scope = &gophercloud.AuthScope{ProjectID: projectID}
 		query.Del("project_id")
@@ -486,13 +515,15 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 
 // authenticate authenticates a user using OpenStack credentials.
 // Those credentials can be username+password, token or application credentials.
-// The parameter asServiceUser controls the behaviour: as a service user the method will validate incoming tokens
+// The parameter `asServiceUser` controls the behaviour: as a service user the method will validate incoming tokens
 // in order to determine the user roles. As a non-service user it will merely request a token from the passed credentials
 // and obtain an endpoint for the Maia service. Both cases will create a token when username and password or OpenStack application
 // credentials are passed in.
+// `rescope` will be set to `true` to indicate that the token passed needs to be used to create a new token
+// because the scope should be changed.
 // It returns the authorization context
 func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser bool, rescope bool) (*policy.Context, string, AuthenticationError) {
-	// check cache, which does not work if tokens are rescoped
+	// check cache, but ignore the result if tokens are rescoped
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found && (authOpts.Scope == nil || authOpts.Scope.ProjectID == entry.(*cacheEntry).context.Auth["project_id"]) {
 		if authOpts.TokenID != "" {
 			util.LogDebug("Token cache hit: token %s... for scope %+v", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope)
@@ -502,7 +533,6 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser 
 		return entry.(*cacheEntry).context, entry.(*cacheEntry).endpointURL, nil
 	}
 
-	//use a custom token struct instead of tokens.Token which is way incomplete
 	var tokenData keystoneToken
 	var endpointURL string
 	if authOpts.TokenID != "" && asServiceUser && !rescope {
@@ -623,9 +653,13 @@ func (d *keystone) ChildProjects(projectID string) ([]string, error) {
 	return projects, nil
 }
 
+// fetchChildProjects builds the full hierarchy of child-projects. This is used
+// e.g. to compute the right project_id filter expression in the PromQL queries
+// generated by Maia
 func (d *keystone) fetchChildProjects(projectID string) ([]string, error) {
 	projectIDs := []string{}
 	enabledVal := true
+	// iterate of all pages returned by the list-projects API call
 	err := projects.List(d.providerClient, projects.ListOpts{ParentID: projectID, Enabled: &enabledVal}).EachPage(func(page pagination.Page) (bool, error) {
 		slice, err := projects.ExtractProjects(page)
 		if err != nil {
@@ -633,6 +667,7 @@ func (d *keystone) fetchChildProjects(projectID string) ([]string, error) {
 		}
 		for _, p := range slice {
 			projectIDs = append(projectIDs, p.ID)
+			//  recurse
 			children, err := d.fetchChildProjects(p.ID)
 			if err != nil {
 				return false, err
@@ -664,9 +699,11 @@ func (d *keystone) UserProjects(userID string) ([]tokens.Scope, error) {
 	return up, nil
 }
 
+// fetchUserProjects lists all projects (i.e. scopes) the user may access using Keystone (no cache lookup)
 func (d *keystone) fetchUserProjects(userID string) ([]tokens.Scope, error) {
 	scopes := []tokens.Scope{}
 	effectiveVal := true
+	// iterate of all pages returned by the list-role-assignments API call
 	err := roles.ListAssignments(d.providerClient, roles.ListAssignmentsOpts{UserID: userID, Effective: &effectiveVal}).EachPage(func(page pagination.Page) (bool, error) {
 		util.LogDebug("loading role assignment page")
 		slice, err := roles.ExtractRoleAssignments(page)
@@ -681,7 +718,7 @@ func (d *keystone) fetchUserProjects(userID string) ([]tokens.Scope, error) {
 					if err != nil {
 						return false, err
 					}
-					domainName := d.domainNames[project.DomainID] // this will panic if domains have been added
+					domainName := d.domainNames[project.DomainID] // this will panic if domains have been added meanwhile --> USE AS A TRIGGER TO RELOAD?
 					scope = tokens.Scope{ProjectID: ra.Scope.Project.ID, ProjectName: project.Name, DomainID: project.DomainID, DomainName: domainName}
 					d.projectScopeCache.Set(ra.Scope.Project.ID, scope, cache.DefaultExpiration)
 				}
@@ -713,6 +750,7 @@ func (d *keystone) UserID(username, userDomain string) (string, error) {
 	return id, nil
 }
 
+// fetchUserID determines the ID of a user of a given qualified name using Keystone (no cache lookup)
 func (d *keystone) fetchUserID(username string, userDomain string) (string, error) {
 	userDomainID := d.domainIDs[userDomain]
 	userID := ""
