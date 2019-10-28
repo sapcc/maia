@@ -68,6 +68,7 @@ func recoverAll() {
 	}
 }
 
+// fetchToken authenticates the client user according to env entries and parameters
 func fetchToken() {
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
@@ -84,30 +85,39 @@ func fetchToken() {
 		auth.ApplicationCredentialSecret = os.Getenv("OS_APPLICATION_CREDENTIAL_SECRET")
 	}
 
-	// authenticate calls to Maia directly
+	// skip token creation and catalog lookup
+	// if both token and Maia endpoint are defined
 	if auth.TokenID != "" && maiaURL != "" {
 		return
 	}
 
+	// default authType of all OpenStack clients is password
 	if authType == "" {
 		authType = "password"
 		util.LogInfo("Authentication type defaults to %s", authType)
 	}
+
+	// ignore any parameters not related to the selected authentication type
+	// to avoid keystone errors for the sake of consumability
 	if authType == "password" {
+		// check mandatory stuff
 		if auth.Password == "" {
 			panic(fmt.Errorf("You must specify --os-password"))
 		}
 		if auth.Username == "" && auth.UserID == "" {
 			panic(fmt.Errorf("You must specify --os-username or --os-user-id"))
 		}
+		// ignore tokens and application credentials
 		auth.TokenID = ""
 		auth.ApplicationCredentialName = ""
 		auth.ApplicationCredentialID = ""
 		auth.ApplicationCredentialSecret = ""
 	} else if authType == "token" {
+		// check mandatory stuff
 		if auth.TokenID == "" {
 			panic(fmt.Errorf("You must specify --os-token"))
 		}
+		// ignore anything but scope (to permit rescoping)
 		auth.Password = ""
 		auth.UserID = ""
 		auth.Username = ""
@@ -117,6 +127,7 @@ func fetchToken() {
 		auth.ApplicationCredentialID = ""
 		auth.ApplicationCredentialSecret = ""
 	} else if authType == "v3applicationcredential" {
+		// check mandatory stuff
 		if auth.ApplicationCredentialSecret == "" {
 			panic(fmt.Errorf("You must specify --os-application-credential-secret"))
 		}
@@ -124,17 +135,20 @@ func fetchToken() {
 			panic(fmt.Errorf("You must specify --os-username or --os-user-id when using" +
 				" --os-application-credential-name"))
 		}
+		// ignore anything user identifiers if specified by application credential ID
 		if auth.ApplicationCredentialID != "" {
 			auth.UserID = ""
 			auth.Username = ""
 			auth.DomainID = ""
 			auth.DomainName = ""
 		}
+		// ignore tokens, passwords and most notably scope
 		auth.Password = ""
 		auth.TokenID = ""
 		auth.Scope = nil
 	}
 
+	// error on ambiguous parameters
 	if auth.UserID != "" && auth.Username != "" {
 		panic(fmt.Errorf("Use either --os-user-id or --os-user-name but not both"))
 	}
@@ -145,16 +159,19 @@ func fetchToken() {
 		panic(fmt.Errorf("Do not specifiy --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
 	}
 
+	// finally ... authenticate with keystone
 	context, url, err := keystoneInstance().Authenticate(auth)
 	if err != nil {
 		panic(err)
 	}
+	// keep the token and use the URL from the catalog (unless set explicitly)
 	auth.TokenID = context.Auth["token"]
 	if maiaURL == "" {
 		maiaURL = url
 	}
 }
 
+// storageInstance creates a new Prometheus driver instance lazily
 func storageInstance() storage.Driver {
 	if storageDriver == nil {
 		if promURL != "" {
@@ -171,6 +188,7 @@ func storageInstance() storage.Driver {
 	return storageDriver
 }
 
+// keystoneInstance creates a new keystone driver instance lazily
 func keystoneInstance() keystone.Driver {
 	if keystoneDriver == nil {
 		setKeystoneInstance(keystone.NewKeystoneDriver())
@@ -178,6 +196,7 @@ func keystoneInstance() keystone.Driver {
 	return keystoneDriver
 }
 
+// printValues prints the result of a Maia API as raw values
 func printValues(resp *http.Response) {
 	defer resp.Body.Close()
 
@@ -216,6 +235,7 @@ func printValues(resp *http.Response) {
 	}
 }
 
+// printTable formats the result of a Maia API call as table
 func printTable(resp *http.Response) {
 	defer resp.Body.Close()
 
@@ -270,6 +290,9 @@ func printTable(resp *http.Response) {
 	}
 }
 
+// buildColumnSet determines which columns are contained in a Maia (Prometheus) query result
+// if the columns have been explicitly set via `--columns`, only those
+// columns will be taken into account regardless of the query result
 func buildColumnSet(promResult model.Value) map[string]bool {
 	result := map[string]bool{}
 	if columns != "" {
@@ -288,6 +311,7 @@ func buildColumnSet(promResult model.Value) map[string]bool {
 	return result
 }
 
+// printHeader prints the header row of a tabular output
 func printHeader(allColumns []string) {
 	if !strings.EqualFold(outputFormat, "value") {
 		for i, field := range allColumns {
@@ -300,6 +324,8 @@ func printHeader(allColumns []string) {
 	}
 }
 
+// extractSeriesColumns determines which columns (labels)
+// are contained in a `series` API call.
 func extractSeriesColumns(table []model.LabelSet) []string {
 	// print all columns
 	set := map[string]bool{}

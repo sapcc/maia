@@ -58,6 +58,7 @@ func NewV1Handler(keystone keystone.Driver, storage storage.Driver) http.Handler
 		observeDuration(observeResponseSize(p.Query, "query"), "query"),
 		false,
 		"metric:show"))
+	// tenant-aware query range
 	r.Methods(http.MethodGet).Path("/query_range").HandlerFunc(authorize(
 		observeDuration(observeResponseSize(p.QueryRange, "query_range"), "query_range"),
 		false,
@@ -108,7 +109,7 @@ func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
 	ReturnResponse(w, resp)
 }
 
-// LabelValues utilizes the series API in order to implement a tenant-aware list.
+// LabelValues utilizes the query range API in order to implement a tenant-aware list.
 // This is a complex operation.
 func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	name := model.LabelName(mux.Vars(req)["name"])
@@ -121,8 +122,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 
 	// build project_id constraint using project hierarchy
 	labelKey, labelValues := scopeToLabelConstraint(req, p.keystone)
-	// make a broad range query and aggregate by requested label. Use count() as cheap aggregation function plus a step size that
-	// yields only a single data point in the entire time-window
+	// make a broad range query and aggregate by requested label. Use count() as cheap aggregation function.
 	query, err := util.AddLabelConstraintToExpression("count({"+string(name)+"!=\"\"}) BY ("+string(name)+")", labelKey, labelValues)
 	if err != nil {
 		ReturnPromError(w, err, http.StatusBadRequest)
@@ -130,7 +130,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 
 	start := time.Now().Add(-ttl)
 	end := time.Now()
-	// choose step-size so long that only two values are returned
+	// choose step-size so long that only two values are returned (oldest and latest)
 	step := viper.GetString("maia.label_value_ttl")
 	resp, err := p.storage.QueryRange(query, start.Format(time.RFC3339), end.Format(time.RFC3339), step, "", req.Header.Get("Accept"))
 	if err != nil {
@@ -138,7 +138,8 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// extract label values from query result
+	// read the complete result into memory
+	// could this be avoided (streaming like in Java)?
 	defer resp.Body.Close()
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -146,6 +147,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// unmarshal
 	var sr storage.QueryResponse
 	if err := json.Unmarshal(buf, &sr); err != nil {
 		ReturnPromError(w, err, http.StatusInternalServerError)
@@ -162,6 +164,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 			result.Data = append(result.Data, metric.Metric[name])
 		}
 	}
+	// sort the stuff (it's often on the UI)
 	sort.Sort(result.Data)
 
 	ReturnJSON(w, 200, &result)
