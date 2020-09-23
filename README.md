@@ -58,7 +58,7 @@ Please refer to the [Maia user guide](./docs/users-guide.md) for more instructio
 The easiest way to deploy Maia as a service is Kubernetes.
 
 Feel free to reuse our [Maia helm chart](https://github.com/sapcc/helm-charts/tree/master/openstack/maia)
-which includes Maia and Prometheus.
+which includes Maia, Prometheus and Thanos.
 
 Follow the [Maia operators guide](./docs/operators-guide.md) to learn how to setup the 
 Maia service from scratch and integrate with Prometheus.
