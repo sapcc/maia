@@ -31,7 +31,8 @@ If you don't use OpenStack, you can still use Maia CLI as a feature-complete she
 
 # Installation
 
-Maia can be built with Go 1.12 and 1.13. Older versions are not supported. Newer versions are not tested.
+Maia can be built with Go 1.14, and 1.15. Older versions are not supported. Newer versions are not tested.
+
 
 ## Binary Releases
 
