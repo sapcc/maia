@@ -167,6 +167,8 @@ The _keystone_ and _storage_ package contain some preparational work to plug-in 
 
 Travis is used for building, static code checks and build-verification testing ([tutorial](https://docs.travis-ci.com/user/tutorial/)). No real integration testing takes place here.
 
+To produce local builds, the makefile can be used. See [.travis.yml](./../.travis.yml) to learn which tools and dependencies are prerequisite.
+
 The _make_ file contains additional targets that can be used e.g. to build continuous deployment pipelines:
 * all: builds and tests the binary for the current platform from scratch
 * clean: removes temporary files, vendored go packages dependencies and generated code
