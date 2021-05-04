@@ -1,4 +1,4 @@
-FROM alpine:3.9
+FROM keppel.eu-de-1.cloud.sap/ccloud-dockerhub-mirror/library/alpine:latest
 
 LABEL "maintainer"="Joachim Barheine <joachim.barheine@sap.com>"
 LABEL source_repository="https://github.com/sapcc/maia"
