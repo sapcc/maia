@@ -1,5 +1,8 @@
 # Maia
 
+
+[![CI](https://github.com/sapcc/maia/actions/workflows/ci.yaml/badge.svg)](https://github.com/sapcc/maia/actions/workflows/ci.yaml)
+
 Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers 
 a [Prometheus-compatible](https://prometheus.io/docs/querying/api/) API and supports federation.
 
