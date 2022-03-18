@@ -48,7 +48,7 @@ Visit the [Prometheus API documentation](https://prometheus.io/docs/querying/api
 Like other OpenStack services, Maia expects a valid and scoped Keystone token in the `X-Auth-Token` header field.
 
 Please refer to the [OpenStack API Quick-Start Guide](https://developer.openstack.org/api-guide/quick-start/api-quick-start.html)
-for detailled instructions.
+for detailed instructions.
 
 #### Basic Authentication
 
@@ -173,7 +173,7 @@ The _make_ file contains additional targets that can be used e.g. to build conti
 * all: builds and tests the binary for the current platform from scratch
 * clean: removes temporary files, vendored go packages dependencies and generated code
 * generate: recreates generated code (mocks, UI binding code)
-* build: builds the executable for the current platfrom
+* build: builds the executable for the current platform
 * build/platforms: builds the executable for all supported platforms
 * build/docker: builds a docker image
 * vendor: updates the vendored go packages to latest (according to `glide.yaml`)
