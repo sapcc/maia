@@ -38,7 +38,7 @@ const (
 	StatusWrongCredentials = 3
 	// StatusNoPermission means that the user could be authenticated but does not have access to the requested scope (no roles)
 	StatusNoPermission = 4
-	// StatusInternalError means that some internal error occured. Retry makes sense
+	// StatusInternalError means that some internal error occurred. Retry makes sense
 	StatusInternalError = 5
 )
 

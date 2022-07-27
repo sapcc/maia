@@ -156,7 +156,7 @@ func fetchToken() {
 		panic(fmt.Errorf("User either --os-user-domain-id or --os-user-domain-name but not both"))
 	}
 	if auth.UserID != "" && (auth.DomainID != "" || auth.DomainName != "") {
-		panic(fmt.Errorf("Do not specifiy --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
+		panic(fmt.Errorf("Do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
 	}
 
 	// finally ... authenticate with keystone
