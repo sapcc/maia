@@ -40,7 +40,7 @@ Username: myUser@myUserDomain
 Password: ******
 ```
 
-If you neither specifiy the user-domain in the username nor the URL, Maia will assume that the user is part
+If you neither specify the user-domain in the username nor the URL, Maia will assume that the user is part
 of the configured default domain (not to be confused with the OpenStack domain `default`).
 
 ```
