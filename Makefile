@@ -34,8 +34,8 @@ all: clean build check
 # If no source files have changed, `go install` exits quickly without doing anything.
 generate: FORCE
 	# generate mocks
-	mockgen --source $(GOPATH)/src/$(PKG)/pkg/storage/interface.go --destination $(GOPATH)/src/$(PKG)/pkg/storage/genmock.go --package storage
-	mockgen --source $(GOPATH)/src/$(PKG)/pkg/keystone/interface.go --destination $(GOPATH)/src/$(PKG)/pkg/keystone/genmock.go --package keystone
+	#mockgen --source $(GOPATH)/src/$(PKG)/pkg/storage/interface.go --destination $(GOPATH)/src/$(PKG)/pkg/storage/genmock.go --package storage
+	#mockgen --source $(GOPATH)/src/$(PKG)/pkg/keystone/interface.go --destination $(GOPATH)/src/$(PKG)/pkg/keystone/genmock.go --package keystone
 	# generate UI
 	go-bindata $(BINDDATA_FLAGS) -pkg ui -o pkg/ui/bindata.go -ignore '(.*\.map|bootstrap\.js|bootstrap-theme\.css|bootstrap\.css)' web/templates/... web/static/...
 	gofmt -s -w ./pkg/ui/bindata.go
