@@ -223,10 +223,10 @@ func (d *keystone) loadDomainsAndRoles() {
 
 	u := d.providerClient.ServiceURL("roles")
 	resp, err := d.providerClient.Get(u, &allRoles, nil)
-	resp.Body.Close()
 	if err != nil {
 		panic(err)
 	}
+	defer resp.Body.Close()
 
 	// get list of all monitoring role names
 	rolesNames := strings.Split(viper.GetString("keystone.roles"), ",")
