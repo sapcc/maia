@@ -42,26 +42,26 @@ import (
 
 // utility functionality
 
-//VersionData is used by version advertisement handlers.
+// VersionData is used by version advertisement handlers.
 type VersionData struct {
 	Status string            `json:"status"`
 	ID     string            `json:"id"`
 	Links  []versionLinkData `json:"links"`
 }
 
-//versionLinkData is used by version advertisement handlers, as part of the
-//VersionData struct.
+// versionLinkData is used by version advertisement handlers, as part of the
+// VersionData struct.
 type versionLinkData struct {
 	URL      string `json:"href"`
 	Relation string `json:"rel"`
 	Type     string `json:"type,omitempty"`
 }
 
-const authTokenCookieName = "X-Auth-Token"
+const authTokenCookieName = "X-Auth-Token" //nolint:gosec //not a credential
 const userDomainCookieName = "X-User-Domain-Name"
-const authTokenHeader = "X-Auth-Token"
+const authTokenHeader = "X-Auth-Token" //nolint:gosec //not a credential
 const userDomainHeader = "X-User-Domain-Name"
-const authTokenExpiryHeader = "X-Auth-Token-Expiry"
+const authTokenExpiryHeader = "X-Auth-Token-Expiry" //nolint:gosec //not a credential
 
 var policyEnforcer *policy.Enforcer
 var authErrorsCounter = prometheus.NewCounter(prometheus.CounterOpts{
@@ -94,7 +94,7 @@ func versionData() VersionData {
 	}
 }
 
-//ReturnResponse basically forwards a received Response.
+// ReturnResponse basically forwards a received Response.
 func ReturnResponse(w http.ResponseWriter, response *http.Response) {
 	defer response.Body.Close()
 
@@ -103,15 +103,16 @@ func ReturnResponse(w http.ResponseWriter, response *http.Response) {
 		w.Header().Set(k, strings.Join(v, ";"))
 	}
 	buf := new(bytes.Buffer)
-	buf.ReadFrom(response.Body)
+	buf.ReadFrom(response.Body) //nolint:errcheck // TODO go-bits replacement?
+
 	body := buf.String()
 	w.WriteHeader(response.StatusCode)
 
 	io.WriteString(w, body)
 }
 
-//ReturnJSON is a convenience function for HTTP handlers returning JSON data.
-//The `code` argument specifies the HTTP Response code, usually 200.
+// ReturnJSON is a convenience function for HTTP handlers returning JSON data.
+// The `code` argument specifies the HTTP Response code, usually 200.
 func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 	payload, err := json.Marshal(&data)
 	if err == nil {
@@ -125,7 +126,7 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 	}
 }
 
-//ReturnPromError produces a Prometheus error Response with HTTP Status code
+// ReturnPromError produces a Prometheus error Response with HTTP Status code
 func ReturnPromError(w http.ResponseWriter, err error, code int) {
 	if code >= 500 {
 		promErrorsCounter.Add(1)
@@ -158,7 +159,7 @@ func scopeToLabelConstraint(req *http.Request, keystone keystone.Driver) (string
 		return "domain_id", []string{domainID}
 	}
 
-	panic(fmt.Errorf("Missing OpenStack scope attributes in request header"))
+	panic(fmt.Errorf("missing OpenStack scope attributes in request header"))
 }
 
 // buildSelectors takes the selectors contained in the "match[]" URL query parameter(s)
@@ -192,7 +193,7 @@ func policyEngine() *policy.Enforcer {
 	// set up policy engine lazily
 	bytes, err := ioutil.ReadFile(viper.GetString("keystone.policy_file"))
 	if err != nil {
-		panic(fmt.Errorf("Policy file %s not found: %s", viper.GetString("keystone.policy_file"), err))
+		panic(fmt.Errorf("policy file %s not found: %s", viper.GetString("keystone.policy_file"), err))
 	}
 	var rules map[string]string
 	err = json.Unmarshal(bytes, &rules)
@@ -344,7 +345,6 @@ func setAuthCookies(req *http.Request, w http.ResponseWriter) {
 }
 
 func authorize(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), guessScope bool, rule string) func(w http.ResponseWriter, req *http.Request) {
-
 	return func(w http.ResponseWriter, req *http.Request) {
 		if authorizeRules(w, req, guessScope, []string{rule}) {
 			wrappedHandlerFunc(w, req)

@@ -59,7 +59,6 @@ type keystone struct {
 	// these caches are thread-safe, no need to lock because worst-case is duplicate processing efforts
 	tokenCache, projectTreeCache, userProjectsCache, userIDCache, projectScopeCache *cache.Cache
 	providerClient                                                                  *gophercloud.ServiceClient
-	seqErrors                                                                       int
 	serviceURL                                                                      string
 	// role-id --> role-name
 	monitoringRoles map[string]string
@@ -202,7 +201,6 @@ func (t *keystoneToken) ToContext() policy.Context {
 type cacheEntry struct {
 	context     *policy.Context
 	endpointURL string
-	projectTree []string
 }
 
 // ServiceURL returns the service's global catalog entry
@@ -224,7 +222,8 @@ func (d *keystone) loadDomainsAndRoles() {
 	}{}
 
 	u := d.providerClient.ServiceURL("roles")
-	_, err := d.providerClient.Get(u, &allRoles, nil)
+	resp, err := d.providerClient.Get(u, &allRoles, nil)
+	resp.Body.Close()
 	if err != nil {
 		panic(err)
 	}
@@ -236,7 +235,7 @@ func (d *keystone) loadDomainsAndRoles() {
 	// get all known roles and match them with our own list to get the ID
 	for _, ar := range allRoles.Roles {
 		for _, name := range rolesNames {
-			if matched, _ := regexp.MatchString(name, ar.Name); matched {
+			if matched, _ := regexp.MatchString(name, ar.Name); matched { //golint:errcheck // an error isn't indicative of a problem as I understand it
 				d.monitoringRoles[ar.ID] = name
 				break
 			}
@@ -522,7 +521,7 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 // `rescope` will be set to `true` to indicate that the token passed needs to be used to create a new token
 // because the scope should be changed.
 // It returns the authorization context
-func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser bool, rescope bool) (*policy.Context, string, AuthenticationError) {
+func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser, rescope bool) (*policy.Context, string, AuthenticationError) {
 	// check cache, but ignore the result if tokens are rescoped
 	if entry, found := d.tokenCache.Get(authOpts2StringKey(authOpts)); found && (authOpts.Scope == nil || authOpts.Scope.ProjectID == entry.(*cacheEntry).context.Auth["project_id"]) {
 		if authOpts.TokenID != "" {
@@ -751,7 +750,7 @@ func (d *keystone) UserID(username, userDomain string) (string, error) {
 }
 
 // fetchUserID determines the ID of a user of a given qualified name using Keystone (no cache lookup)
-func (d *keystone) fetchUserID(username string, userDomain string) (string, error) {
+func (d *keystone) fetchUserID(username, userDomain string) (string, error) {
 	userDomainID := d.domainIDs[userDomain]
 	userID := ""
 	enabled := true

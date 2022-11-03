@@ -17,6 +17,7 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 	text, err := getTemplate(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	tmplFuncs := html_template.FuncMap{
@@ -85,14 +86,14 @@ func getTemplate(name string) (string, error) {
 	return string(baseTmpl) + string(pageTmpl), nil
 }
 
-func expandHTMLTemplate(name string, text string, data interface{}, funcMap html_template.FuncMap) (string, error) {
+func expandHTMLTemplate(name, text string, data interface{}, funcMap html_template.FuncMap) (string, error) {
 	tmpl := html_template.New(name).Funcs(funcMap)
 	tmpl.Option("missingkey=zero")
 	tmpl.Funcs(html_template.FuncMap{
 		"tmpl": func(name string, data interface{}) (html_template.HTML, error) {
 			var buffer bytes.Buffer
 			err := tmpl.ExecuteTemplate(&buffer, name, data)
-			return html_template.HTML(buffer.String()), err
+			return html_template.HTML(buffer.String()), err //nolint:gosec // this is the correct method for trusted templating
 		},
 	})
 	tmpl, err := tmpl.Parse(text)

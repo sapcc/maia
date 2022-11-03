@@ -444,7 +444,6 @@ func Test_Auth(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func authentication(tokenid, authtype, username, userid, password, appcredid, appcredname, appcredsecret string) (paniced bool) {
@@ -455,7 +454,6 @@ func authentication(tokenid, authtype, username, userid, password, appcredid, ap
 			fmt.Fprintln(os.Stderr, r)
 			paniced = true
 		}
-
 	}()
 
 	tr := testReporter{}

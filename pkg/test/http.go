@@ -35,7 +35,7 @@ import (
 	"testing"
 )
 
-//APIRequest contains all metadata about a test request.
+// APIRequest contains all metadata about a test request.
 type APIRequest struct {
 	Headers          map[string]string
 	Method           string
@@ -47,9 +47,9 @@ type APIRequest struct {
 	ExpectFile       string  //path to arbitrary file
 }
 
-//Check performs the HTTP request described by this APIRequest against the
-//given http.Handler and compares the response with the expectation in the
-//APIRequest.
+// Check performs the HTTP request described by this APIRequest against the
+// given http.Handler and compares the response with the expectation in the
+// APIRequest.
 func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 	var requestBody io.Reader
 	if r.RequestJSON != nil {

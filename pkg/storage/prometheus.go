@@ -55,7 +55,7 @@ func (promCli *prometheusStorageClient) init() {
 	if viper.IsSet("maia.proxy") {
 		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
 		if err != nil {
-			panic(fmt.Errorf("Could not set proxy: %s .\n%s", proxyURL, err.Error()))
+			panic(fmt.Errorf("could not set proxy: %s .\n%s", proxyURL, err.Error()))
 		} else {
 			promCli.httpClient = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 			return
@@ -75,26 +75,26 @@ func (promCli *prometheusStorageClient) init() {
 	}
 }
 
-func (promCli *prometheusStorageClient) Query(query, time, timeout string, acceptContentType string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) Query(query, time, timeout, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("/api/v1/query", map[string]interface{}{"query": query, "time": time, "timeout": timeout})
 
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
-func (promCli *prometheusStorageClient) QueryRange(query, start, end, step, timeout string, acceptContentType string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) QueryRange(query, start, end, step, timeout, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("/api/v1/query_range", map[string]interface{}{"query": query, "start": start, "end": end,
 		"step": step, "timeout": timeout})
 
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
-func (promCli *prometheusStorageClient) Series(match []string, start, end string, acceptContentType string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) Series(match []string, start, end, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("/api/v1/series", map[string]interface{}{"match[]": match, "start": start, "end": end})
 
 	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
 }
 
-func (promCli *prometheusStorageClient) LabelValues(name string, acceptContentType string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) LabelValues(name, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("/api/v1/label/"+name+"/values", map[string]interface{}{})
 
 	res, err := promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
@@ -155,7 +155,7 @@ func (promCli *prometheusStorageClient) mapURL(maiaURL *url.URL) url.URL {
 }
 
 // SendToPrometheus takes care of the request wrapping and delivery to Prometheus
-func (promCli *prometheusStorageClient) sendToPrometheus(method string, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
+func (promCli *prometheusStorageClient) sendToPrometheus(method, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
 	req, err := http.NewRequest(method, promURL, body)
 	if err != nil {
 		util.LogError("Could not create request.\n", err.Error())

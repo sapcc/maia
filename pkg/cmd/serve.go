@@ -47,7 +47,7 @@ var serveCmd = &cobra.Command{
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		if _, err := os.Stat(configFile); err != nil {
-			panic(fmt.Errorf("No config file found at %s (required for server mode)", configFile))
+			panic(fmt.Errorf("no config file found at %s (required for server mode)", configFile))
 		}
 
 		readConfig(configFile)
@@ -62,7 +62,7 @@ func readConfig(configPath string) {
 		viper.SetConfigType("toml")
 		err := viper.ReadInConfig()
 		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("Fatal error config file: %s", err))
+			panic(fmt.Errorf("fatal error config file: %s", err))
 		}
 	}
 }

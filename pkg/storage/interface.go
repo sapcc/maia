@@ -167,6 +167,6 @@ func NewPrometheusDriver(prometheusAPIURL string, customHeader map[string]string
 
 		return driver
 	default:
-		panic(fmt.Errorf("Invalid service.storage_driver setting: %s", driverName))
+		panic(fmt.Errorf("invalid service.storage_driver setting: %s", driverName))
 	}
 }

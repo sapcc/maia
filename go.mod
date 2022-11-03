@@ -45,7 +45,7 @@ require (
 	github.com/spf13/pflag v1.0.4-0.20181223182923-24fa6976df40 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965 // indirect
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204 // indirect
-	golang.org/x/sys v0.0.0-20190515120540-06a5c4944438 // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect

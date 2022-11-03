@@ -42,9 +42,9 @@ type v1Provider struct {
 	storage  storage.Driver
 }
 
-//NewV1Handler creates a http.Handler that serves the Maia v1 API.
-//It also returns the VersionData for this API version which is needed for the
-//version advertisement on "GET /".
+// NewV1Handler creates a http.Handler that serves the Maia v1 API.
+// It also returns the VersionData for this API version which is needed for the
+// version advertisement on "GET /".
 func NewV1Handler(keystone keystone.Driver, storage storage.Driver) http.Handler {
 
 	r := mux.NewRouter()
@@ -116,7 +116,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	// do not list label values from series older than maia.label_value_ttl
 	ttl, err := time.ParseDuration(viper.GetString("maia.label_value_ttl"))
 	if err != nil {
-		ReturnPromError(w, errors.New("Invalid Maia configuration (maia.label_value_ttl)"), http.StatusInternalServerError)
+		ReturnPromError(w, errors.New("invalid Maia configuration (maia.label_value_ttl)"), http.StatusInternalServerError)
 		return
 	}
 

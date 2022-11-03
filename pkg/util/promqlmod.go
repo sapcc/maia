@@ -8,7 +8,7 @@ import (
 )
 
 // AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label
-func AddLabelConstraintToExpression(expression string, key string, values []string) (string, error) {
+func AddLabelConstraintToExpression(expression, key string, values []string) (string, error) {
 	exprNode, err := promql.ParseExpr(expression)
 	if err != nil {
 		return "", err
@@ -25,7 +25,7 @@ func AddLabelConstraintToExpression(expression string, key string, values []stri
 }
 
 // AddLabelConstraintToSelector enhances a PromQL selector with an additional label selector
-func AddLabelConstraintToSelector(metricSelector string, key string, values []string) (string, error) {
+func AddLabelConstraintToSelector(metricSelector, key string, values []string) (string, error) {
 	matcher, err := makeLabelMatcher(key, values)
 	if err != nil {
 		return "", err
@@ -59,12 +59,12 @@ type labelInjector struct {
 
 // Visit does the actual modifications to PromQL expression nodes
 func (v labelInjector) Visit(node promql.Node) (w promql.Visitor) {
-	switch node.(type) {
+	switch node.(type) { //nolint:gosimple
 	case *promql.MatrixSelector:
-		sel := node.(*promql.MatrixSelector)
+		sel := node.(*promql.MatrixSelector) //nolint:errcheck // TODO look again? I don't quite understand
 		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher))
 	case *promql.VectorSelector:
-		sel := node.(*promql.VectorSelector)
+		sel := node.(*promql.VectorSelector) //nolint:errcheck // TODO look again? I don't quite understand
 		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher))
 	}
 

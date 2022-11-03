@@ -61,5 +61,5 @@ func (m TimeStringMatcher) Matches(x interface{}) bool {
 }
 
 func (m TimeStringMatcher) String() string {
-	return fmt.Sprintf("is a string with a timestamp")
+	return "is a string with a timestamp"
 }

@@ -102,10 +102,10 @@ func fetchToken() {
 	if authType == "password" {
 		// check mandatory stuff
 		if auth.Password == "" {
-			panic(fmt.Errorf("You must specify --os-password"))
+			panic(fmt.Errorf("you must specify --os-password"))
 		}
 		if auth.Username == "" && auth.UserID == "" {
-			panic(fmt.Errorf("You must specify --os-username or --os-user-id"))
+			panic(fmt.Errorf("you must specify --os-username or --os-user-id"))
 		}
 		// ignore tokens and application credentials
 		auth.TokenID = ""
@@ -115,7 +115,7 @@ func fetchToken() {
 	} else if authType == "token" {
 		// check mandatory stuff
 		if auth.TokenID == "" {
-			panic(fmt.Errorf("You must specify --os-token"))
+			panic(fmt.Errorf("you must specify --os-token"))
 		}
 		// ignore anything but scope (to permit rescoping)
 		auth.Password = ""
@@ -129,10 +129,10 @@ func fetchToken() {
 	} else if authType == "v3applicationcredential" {
 		// check mandatory stuff
 		if auth.ApplicationCredentialSecret == "" {
-			panic(fmt.Errorf("You must specify --os-application-credential-secret"))
+			panic(fmt.Errorf("you must specify --os-application-credential-secret"))
 		}
 		if auth.ApplicationCredentialName != "" && auth.Username == "" && auth.UserID == "" {
-			panic(fmt.Errorf("You must specify --os-username or --os-user-id when using" +
+			panic(fmt.Errorf("you must specify --os-username or --os-user-id when using" +
 				" --os-application-credential-name"))
 		}
 		// ignore anything user identifiers if specified by application credential ID
@@ -150,13 +150,13 @@ func fetchToken() {
 
 	// error on ambiguous parameters
 	if auth.UserID != "" && auth.Username != "" {
-		panic(fmt.Errorf("Use either --os-user-id or --os-user-name but not both"))
+		panic(fmt.Errorf("use either --os-user-id or --os-user-name but not both"))
 	}
 	if auth.DomainID != "" && auth.DomainName != "" {
-		panic(fmt.Errorf("User either --os-user-domain-id or --os-user-domain-name but not both"))
+		panic(fmt.Errorf("user either --os-user-domain-id or --os-user-domain-name but not both"))
 	}
 	if auth.UserID != "" && (auth.DomainID != "" || auth.DomainName != "") {
-		panic(fmt.Errorf("Do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
+		panic(fmt.Errorf("do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
 	}
 
 	// finally ... authenticate with keystone
@@ -181,7 +181,7 @@ func storageInstance() storage.Driver {
 			fetchToken()
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
 		} else {
-			panic(fmt.Errorf("Either --os-auth-url or --prometheus-url need to be specified"))
+			panic(fmt.Errorf("either --os-auth-url or --prometheus-url need to be specified"))
 		}
 	}
 
@@ -202,7 +202,7 @@ func printValues(resp *http.Response) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(fmt.Errorf("Server responsed with error code %d: %s", resp.StatusCode, err.Error()))
+		panic(fmt.Errorf("server responsed with error code %d: %s", resp.StatusCode, err.Error()))
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
@@ -220,17 +220,17 @@ func printValues(resp *http.Response) {
 					fmt.Println(value)
 				}
 			} else {
-				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
 		} else if strings.HasPrefix(contentType, "text/plain") {
 			if strings.EqualFold(outputFormat, "value") {
 				fmt.Print(string(body))
 			} else {
-				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
 		} else {
 			util.LogError("Response body: %s", string(body))
-			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
+			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 		}
 	}
 }
@@ -241,7 +241,7 @@ func printTable(resp *http.Response) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
+		fmt.Printf("server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
@@ -250,7 +250,6 @@ func printTable(resp *http.Response) {
 				fmt.Print(string(body))
 				return
 			} else if strings.EqualFold(outputFormat, "table") || strings.EqualFold(outputFormat, "value") {
-
 				// unmarshal
 				var jsonResponse struct {
 					Table []model.LabelSet `json:"data,omitempty"`
@@ -278,14 +277,14 @@ func printTable(resp *http.Response) {
 					printRow(allColumns, row)
 				}
 			} else {
-				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
 		} else if strings.HasPrefix(contentType, "text/plain") {
 			// This affects /federate aka. metrics only. There is no point in filtering this output
 			fmt.Print(string(body))
 		} else {
 			util.LogWarning("Response body: %s", string(body))
-			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
+			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 		}
 	}
 }
@@ -462,17 +461,17 @@ func printQueryResponse(resp *http.Response) {
 				fmt.Print(string(body))
 			} else if strings.EqualFold(outputFormat, "template") {
 				if jsonTemplate == "" {
-					panic(fmt.Errorf("Missing --template parameter"))
+					panic(fmt.Errorf("missing --template parameter"))
 				}
 				printTemplate(body, jsonTemplate)
 			} else if strings.EqualFold(outputFormat, "table") {
 				printQueryResultAsTable(body)
 			} else {
-				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
 		} else {
 			util.LogWarning("Response body: %s", string(body))
-			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
+			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 		}
 	}
 }
@@ -619,14 +618,21 @@ func Query(cmd *cobra.Command, args []string) (ret error) {
 			stepStr = fmt.Sprintf("%ds", int(sz.Seconds()))
 		}
 		resp, err = prometheus.QueryRange(queryExpr, starttime, endtime, stepStr, timeoutStr, storage.JSON)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
 	} else {
 		resp, err = prometheus.Query(queryExpr, timestamp, timeoutStr, storage.JSON)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
 	}
 
 	checkResponse(err, resp)
 
 	printQueryResponse(resp)
-
 	return nil
 }
 
@@ -641,7 +647,7 @@ func checkResponse(err error, resp *http.Response) {
 	if err != nil {
 		panic(err)
 	} else if resp.StatusCode != http.StatusOK {
-		panic(fmt.Errorf("Server failed with status: %s (%d)", string(resp.Status), resp.StatusCode))
+		panic(fmt.Errorf("server failed with status: %s (%d)", string(resp.Status), resp.StatusCode))
 	}
 }
 

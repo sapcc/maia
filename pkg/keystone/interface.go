@@ -103,6 +103,6 @@ func NewKeystoneDriver() Driver {
 	case "keystone":
 		return Keystone()
 	default:
-		panic(fmt.Errorf("Couldn't match a keystone driver for configured value \"%s\"", driverName))
+		panic(fmt.Errorf("couldn't match a keystone driver for configured value \"%s\"", driverName))
 	}
 }

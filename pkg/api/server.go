@@ -43,10 +43,9 @@ var keystoneInstance keystone.Driver
 
 // Server initializes and starts the API server, hooking it up to the API router
 func Server() error {
-
 	prometheusAPIURL := viper.GetString("maia.prometheus_url")
 	if prometheusAPIURL == "" {
-		panic(fmt.Errorf("Prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
+		panic(fmt.Errorf("prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
 	}
 
 	// the main router dispatches all incoming requests
