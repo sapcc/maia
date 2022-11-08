@@ -68,7 +68,11 @@ func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 	handler.ServeHTTP(recorder, request)
 
 	response := recorder.Result()
-	responseBytes, _ := io.ReadAll(response.Body)
+	responseBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
 
 	if response.StatusCode != r.ExpectStatusCode {
 		t.Errorf("%s %s: expected status code %d, got %d",
@@ -101,9 +105,12 @@ func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 func (r APIRequest) compareBodyToFixture(t *testing.T, fixturePath string, data []byte) {
 	//write actual content to file to make it easy to copy the computed result over
 	//to the fixture path when a new test is added or an existing one is modified
-	fixturePathAbs, _ := filepath.Abs(fixturePath)
+	fixturePathAbs, err := filepath.Abs(fixturePath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	actualPathAbs := fixturePathAbs + ".actual"
-	err := os.WriteFile(actualPathAbs, data, 0644)
+	err = os.WriteFile(actualPathAbs, data, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,6 +140,9 @@ func HTTPResponseFromFile(filename string) *http.Response {
 		contentType = storage.PlainText
 	}
 	responseRec.Header().Set("Content-Type", contentType)
-	responseRec.Write(fixture)
+	_, err = responseRec.Write(fixture)
+	if err != nil {
+		panic(err)
+	}
 	return responseRec.Result()
 }

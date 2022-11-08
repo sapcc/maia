@@ -15,7 +15,7 @@ import (
 )
 
 // ExecuteTemplate renders an HTML-template stored in web/templates/
-func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keystone keystone.Driver, data interface{}) {
+func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keystoneDriver keystone.Driver, data interface{}) {
 	text, err := getTemplate(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -49,7 +49,7 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		//	return []string{}
 		//},
 		"childProjects": func() []string {
-			children, err := keystone.ChildProjects(req.Header.Get("X-Project-Id"))
+			children, err := keystoneDriver.ChildProjects(req.Header.Get("X-Project-Id"))
 			if err != nil {
 				return []string{}
 			}
@@ -58,7 +58,7 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		// return list of user's projects with monitoring role: name --> id
 		"userProjects": func() map[string]string {
 			result := map[string]string{}
-			projects, err := keystone.UserProjects(req.Header.Get("X-User-Id"))
+			projects, err := keystoneDriver.UserProjects(req.Header.Get("X-User-Id"))
 			if err == nil {
 				for _, p := range projects {
 					result[p.ProjectName] = p.ProjectID
@@ -73,7 +73,11 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	io.WriteString(w, result)
+	_, err = io.WriteString(w, result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func getTemplate(name string) (string, error) {

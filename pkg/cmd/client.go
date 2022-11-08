@@ -551,8 +551,8 @@ func MetricNames(cmd *cobra.Command, args []string) (ret error) {
 
 func parseTime(timestamp string) time.Time {
 	t, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		t, err = time.Parse(time.UnixDate, timestamp)
+	if err != nil { //golint:ineffassign
+		t, err = time.Parse(time.UnixDate, timestamp) //golint:ineffassign
 	}
 	return t
 }
