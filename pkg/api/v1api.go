@@ -20,11 +20,10 @@
 package api
 
 import (
-	"net/http"
-
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
+	"net/http"
 	"sort"
 	"time"
 
@@ -141,7 +140,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	// read the complete result into memory
 	// could this be avoided (streaming like in Java)?
 	defer resp.Body.Close()
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		ReturnPromError(w, err, resp.StatusCode)
 		return

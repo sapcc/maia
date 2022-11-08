@@ -25,8 +25,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -191,7 +191,7 @@ func policyEngine() *policy.Enforcer {
 	}
 
 	// set up policy engine lazily
-	bytes, err := ioutil.ReadFile(viper.GetString("keystone.policy_file"))
+	bytes, err := os.ReadFile(viper.GetString("keystone.policy_file"))
 	if err != nil {
 		panic(fmt.Errorf("policy file %s not found: %s", viper.GetString("keystone.policy_file"), err))
 	}

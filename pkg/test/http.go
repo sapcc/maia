@@ -22,9 +22,7 @@ package test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/sapcc/maia/pkg/storage"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,6 +31,8 @@ import (
 	"runtime/debug"
 	"strings"
 	"testing"
+
+	"github.com/sapcc/maia/pkg/storage"
 )
 
 // APIRequest contains all metadata about a test request.
@@ -68,7 +68,7 @@ func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 	handler.ServeHTTP(recorder, request)
 
 	response := recorder.Result()
-	responseBytes, _ := ioutil.ReadAll(response.Body)
+	responseBytes, _ := io.ReadAll(response.Body)
 
 	if response.StatusCode != r.ExpectStatusCode {
 		t.Errorf("%s %s: expected status code %d, got %d",
@@ -103,7 +103,7 @@ func (r APIRequest) compareBodyToFixture(t *testing.T, fixturePath string, data 
 	//to the fixture path when a new test is added or an existing one is modified
 	fixturePathAbs, _ := filepath.Abs(fixturePath)
 	actualPathAbs := fixturePathAbs + ".actual"
-	err := ioutil.WriteFile(actualPathAbs, data, 0644)
+	err := os.WriteFile(actualPathAbs, data, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func (r APIRequest) compareBodyToFixture(t *testing.T, fixturePath string, data 
 // HTTPResponseFromFile creates a response object from the contents of a file.
 // It uses to suffix of the filename to determine the content-type
 func HTTPResponseFromFile(filename string) *http.Response {
-	fixture, err := ioutil.ReadFile(filename)
+	fixture, err := os.ReadFile(filename)
 	if err != nil {
 		panic(err)
 	}

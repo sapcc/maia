@@ -22,7 +22,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -200,7 +200,7 @@ func keystoneInstance() keystone.Driver {
 func printValues(resp *http.Response) {
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(fmt.Errorf("server responsed with error code %d: %s", resp.StatusCode, err.Error()))
 	} else {
@@ -239,7 +239,7 @@ func printValues(resp *http.Response) {
 func printTable(resp *http.Response) {
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
@@ -451,7 +451,7 @@ func printQueryResultAsTable(body []byte) {
 func printQueryResponse(resp *http.Response) {
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
