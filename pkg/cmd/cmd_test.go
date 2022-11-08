@@ -46,7 +46,7 @@ func (r testReporter) Fatalf(format string, args ...interface{}) {
 	panic(fmt.Errorf(format, args...))
 }
 
-func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.MockDriver) {
+func setupTest(controller *gomock.Controller) (keystoneDriver *keystone.MockDriver, storageDriver *storage.MockDriver) {
 	// simulate command parameters
 	authType = ""
 	outputFormat = ""
@@ -68,13 +68,13 @@ func setupTest(controller *gomock.Controller) (*keystone.MockDriver, *storage.Mo
 			ProjectID: "12345"}}
 
 	// create dummy keystone and storage mock
-	keystone := keystone.NewMockDriver(controller)
-	storage := storage.NewMockDriver(controller)
+	keystoneDriver = keystone.NewMockDriver(controller)
+	storageDriver = storage.NewMockDriver(controller)
 
-	setKeystoneInstance(keystone)
-	setStorageInstance(storage)
+	setKeystoneInstance(keystoneDriver)
+	setStorageInstance(storageDriver)
 
-	return keystone, storage
+	return keystoneDriver, storageDriver
 }
 
 func expectAuth(keystoneMock *keystone.MockDriver) {
@@ -102,6 +102,7 @@ func ExampleSnapshot() {
 	storageMock.EXPECT().Federate([]string{"{" + selector + "}"}, storage.PlainText).Return(test.HTTPResponseFromFile("fixtures/federate.txt"), nil)
 
 	snapshotCmd.RunE(snapshotCmd, []string{})
+
 	// Output:
 	// # TYPE vcenter_cpu_costop_summation untyped
 	// vcenter_cpu_costop_summation{component="vcenter-exporter-vc-a-0",instance="100.65.0.252:9102",instance_uuid="3b32f415-c953-40b9-883d-51321611a7d4",job="endpoints",kubernetes_name="vcenter-exporter-vc-a-0",kubernetes_namespace="maia",metric_detail="3",project_id="12345",region="staging",service="metrics",system="openstack",vcenter_name="STAGINGA",vcenter_node="10.44.2.40",vmware_name="win_cifs_13"} 0 1500291187275

@@ -67,9 +67,9 @@ func Server() error {
 }
 
 // setupRouter initializes the main http router
-func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler {
-	storageInstance = storage
-	keystoneInstance = keystone
+func setupRouter(keystoneDriver keystone.Driver, storageDriver storage.Driver) http.Handler {
+	storageInstance = storageDriver
+	keystoneInstance = keystoneDriver
 
 	mainRouter := mux.NewRouter()
 	mainRouter.Methods(http.MethodGet).Path("/").HandlerFunc(redirectToRootPage)
@@ -84,7 +84,7 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler 
 	})
 	//hook up the v1 API (this code is structured so that a newer API version can
 	//be added easily later)
-	v1Handler := NewV1Handler(keystone, storage)
+	v1Handler := NewV1Handler(keystoneDriver, storageDriver)
 	apiRouter.PathPrefix("/v1/").Handler(http.StripPrefix("/api/v1", v1Handler))
 
 	// other endpoints

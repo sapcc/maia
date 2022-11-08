@@ -109,7 +109,7 @@ func ReturnResponse(w http.ResponseWriter, response *http.Response) {
 	body := buf.String()
 	w.WriteHeader(response.StatusCode)
 
-	io.WriteString(w, body)
+	io.WriteString(w, body) //nolint:errcheck // TODO go-bits? otherwise I can make return response return an err
 }
 
 // ReturnJSON is a convenience function for HTTP handlers returning JSON data.
@@ -120,7 +120,7 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		// restore "&" in links that are broken by the json.Marshaller
-		payload := bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
+		payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
 		w.Write(payload)
 	} else {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -149,9 +149,9 @@ func ReturnPromError(w http.ResponseWriter, err error, code int) {
 	ReturnJSON(w, code, jsonErr)
 }
 
-func scopeToLabelConstraint(req *http.Request, keystone keystone.Driver) (string, []string) {
+func scopeToLabelConstraint(req *http.Request, keystoneDriver keystone.Driver) (string, []string) { //nolint:gocritic
 	if projectID := req.Header.Get("X-Project-Id"); projectID != "" {
-		children, err := keystone.ChildProjects(projectID)
+		children, err := keystoneDriver.ChildProjects(projectID)
 		if err != nil {
 			panic(err)
 		}
@@ -165,8 +165,8 @@ func scopeToLabelConstraint(req *http.Request, keystone keystone.Driver) (string
 
 // buildSelectors takes the selectors contained in the "match[]" URL query parameter(s)
 // and extends them with a label-constrained for the project/domain scope
-func buildSelectors(req *http.Request, keystone keystone.Driver) (*[]string, error) {
-	labelKey, labelValues := scopeToLabelConstraint(req, keystone)
+func buildSelectors(req *http.Request, keystoneDriver keystone.Driver) (*[]string, error) {
+	labelKey, labelValues := scopeToLabelConstraint(req, keystoneDriver)
 
 	queryParams := req.URL.Query()
 	selectors := queryParams["match[]"]
@@ -192,12 +192,12 @@ func policyEngine() *policy.Enforcer {
 	}
 
 	// set up policy engine lazily
-	bytes, err := os.ReadFile(viper.GetString("keystone.policy_file"))
+	filebytes, err := os.ReadFile(viper.GetString("keystone.policy_file"))
 	if err != nil {
 		panic(fmt.Errorf("policy file %s not found: %s", viper.GetString("keystone.policy_file"), err))
 	}
 	var rules map[string]string
-	err = json.Unmarshal(bytes, &rules)
+	err = json.Unmarshal(filebytes, &rules)
 	if err != nil {
 		panic(err)
 	}

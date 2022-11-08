@@ -236,7 +236,7 @@ func (d *keystone) loadDomainsAndRoles() {
 	// get all known roles and match them with our own list to get the ID
 	for _, ar := range allRoles.Roles {
 		for _, name := range rolesNames {
-			if matched, _ := regexp.MatchString(name, ar.Name); matched { //golint:errcheck // an error isn't indicative of a problem as I understand it
+			if matched, _ := regexp.MatchString(name, ar.Name); matched { //golint:errcheck
 				d.monitoringRoles[ar.ID] = name
 				break
 			}
@@ -411,10 +411,10 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 			// if the username is prefixed with '*', we assume these are application credentials
 			if len(userParts) == 1 {
 				// this is application credential ID (remove the leading '*')
-				ba.ApplicationCredentialID = string(userParts[0][1:])
+				ba.ApplicationCredentialID = userParts[0][1:]
 			} else if len(userParts) >= 2 {
 				// this is an application credential name qualified with a username
-				ba.ApplicationCredentialName = string(userParts[0][1:])
+				ba.ApplicationCredentialName = userParts[0][1:]
 				if len(userParts) > 2 {
 					// the username is qualified, too
 					ba.Username = userParts[1]
@@ -497,17 +497,17 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 			return NewAuthenticationError(StatusWrongCredentials, err.Error())
 		}
 	}
-	projects, err := d.UserProjects(userID)
+	userprojects, err := d.UserProjects(userID)
 	if err != nil {
 		return NewAuthenticationError(StatusNotAvailable, err.Error())
-	} else if len(projects) == 0 {
+	} else if len(userprojects) == 0 {
 		return NewAuthenticationError(StatusNoPermission, "User %s (%s@%s) does not have monitoring authorization on any project in any domain (required roles: %s)", userID, ba.Username, ba.DomainName, viper.GetString("keystone.roles"))
 	}
 
 	// default to first project (note that redundant attributes are not copied here to aovid errors)
-	ba.Scope = &gophercloud.AuthScope{ProjectID: projects[0].ProjectID}
+	ba.Scope = &gophercloud.AuthScope{ProjectID: userprojects[0].ProjectID}
 	if ba.Scope.ProjectID == "" {
-		ba.Scope.DomainID = projects[0].DomainID
+		ba.Scope.DomainID = userprojects[0].DomainID
 	}
 
 	return nil
@@ -552,7 +552,10 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser,
 			util.LogDebug("scope change detected")
 			return d.authenticate(authOpts, asServiceUser, true)
 		}
-		tokenInfo, _ := response.ExtractToken()
+		tokenInfo, err := response.ExtractToken()
+		if err != nil {
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
+		}
 		tokenData.Token = tokenInfo.ID
 		catalog, err := response.ExtractServiceCatalog()
 		if err != nil {
@@ -643,14 +646,14 @@ func (d *keystone) ChildProjects(projectID string) ([]string, error) {
 		return ce.([]string), nil
 	}
 
-	projects, err := d.fetchChildProjects(projectID)
+	childprojects, err := d.fetchChildProjects(projectID)
 	if err != nil {
 		util.LogError("Unable to obtain project tree of project %s: %s", projectID, err.Error)
 		return nil, err
 	}
 
-	d.projectTreeCache.Set(projectID, projects, cache.DefaultExpiration)
-	return projects, nil
+	d.projectTreeCache.Set(projectID, childprojects, cache.DefaultExpiration)
+	return childprojects, nil
 }
 
 // fetchChildProjects builds the full hierarchy of child-projects. This is used

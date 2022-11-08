@@ -45,11 +45,11 @@ type v1Provider struct {
 // NewV1Handler creates a http.Handler that serves the Maia v1 API.
 // It also returns the VersionData for this API version which is needed for the
 // version advertisement on "GET /".
-func NewV1Handler(keystone keystone.Driver, storage storage.Driver) http.Handler {
+func NewV1Handler(keystoneDriver keystone.Driver, storageDriver storage.Driver) http.Handler {
 	r := mux.NewRouter()
 	p := &v1Provider{
-		keystone: keystone,
-		storage:  storage,
+		keystone: keystoneDriver,
+		storage:  storageDriver,
 	}
 
 	// tenant-aware query
@@ -153,6 +153,10 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	matrix := sr.Data.Value.(model.Matrix)
+	if err != nil {
+		ReturnPromError(w, err, http.StatusInternalServerError)
+		return
+	}
 	// take just the label values from the query result
 	var result storage.LabelValuesResponse
 	result.Status = sr.Status

@@ -552,7 +552,7 @@ func MetricNames(cmd *cobra.Command, args []string) (ret error) {
 func parseTime(timestamp string) time.Time {
 	t, err := time.Parse(time.RFC3339, timestamp)
 	if err != nil { //golint:ineffassign
-		t, err = time.Parse(time.UnixDate, timestamp) //golint:ineffassign
+		t, _ = time.Parse(time.UnixDate, timestamp) //golint:ineffassign
 	}
 	return t
 }
@@ -703,7 +703,10 @@ func init() {
 	// pass OpenStack auth. information via global top-level parameters or environment variables
 	// it is used by the "serve" command as service user, otherwise to authenticate the client
 	RootCmd.PersistentFlags().StringVar(&auth.IdentityEndpoint, "os-auth-url", os.Getenv("OS_AUTH_URL"), "OpenStack Authentication URL")
-	viper.BindPFlag("keystone.auth_url", RootCmd.PersistentFlags().Lookup("os-auth-url"))
+	err := viper.BindPFlag("keystone.auth_url", RootCmd.PersistentFlags().Lookup("os-auth-url"))
+	if err != nil {
+		panic(err)
+	}
 
 	RootCmd.PersistentFlags().StringVar(&auth.Username, "os-username", os.Getenv("OS_USERNAME"), "OpenStack Username")
 	RootCmd.PersistentFlags().StringVar(&auth.UserID, "os-user-id", os.Getenv("OS_USER_ID"), "OpenStack Username")
@@ -728,7 +731,10 @@ func init() {
 
 	RootCmd.PersistentFlags().StringVar(&maiaURL, "maia-url", os.Getenv("MAIA_URL"), "URL of the target Maia service (override OpenStack service catalog)")
 	RootCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
-	viper.BindPFlag("maia.prometheus_url", RootCmd.PersistentFlags().Lookup("prometheus-url"))
+	err = viper.BindPFlag("maia.prometheus_url", RootCmd.PersistentFlags().Lookup("prometheus-url"))
+	if err != nil {
+		panic(err)
+	}
 
 	snapshotCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
 
@@ -743,10 +749,10 @@ func init() {
 	seriesCmd.Flags().StringVar(&endtime, "end", "", "End timestamp (RFC3339 or Unix format; default: now)")
 }
 
-func setKeystoneInstance(keystone keystone.Driver) {
-	keystoneDriver = keystone
+func setKeystoneInstance(KeystoneDriver keystone.Driver) {
+	keystoneDriver = KeystoneDriver // TODO: This is ugly, I know
 }
 
-func setStorageInstance(storage storage.Driver) {
-	storageDriver = storage
+func setStorageInstance(StorageDriver storage.Driver) {
+	storageDriver = StorageDriver // TODO: This is ugly, I know
 }

@@ -43,7 +43,10 @@ var serveCmd = &cobra.Command{
 		}()
 
 		// just run the server
-		api.Server()
+		err := api.Server()
+		if err != nil {
+			return err
+		}
 
 		return nil
 	},
@@ -89,9 +92,18 @@ func init() {
 	var bindAddr, policyFile string
 
 	serveCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
-	viper.BindPFlag("maia.prometheus_url", serveCmd.PersistentFlags().Lookup("prometheus-url"))
+	err := viper.BindPFlag("maia.prometheus_url", serveCmd.PersistentFlags().Lookup("prometheus-url"))
+	if err != nil {
+		panic(err)
+	}
 	serveCmd.Flags().StringVar(&bindAddr, "bind-address", "0.0.0.0:9091", "IP-Address and port where Maia is listening for incoming requests (e.g. 0.0.0.0:9091)")
-	viper.BindPFlag("maia.bind_address", serveCmd.Flags().Lookup("bind-address"))
+	err = viper.BindPFlag("maia.bind_address", serveCmd.Flags().Lookup("bind-address"))
+	if err != nil {
+		panic(err)
+	}
 	serveCmd.Flags().StringVar(&policyFile, "policy-file", "", "Location of the OpenStack policy file")
-	viper.BindPFlag("keystone.policy_file", serveCmd.Flags().Lookup("policy-file"))
+	err = viper.BindPFlag("keystone.policy_file", serveCmd.Flags().Lookup("policy-file"))
+	if err != nil {
+		panic(err)
+	}
 }
