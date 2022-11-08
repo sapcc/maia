@@ -29,10 +29,11 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/common/model"
+	"github.com/spf13/viper"
+
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/viper"
 )
 
 // class for Prometheus v1 API provider implementation
@@ -45,7 +46,6 @@ type v1Provider struct {
 // It also returns the VersionData for this API version which is needed for the
 // version advertisement on "GET /".
 func NewV1Handler(keystone keystone.Driver, storage storage.Driver) http.Handler {
-
 	r := mux.NewRouter()
 	p := &v1Provider{
 		keystone: keystone,

@@ -39,8 +39,9 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/pagination"
 	cache "github.com/patrickmn/go-cache"
-	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
+
+	"github.com/sapcc/maia/pkg/util"
 )
 
 var metricsEndpointOpts = gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic}

@@ -27,8 +27,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/sapcc/maia/pkg/util"
 	"github.com/spf13/viper"
+
+	"github.com/sapcc/maia/pkg/util"
 )
 
 type prometheusStorageClient struct {

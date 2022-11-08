@@ -1,10 +1,11 @@
 package util
 
 import (
+	"strings"
+
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/storage/metric"
-	"strings"
 )
 
 // AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label

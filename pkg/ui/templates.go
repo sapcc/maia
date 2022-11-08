@@ -3,13 +3,15 @@ package ui
 import (
 	"bytes"
 	"fmt"
-	"github.com/prometheus/common/model"
-	"github.com/sapcc/maia/pkg/keystone"
 	html_template "html/template"
 	"io"
 	"net/http"
 	"path/filepath"
 	"time"
+
+	"github.com/prometheus/common/model"
+
+	"github.com/sapcc/maia/pkg/keystone"
 )
 
 // ExecuteTemplate renders an HTML-template stored in web/templates/

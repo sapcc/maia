@@ -31,11 +31,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
+	"github.com/spf13/viper"
+
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/ui"
 	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/viper"
 )
 
 var storageInstance storage.Driver

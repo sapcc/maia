@@ -2,10 +2,11 @@ package test
 
 import (
 	"fmt"
-	"github.com/golang/mock/gomock"
 	"net/http"
 	"regexp"
 	"time"
+
+	"github.com/golang/mock/gomock"
 )
 
 // HTTPRequestMatcher matches against http.Request parameters

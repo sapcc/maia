@@ -32,11 +32,12 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/prometheus/common/model"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (

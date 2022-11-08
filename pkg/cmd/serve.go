@@ -21,10 +21,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/sapcc/maia/pkg/api"
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
+
+	"github.com/sapcc/maia/pkg/api"
 )
 
 // serveCmd represents the get command
