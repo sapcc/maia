@@ -148,15 +148,13 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 
 	// unmarshal
 	var sr storage.QueryResponse
-	if err := json.Unmarshal(buf, &sr); err != nil {
-		ReturnPromError(w, err, http.StatusInternalServerError)
-		return
-	}
-	matrix := sr.Data.Value.(model.Matrix)
+	err = json.Unmarshal(buf, &sr)
 	if err != nil {
 		ReturnPromError(w, err, http.StatusInternalServerError)
 		return
 	}
+	matrix := sr.Data.Value.(model.Matrix) //nolint:errcheck
+
 	// take just the label values from the query result
 	var result storage.LabelValuesResponse
 	result.Status = sr.Status

@@ -236,7 +236,11 @@ func (d *keystone) loadDomainsAndRoles() {
 	// get all known roles and match them with our own list to get the ID
 	for _, ar := range allRoles.Roles {
 		for _, name := range rolesNames {
-			if matched, _ := regexp.MatchString(name, ar.Name); matched { //golint:errcheck
+			matched, err := regexp.MatchString(name, ar.Name)
+			if err != nil {
+				panic(err)
+			}
+			if matched {
 				d.monitoringRoles[ar.ID] = name
 				break
 			}

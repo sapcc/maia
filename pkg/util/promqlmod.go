@@ -41,7 +41,7 @@ func AddLabelConstraintToSelector(metricSelector, key string, values []string) (
 	if err != nil {
 		return "", err
 	}
-	return "{" + metric.LabelMatchers(append(labelMatchers, matcher)).String() + "}", nil
+	return "{" + metric.LabelMatchers(append(labelMatchers, matcher)).String() + "}", nil //nolint:unconvert
 }
 
 func makeLabelMatcher(key string, values []string) (*metric.LabelMatcher, error) {
@@ -60,13 +60,13 @@ type labelInjector struct {
 
 // Visit does the actual modifications to PromQL expression nodes
 func (v labelInjector) Visit(node promql.Node) (w promql.Visitor) {
-	switch node.(type) { //nolint:gosimple
+	switch node := node.(type) {
 	case *promql.MatrixSelector:
-		sel := node.(*promql.MatrixSelector) //nolint:errcheck // TODO look again? I don't quite understand
-		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher))
+		sel := node
+		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher)) //nolint:unconvert
 	case *promql.VectorSelector:
-		sel := node.(*promql.VectorSelector) //nolint:errcheck // TODO look again? I don't quite understand
-		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher))
+		sel := node
+		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher)) //nolint:unconvert
 	}
 
 	return v

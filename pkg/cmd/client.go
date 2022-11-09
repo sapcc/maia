@@ -213,7 +213,7 @@ func printValues(resp *http.Response) {
 				var jsonResponse struct {
 					Value []string `json:"data,omitempty"`
 				}
-				if err := json.Unmarshal([]byte(body), &jsonResponse); err != nil {
+				if err := json.Unmarshal(body, &jsonResponse); err != nil {
 					panic(err)
 				}
 
@@ -255,7 +255,7 @@ func printTable(resp *http.Response) {
 				var jsonResponse struct {
 					Table []model.LabelSet `json:"data,omitempty"`
 				}
-				if err := json.Unmarshal([]byte(body), &jsonResponse); err != nil {
+				if err := json.Unmarshal(body, &jsonResponse); err != nil {
 					panic(err)
 				}
 
@@ -299,7 +299,7 @@ func buildColumnSet(promResult model.Value) map[string]bool {
 		for _, c := range strings.Split(columns, ",") {
 			result[c] = true
 		}
-	} else if vector, ok := promResult.(model.Vector); ok {
+	} else if vector, ok := promResult.(model.Vector); ok { //nolint:gocritic
 		for _, el := range vector {
 			collectKeys(result, model.LabelSet(el.Metric))
 		}
@@ -367,7 +367,7 @@ func printRow(allColumns []string, rec map[string]string) {
 func printTemplate(body []byte, tpl string) {
 	t := template.Must(template.New("").Parse(tpl))
 	m := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(body), &m); err != nil {
+	if err := json.Unmarshal(body, &m); err != nil {
 		panic(err)
 	}
 	if err := t.Execute(os.Stdout, m); err != nil {
@@ -387,14 +387,14 @@ func printQueryResultAsTable(body []byte) {
 		panic(err)
 	}
 
-	valueObject := model.Value(queryResponse.Data.Value)
+	valueObject := model.Value(queryResponse.Data.Value) //nolint:unconvert
 
 	rows := []map[string]string{}
 	var allColumns []string
 
 	switch valueObject.Type() {
 	case model.ValMatrix:
-		matrix := valueObject.(model.Matrix)
+		matrix := valueObject.(model.Matrix) //nolint:errcheck
 		tsSet := map[string]bool{}
 		// if no columns have been specified by user then collect them all
 		set := buildColumnSet(matrix)
@@ -418,7 +418,7 @@ func printQueryResultAsTable(body []byte) {
 		}
 		allColumns = append(allColumns, makeColumns(tsSet)...)
 	case model.ValVector:
-		matrix := valueObject.(model.Vector)
+		matrix := valueObject.(model.Vector) //nolint:errcheck
 		set := buildColumnSet(matrix)
 		for _, el := range matrix {
 			collectKeys(set, model.LabelSet(el.Metric))
@@ -438,7 +438,7 @@ func printQueryResultAsTable(body []byte) {
 		}
 		allColumns = append(allColumns, []string{timestampKey, valueKey}...)
 	case model.ValScalar:
-		scalarValue := valueObject.(*model.Scalar)
+		scalarValue := valueObject.(*model.Scalar) //nolint:errcheck
 		allColumns = []string{timestampKey, valueKey}
 		rows = []map[string]string{{timestampKey: scalarValue.Timestamp.Time().In(tzLocation).Format(time.RFC3339Nano), valueKey: scalarValue.String()}}
 	}
@@ -550,14 +550,14 @@ func MetricNames(cmd *cobra.Command, args []string) (ret error) {
 }
 
 func parseTime(timestamp string) time.Time {
-	t, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil { //golint:ineffassign
-		t, _ = time.Parse(time.UnixDate, timestamp) //golint:ineffassign
+	t, err := time.Parse(time.RFC3339, timestamp) //no:errcheck
+	if err != nil {
+		t, _ = time.Parse(time.UnixDate, timestamp) //nolint:errcheck
 	}
 	return t
 }
 
-func defaultTimeRangeStr(start, end string) (string, string) {
+func defaultTimeRangeStr(start, end string) (string, string) { //nolint:gocritic
 	s, e := start, end
 	if e == "" {
 		e = time.Now().Format(time.RFC3339)
@@ -648,7 +648,7 @@ func checkResponse(err error, resp *http.Response) {
 	if err != nil {
 		panic(err)
 	} else if resp.StatusCode != http.StatusOK {
-		panic(fmt.Errorf("server failed with status: %s (%d)", string(resp.Status), resp.StatusCode))
+		panic(fmt.Errorf("server failed with status: %s (%d)", resp.Status, resp.StatusCode))
 	}
 }
 

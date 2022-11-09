@@ -101,7 +101,7 @@ func ExampleSnapshot() {
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().Federate([]string{"{" + selector + "}"}, storage.PlainText).Return(test.HTTPResponseFromFile("fixtures/federate.txt"), nil)
 
-	snapshotCmd.RunE(snapshotCmd, []string{})
+	snapshotCmd.RunE(snapshotCmd, []string{}) //nolint:errcheck
 
 	// Output:
 	// # TYPE vcenter_cpu_costop_summation untyped
@@ -123,7 +123,7 @@ func ExampleSeries_json() {
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().Series([]string{"{" + selector + "}"}, starttime, endtime, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
-	seriesCmd.RunE(seriesCmd, []string{})
+	seriesCmd.RunE(seriesCmd, []string{}) //nolint:errcheck
 
 	// Output:
 	// {
@@ -159,7 +159,7 @@ func ExampleSeries_table() {
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().Series([]string{"{" + selector + "}"}, starttime, endtime, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
 
-	seriesCmd.RunE(seriesCmd, []string{})
+	seriesCmd.RunE(seriesCmd, []string{}) //nolint:errcheck
 
 	// Output:
 	// __name__ component instance job kubernetes_name kubernetes_namespace os_cluster region system
@@ -179,7 +179,7 @@ func ExampleLabelValues_json() {
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().LabelValues(labelName, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/label_values.json"), nil)
 
-	labelValuesCmd.RunE(labelValuesCmd, []string{labelName})
+	labelValuesCmd.RunE(labelValuesCmd, []string{labelName}) //nolint:errcheck
 
 	// Output:
 	// {
@@ -203,7 +203,7 @@ func ExampleLabelValues_values() {
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().LabelValues(labelName, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/label_values.json"), nil)
 
-	labelValuesCmd.RunE(labelValuesCmd, []string{labelName})
+	labelValuesCmd.RunE(labelValuesCmd, []string{labelName}) //nolint:errcheck
 
 	// Output:
 	// objectstore
@@ -221,7 +221,7 @@ func ExampleMetricNames_values() {
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().LabelValues("__name__", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/metric_names.json"), nil)
 
-	metricNamesCmd.RunE(metricNamesCmd, []string{})
+	metricNamesCmd.RunE(metricNamesCmd, []string{}) //nolint:errcheck
 
 	// Output:
 	// vcenter_cpu_costop_summation
@@ -239,14 +239,14 @@ func ExampleQuery_json() {
 
 	timestamp = "2017-07-01T20:10:30.781Z"
 	timeoutStr := "1440s"
-	timeout, _ = time.ParseDuration(timeoutStr)
+	timeout, _ = time.ParseDuration(timeoutStr) //nolint:errcheck
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "jsoN"
 
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
-	queryCmd.RunE(queryCmd, []string{query})
+	queryCmd.RunE(queryCmd, []string{query}) //nolint:errcheck
 
 	// Output:
 	// {
@@ -275,14 +275,14 @@ func ExampleQuery_table() {
 
 	timestamp = "2017-07-03T07:26:23.997Z"
 	timeoutStr := "1440s"
-	timeout, _ = time.ParseDuration(timeoutStr)
+	timeout, _ = time.ParseDuration(timeoutStr) //nolint:errcheck
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "TaBle"
 
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
-	queryCmd.RunE(queryCmd, []string{query})
+	queryCmd.RunE(queryCmd, []string{query}) //nolint:errcheck
 
 	// Output:
 	// __timestamp__ __value__
@@ -298,7 +298,7 @@ func ExampleQuery_tableColumns() {
 
 	timestamp = "2019-05-09T12:00:10.724Z"
 	timeoutStr := "1440s"
-	timeout, _ = time.ParseDuration(timeoutStr)
+	timeout, _ = time.ParseDuration(timeoutStr) //nolint:errcheck
 	query := "limes_domain_quota"
 	outputFormat = "TaBle"
 	columns = "domain"
@@ -306,7 +306,7 @@ func ExampleQuery_tableColumns() {
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().Query(query, timestamp, timeoutStr, storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query2.json"), nil)
 
-	queryCmd.RunE(queryCmd, []string{query})
+	queryCmd.RunE(queryCmd, []string{query}) //nolint:errcheck
 
 	// Output:
 	// domain __timestamp__ __value__
@@ -324,16 +324,16 @@ func ExampleQuery_rangeJSON() {
 	starttime = "2017-07-13T20:10:30.781Z"
 	endtime = "2017-07-13T20:15:00.781Z"
 	stepsizeStr := "300s"
-	stepsize, _ = time.ParseDuration(stepsizeStr)
+	stepsize, _ = time.ParseDuration(stepsizeStr) //nolint:errcheck
 	timeoutStr := "90s"
-	timeout, _ = time.ParseDuration(timeoutStr)
+	timeout, _ = time.ParseDuration(timeoutStr) //nolint:errcheck
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "jsoN"
 
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().QueryRange(query, starttime, endtime, stepsizeStr, timeoutStr, "application/json").Return(test.HTTPResponseFromFile("fixtures/query_range_values.json"), nil)
 
-	queryCmd.RunE(queryCmd, []string{query})
+	queryCmd.RunE(queryCmd, []string{query}) //nolint:errcheck
 
 	// Output:
 	// {
@@ -369,16 +369,16 @@ func ExampleQuery_rangeValuesTable() {
 	starttime = "2017-07-13T20:10:30.000Z"
 	endtime = "2017-07-13T20:15:00.000Z"
 	stepsizeStr := "300s"
-	stepsize, _ = time.ParseDuration(stepsizeStr)
+	stepsize, _ = time.ParseDuration(stepsizeStr) //nolint:errcheck
 	timeoutStr := "90s"
-	timeout, _ = time.ParseDuration(timeoutStr)
+	timeout, _ = time.ParseDuration(timeoutStr) //nolint:errcheck
 	query := "sum(blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "tablE"
 
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().QueryRange(query, starttime, endtime, stepsizeStr, timeoutStr, "application/json").Return(test.HTTPResponseFromFile("fixtures/query_range_values.json"), nil)
 
-	queryCmd.RunE(queryCmd, []string{query})
+	queryCmd.RunE(queryCmd, []string{query}) //nolint:errcheck
 
 	// Output:
 	// 2017-07-13T20:10:00Z 2017-07-13T20:15:00Z
@@ -395,9 +395,9 @@ func ExampleQuery_rangeSeriesTable() {
 	starttime = "2017-07-22T20:10:00.000Z"
 	endtime = "2017-07-22T20:20:00.000Z"
 	stepsizeStr := "300s"
-	stepsize, _ = time.ParseDuration(stepsizeStr)
+	stepsize, _ = time.ParseDuration(stepsizeStr) //nolint:errcheck
 	timeoutStr := "90s"
-	timeout, _ = time.ParseDuration(timeoutStr)
+	timeout, _ = time.ParseDuration(timeoutStr) //nolint:errcheck
 	query := "blackbox_api_status_gauge{check=~\"keystone\"})"
 	outputFormat = "tablE"
 	columns = "region,check,instance"
@@ -405,7 +405,7 @@ func ExampleQuery_rangeSeriesTable() {
 	expectAuth(keystoneMock)
 	storageMock.EXPECT().QueryRange(query, starttime, endtime, stepsizeStr, timeoutStr, "application/json").Return(test.HTTPResponseFromFile("fixtures/query_range_series.json"), nil)
 
-	queryCmd.RunE(queryCmd, []string{query})
+	queryCmd.RunE(queryCmd, []string{query}) //nolint:errcheck
 
 	// Output:
 	// region check instance 2017-07-22T20:10:00Z 2017-07-22T20:15:00Z 2017-07-22T20:20:00Z

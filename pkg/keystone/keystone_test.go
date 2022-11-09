@@ -130,7 +130,7 @@ func TestNewKeystoneDriver(t *testing.T) {
 
 	assertDone(t)
 }
-func assertDone(t *testing.T) bool {
+func assertDone(t *testing.T) bool { //nolint:unparam
 	return assert.True(t, gock.IsDone(), "pending mocks: %v\nunmatched requests: %v", mocksToStrings(gock.Pending()), gock.GetUnmatchedRequests())
 }
 

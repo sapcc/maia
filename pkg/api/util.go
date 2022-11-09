@@ -121,9 +121,14 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 		w.WriteHeader(code)
 		// restore "&" in links that are broken by the json.Marshaller
 		payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
-		w.Write(payload)
+		_, err = w.Write(payload)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	} else {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -372,5 +377,5 @@ func observeResponseSize(handlerFunc http.HandlerFunc, handler string) http.Hand
 	durationSummary := prometheus.NewSummaryVec(prometheus.SummaryOpts{Name: "maia_response_size_bytes", Help: "Size of the Maia response (e.g. to a query)", ConstLabels: prometheus.Labels{"handler": handler}}, nil)
 	prometheus.MustRegister(durationSummary)
 
-	return promhttp.InstrumentHandlerResponseSize(durationSummary, http.HandlerFunc(handlerFunc)).ServeHTTP
+	return promhttp.InstrumentHandlerResponseSize(durationSummary, handlerFunc).ServeHTTP
 }

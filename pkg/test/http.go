@@ -57,7 +57,7 @@ func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		requestBody = bytes.NewReader([]byte(body))
+		requestBody = bytes.NewReader(body)
 	}
 	request := httptest.NewRequest(r.Method, r.Path, requestBody)
 	for k, v := range r.Headers {
