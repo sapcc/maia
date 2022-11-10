@@ -111,7 +111,6 @@ linters:
     - sqlclosecheck
     - staticcheck
     - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
