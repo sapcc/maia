@@ -9,12 +9,12 @@ require (
 	github.com/gorilla/mux v1.7.1
 	github.com/h2non/gock v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/prometheus/client_golang v0.9.1
+	github.com/prometheus/client_golang v0.9.3
 	github.com/prometheus/common v0.4.0
 	github.com/prometheus/prometheus v0.0.0-20171104155738-5211b96d4d12
 	github.com/rs/cors v1.6.1-0.20190116175910-76f58f330d76
-	github.com/spf13/cobra v0.0.3
-	github.com/spf13/viper v1.3.2
+	github.com/spf13/cobra v0.0.7
+	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.2.2
 )
 
@@ -44,7 +44,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.4-0.20181223182923-24fa6976df40 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965 // indirect
-	golang.org/x/net v0.0.0-20190514140710-3ec191127204 // indirect
+	golang.org/x/net v0.0.0-20190522155817-f3200d17e092 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
