@@ -63,7 +63,7 @@ func Server() error {
 	handler := c.Handler(mainRouter)
 
 	//start HTTP server and block
-	return http.ListenAndServe(bindAddress, handler)
+	return http.ListenAndServe(bindAddress, handler) //nolint:gosec // TODO: use httpext.ListenAndServeContext() from go-bits
 }
 
 // setupRouter initializes the main http router
