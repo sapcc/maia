@@ -31,11 +31,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
+	"github.com/spf13/viper"
+
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/ui"
 	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/viper"
 )
 
 var storageInstance storage.Driver
@@ -43,10 +44,9 @@ var keystoneInstance keystone.Driver
 
 // Server initializes and starts the API server, hooking it up to the API router
 func Server() error {
-
 	prometheusAPIURL := viper.GetString("maia.prometheus_url")
 	if prometheusAPIURL == "" {
-		panic(fmt.Errorf("Prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
+		panic(fmt.Errorf("prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
 	}
 
 	// the main router dispatches all incoming requests
@@ -63,13 +63,13 @@ func Server() error {
 	handler := c.Handler(mainRouter)
 
 	//start HTTP server and block
-	return http.ListenAndServe(bindAddress, handler)
+	return http.ListenAndServe(bindAddress, handler) //nolint:gosec // TODO: use httpext.ListenAndServeContext() from go-bits
 }
 
 // setupRouter initializes the main http router
-func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler {
-	storageInstance = storage
-	keystoneInstance = keystone
+func setupRouter(keystoneDriver keystone.Driver, storageDriver storage.Driver) http.Handler {
+	storageInstance = storageDriver
+	keystoneInstance = keystoneDriver
 
 	mainRouter := mux.NewRouter()
 	mainRouter.Methods(http.MethodGet).Path("/").HandlerFunc(redirectToRootPage)
@@ -84,7 +84,7 @@ func setupRouter(keystone keystone.Driver, storage storage.Driver) http.Handler 
 	})
 	//hook up the v1 API (this code is structured so that a newer API version can
 	//be added easily later)
-	v1Handler := NewV1Handler(keystone, storage)
+	v1Handler := NewV1Handler(keystoneDriver, storageDriver)
 	apiRouter.PathPrefix("/v1/").Handler(http.StripPrefix("/api/v1", v1Handler))
 
 	// other endpoints

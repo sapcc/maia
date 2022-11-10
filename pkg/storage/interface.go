@@ -22,10 +22,12 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/prometheus/common/model"
-	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/viper"
 	"net/http"
+
+	"github.com/prometheus/common/model"
+	"github.com/spf13/viper"
+
+	"github.com/sapcc/maia/pkg/util"
 )
 
 const (
@@ -167,6 +169,6 @@ func NewPrometheusDriver(prometheusAPIURL string, customHeader map[string]string
 
 		return driver
 	default:
-		panic(fmt.Errorf("Invalid service.storage_driver setting: %s", driverName))
+		panic(fmt.Errorf("invalid service.storage_driver setting: %s", driverName))
 	}
 }

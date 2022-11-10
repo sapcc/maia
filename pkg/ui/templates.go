@@ -3,20 +3,23 @@ package ui
 import (
 	"bytes"
 	"fmt"
-	"github.com/prometheus/common/model"
-	"github.com/sapcc/maia/pkg/keystone"
 	html_template "html/template"
 	"io"
 	"net/http"
 	"path/filepath"
 	"time"
+
+	"github.com/prometheus/common/model"
+
+	"github.com/sapcc/maia/pkg/keystone"
 )
 
 // ExecuteTemplate renders an HTML-template stored in web/templates/
-func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keystone keystone.Driver, data interface{}) {
+func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keystoneDriver keystone.Driver, data interface{}) {
 	text, err := getTemplate(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	tmplFuncs := html_template.FuncMap{
@@ -46,7 +49,7 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		//	return []string{}
 		//},
 		"childProjects": func() []string {
-			children, err := keystone.ChildProjects(req.Header.Get("X-Project-Id"))
+			children, err := keystoneDriver.ChildProjects(req.Header.Get("X-Project-Id"))
 			if err != nil {
 				return []string{}
 			}
@@ -55,7 +58,7 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		// return list of user's projects with monitoring role: name --> id
 		"userProjects": func() map[string]string {
 			result := map[string]string{}
-			projects, err := keystone.UserProjects(req.Header.Get("X-User-Id"))
+			projects, err := keystoneDriver.UserProjects(req.Header.Get("X-User-Id"))
 			if err == nil {
 				for _, p := range projects {
 					result[p.ProjectName] = p.ProjectID
@@ -70,7 +73,11 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	io.WriteString(w, result)
+	_, err = io.WriteString(w, result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func getTemplate(name string) (string, error) {
@@ -85,14 +92,14 @@ func getTemplate(name string) (string, error) {
 	return string(baseTmpl) + string(pageTmpl), nil
 }
 
-func expandHTMLTemplate(name string, text string, data interface{}, funcMap html_template.FuncMap) (string, error) {
+func expandHTMLTemplate(name, text string, data interface{}, funcMap html_template.FuncMap) (string, error) {
 	tmpl := html_template.New(name).Funcs(funcMap)
 	tmpl.Option("missingkey=zero")
 	tmpl.Funcs(html_template.FuncMap{
 		"tmpl": func(name string, data interface{}) (html_template.HTML, error) {
 			var buffer bytes.Buffer
 			err := tmpl.ExecuteTemplate(&buffer, name, data)
-			return html_template.HTML(buffer.String()), err
+			return html_template.HTML(buffer.String()), err //nolint:gosec // this is the correct method for trusted templating
 		},
 	})
 	tmpl, err := tmpl.Parse(text)

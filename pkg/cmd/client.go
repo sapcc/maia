@@ -22,7 +22,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -32,11 +32,12 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/prometheus/common/model"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -102,10 +103,10 @@ func fetchToken() {
 	if authType == "password" {
 		// check mandatory stuff
 		if auth.Password == "" {
-			panic(fmt.Errorf("You must specify --os-password"))
+			panic(fmt.Errorf("you must specify --os-password"))
 		}
 		if auth.Username == "" && auth.UserID == "" {
-			panic(fmt.Errorf("You must specify --os-username or --os-user-id"))
+			panic(fmt.Errorf("you must specify --os-username or --os-user-id"))
 		}
 		// ignore tokens and application credentials
 		auth.TokenID = ""
@@ -115,7 +116,7 @@ func fetchToken() {
 	} else if authType == "token" {
 		// check mandatory stuff
 		if auth.TokenID == "" {
-			panic(fmt.Errorf("You must specify --os-token"))
+			panic(fmt.Errorf("you must specify --os-token"))
 		}
 		// ignore anything but scope (to permit rescoping)
 		auth.Password = ""
@@ -129,10 +130,10 @@ func fetchToken() {
 	} else if authType == "v3applicationcredential" {
 		// check mandatory stuff
 		if auth.ApplicationCredentialSecret == "" {
-			panic(fmt.Errorf("You must specify --os-application-credential-secret"))
+			panic(fmt.Errorf("you must specify --os-application-credential-secret"))
 		}
 		if auth.ApplicationCredentialName != "" && auth.Username == "" && auth.UserID == "" {
-			panic(fmt.Errorf("You must specify --os-username or --os-user-id when using" +
+			panic(fmt.Errorf("you must specify --os-username or --os-user-id when using" +
 				" --os-application-credential-name"))
 		}
 		// ignore anything user identifiers if specified by application credential ID
@@ -150,13 +151,13 @@ func fetchToken() {
 
 	// error on ambiguous parameters
 	if auth.UserID != "" && auth.Username != "" {
-		panic(fmt.Errorf("Use either --os-user-id or --os-user-name but not both"))
+		panic(fmt.Errorf("use either --os-user-id or --os-user-name but not both"))
 	}
 	if auth.DomainID != "" && auth.DomainName != "" {
-		panic(fmt.Errorf("User either --os-user-domain-id or --os-user-domain-name but not both"))
+		panic(fmt.Errorf("user either --os-user-domain-id or --os-user-domain-name but not both"))
 	}
 	if auth.UserID != "" && (auth.DomainID != "" || auth.DomainName != "") {
-		panic(fmt.Errorf("Do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
+		panic(fmt.Errorf("do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
 	}
 
 	// finally ... authenticate with keystone
@@ -181,7 +182,7 @@ func storageInstance() storage.Driver {
 			fetchToken()
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
 		} else {
-			panic(fmt.Errorf("Either --os-auth-url or --prometheus-url need to be specified"))
+			panic(fmt.Errorf("either --os-auth-url or --prometheus-url need to be specified"))
 		}
 	}
 
@@ -200,9 +201,9 @@ func keystoneInstance() keystone.Driver {
 func printValues(resp *http.Response) {
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(fmt.Errorf("Server responsed with error code %d: %s", resp.StatusCode, err.Error()))
+		panic(fmt.Errorf("server responsed with error code %d: %s", resp.StatusCode, err.Error()))
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
@@ -212,7 +213,7 @@ func printValues(resp *http.Response) {
 				var jsonResponse struct {
 					Value []string `json:"data,omitempty"`
 				}
-				if err := json.Unmarshal([]byte(body), &jsonResponse); err != nil {
+				if err := json.Unmarshal(body, &jsonResponse); err != nil {
 					panic(err)
 				}
 
@@ -220,17 +221,17 @@ func printValues(resp *http.Response) {
 					fmt.Println(value)
 				}
 			} else {
-				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
 		} else if strings.HasPrefix(contentType, "text/plain") {
 			if strings.EqualFold(outputFormat, "value") {
 				fmt.Print(string(body))
 			} else {
-				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
 		} else {
 			util.LogError("Response body: %s", string(body))
-			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
+			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 		}
 	}
 }
@@ -239,9 +240,9 @@ func printValues(resp *http.Response) {
 func printTable(resp *http.Response) {
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Server responsed with error code %d: %s", resp.StatusCode, err.Error())
+		fmt.Printf("server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == storage.JSON {
@@ -250,12 +251,11 @@ func printTable(resp *http.Response) {
 				fmt.Print(string(body))
 				return
 			} else if strings.EqualFold(outputFormat, "table") || strings.EqualFold(outputFormat, "value") {
-
 				// unmarshal
 				var jsonResponse struct {
 					Table []model.LabelSet `json:"data,omitempty"`
 				}
-				if err := json.Unmarshal([]byte(body), &jsonResponse); err != nil {
+				if err := json.Unmarshal(body, &jsonResponse); err != nil {
 					panic(err)
 				}
 
@@ -278,14 +278,14 @@ func printTable(resp *http.Response) {
 					printRow(allColumns, row)
 				}
 			} else {
-				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
 		} else if strings.HasPrefix(contentType, "text/plain") {
 			// This affects /federate aka. metrics only. There is no point in filtering this output
 			fmt.Print(string(body))
 		} else {
 			util.LogWarning("Response body: %s", string(body))
-			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
+			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 		}
 	}
 }
@@ -299,7 +299,7 @@ func buildColumnSet(promResult model.Value) map[string]bool {
 		for _, c := range strings.Split(columns, ",") {
 			result[c] = true
 		}
-	} else if vector, ok := promResult.(model.Vector); ok {
+	} else if vector, ok := promResult.(model.Vector); ok { //nolint:gocritic
 		for _, el := range vector {
 			collectKeys(result, model.LabelSet(el.Metric))
 		}
@@ -367,7 +367,7 @@ func printRow(allColumns []string, rec map[string]string) {
 func printTemplate(body []byte, tpl string) {
 	t := template.Must(template.New("").Parse(tpl))
 	m := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(body), &m); err != nil {
+	if err := json.Unmarshal(body, &m); err != nil {
 		panic(err)
 	}
 	if err := t.Execute(os.Stdout, m); err != nil {
@@ -387,14 +387,14 @@ func printQueryResultAsTable(body []byte) {
 		panic(err)
 	}
 
-	valueObject := model.Value(queryResponse.Data.Value)
+	valueObject := model.Value(queryResponse.Data.Value) //nolint:unconvert
 
 	rows := []map[string]string{}
 	var allColumns []string
 
 	switch valueObject.Type() {
 	case model.ValMatrix:
-		matrix := valueObject.(model.Matrix)
+		matrix := valueObject.(model.Matrix) //nolint:errcheck
 		tsSet := map[string]bool{}
 		// if no columns have been specified by user then collect them all
 		set := buildColumnSet(matrix)
@@ -418,7 +418,7 @@ func printQueryResultAsTable(body []byte) {
 		}
 		allColumns = append(allColumns, makeColumns(tsSet)...)
 	case model.ValVector:
-		matrix := valueObject.(model.Vector)
+		matrix := valueObject.(model.Vector) //nolint:errcheck
 		set := buildColumnSet(matrix)
 		for _, el := range matrix {
 			collectKeys(set, model.LabelSet(el.Metric))
@@ -438,7 +438,7 @@ func printQueryResultAsTable(body []byte) {
 		}
 		allColumns = append(allColumns, []string{timestampKey, valueKey}...)
 	case model.ValScalar:
-		scalarValue := valueObject.(*model.Scalar)
+		scalarValue := valueObject.(*model.Scalar) //nolint:errcheck
 		allColumns = []string{timestampKey, valueKey}
 		rows = []map[string]string{{timestampKey: scalarValue.Timestamp.Time().In(tzLocation).Format(time.RFC3339Nano), valueKey: scalarValue.String()}}
 	}
@@ -452,7 +452,7 @@ func printQueryResultAsTable(body []byte) {
 func printQueryResponse(resp *http.Response) {
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Server responsed with error code %d: %s", resp.StatusCode, err.Error())
 	} else {
@@ -462,17 +462,17 @@ func printQueryResponse(resp *http.Response) {
 				fmt.Print(string(body))
 			} else if strings.EqualFold(outputFormat, "template") {
 				if jsonTemplate == "" {
-					panic(fmt.Errorf("Missing --template parameter"))
+					panic(fmt.Errorf("missing --template parameter"))
 				}
 				printTemplate(body, jsonTemplate)
 			} else if strings.EqualFold(outputFormat, "table") {
 				printQueryResultAsTable(body)
 			} else {
-				panic(fmt.Errorf("Unsupported --format value for this command: %s", outputFormat))
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
 		} else {
 			util.LogWarning("Response body: %s", string(body))
-			panic(fmt.Errorf("Unsupported response type from server: %s", contentType))
+			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 		}
 	}
 }
@@ -550,14 +550,14 @@ func MetricNames(cmd *cobra.Command, args []string) (ret error) {
 }
 
 func parseTime(timestamp string) time.Time {
-	t, err := time.Parse(time.RFC3339, timestamp)
+	t, err := time.Parse(time.RFC3339, timestamp) //no:errcheck
 	if err != nil {
-		t, err = time.Parse(time.UnixDate, timestamp)
+		t, _ = time.Parse(time.UnixDate, timestamp) //nolint:errcheck
 	}
 	return t
 }
 
-func defaultTimeRangeStr(start, end string) (string, string) {
+func defaultTimeRangeStr(start, end string) (string, string) { //nolint:gocritic
 	s, e := start, end
 	if e == "" {
 		e = time.Now().Format(time.RFC3339)
@@ -619,14 +619,21 @@ func Query(cmd *cobra.Command, args []string) (ret error) {
 			stepStr = fmt.Sprintf("%ds", int(sz.Seconds()))
 		}
 		resp, err = prometheus.QueryRange(queryExpr, starttime, endtime, stepStr, timeoutStr, storage.JSON)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
 	} else {
 		resp, err = prometheus.Query(queryExpr, timestamp, timeoutStr, storage.JSON)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
 	}
 
 	checkResponse(err, resp)
 
 	printQueryResponse(resp)
-
 	return nil
 }
 
@@ -641,7 +648,7 @@ func checkResponse(err error, resp *http.Response) {
 	if err != nil {
 		panic(err)
 	} else if resp.StatusCode != http.StatusOK {
-		panic(fmt.Errorf("Server failed with status: %s (%d)", string(resp.Status), resp.StatusCode))
+		panic(fmt.Errorf("server failed with status: %s (%d)", resp.Status, resp.StatusCode))
 	}
 }
 
@@ -696,7 +703,10 @@ func init() {
 	// pass OpenStack auth. information via global top-level parameters or environment variables
 	// it is used by the "serve" command as service user, otherwise to authenticate the client
 	RootCmd.PersistentFlags().StringVar(&auth.IdentityEndpoint, "os-auth-url", os.Getenv("OS_AUTH_URL"), "OpenStack Authentication URL")
-	viper.BindPFlag("keystone.auth_url", RootCmd.PersistentFlags().Lookup("os-auth-url"))
+	err := viper.BindPFlag("keystone.auth_url", RootCmd.PersistentFlags().Lookup("os-auth-url"))
+	if err != nil {
+		panic(err)
+	}
 
 	RootCmd.PersistentFlags().StringVar(&auth.Username, "os-username", os.Getenv("OS_USERNAME"), "OpenStack Username")
 	RootCmd.PersistentFlags().StringVar(&auth.UserID, "os-user-id", os.Getenv("OS_USER_ID"), "OpenStack Username")
@@ -721,7 +731,10 @@ func init() {
 
 	RootCmd.PersistentFlags().StringVar(&maiaURL, "maia-url", os.Getenv("MAIA_URL"), "URL of the target Maia service (override OpenStack service catalog)")
 	RootCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
-	viper.BindPFlag("maia.prometheus_url", RootCmd.PersistentFlags().Lookup("prometheus-url"))
+	err = viper.BindPFlag("maia.prometheus_url", RootCmd.PersistentFlags().Lookup("prometheus-url"))
+	if err != nil {
+		panic(err)
+	}
 
 	snapshotCmd.Flags().StringVarP(&selector, "selector", "l", "", "Prometheus label-selector to restrict the amount of metrics")
 
@@ -736,10 +749,10 @@ func init() {
 	seriesCmd.Flags().StringVar(&endtime, "end", "", "End timestamp (RFC3339 or Unix format; default: now)")
 }
 
-func setKeystoneInstance(keystone keystone.Driver) {
-	keystoneDriver = keystone
+func setKeystoneInstance(KeystoneDriver keystone.Driver) {
+	keystoneDriver = KeystoneDriver // TODO: This is ugly, I know
 }
 
-func setStorageInstance(storage storage.Driver) {
-	storageDriver = storage
+func setStorageInstance(StorageDriver storage.Driver) {
+	storageDriver = StorageDriver // TODO: This is ugly, I know
 }

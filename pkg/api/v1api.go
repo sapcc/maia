@@ -20,20 +20,20 @@
 package api
 
 import (
-	"net/http"
-
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
+	"net/http"
 	"sort"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/common/model"
+	"github.com/spf13/viper"
+
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/util"
-	"github.com/spf13/viper"
 )
 
 // class for Prometheus v1 API provider implementation
@@ -42,15 +42,14 @@ type v1Provider struct {
 	storage  storage.Driver
 }
 
-//NewV1Handler creates a http.Handler that serves the Maia v1 API.
-//It also returns the VersionData for this API version which is needed for the
-//version advertisement on "GET /".
-func NewV1Handler(keystone keystone.Driver, storage storage.Driver) http.Handler {
-
+// NewV1Handler creates a http.Handler that serves the Maia v1 API.
+// It also returns the VersionData for this API version which is needed for the
+// version advertisement on "GET /".
+func NewV1Handler(keystoneDriver keystone.Driver, storageDriver storage.Driver) http.Handler {
 	r := mux.NewRouter()
 	p := &v1Provider{
-		keystone: keystone,
-		storage:  storage,
+		keystone: keystoneDriver,
+		storage:  storageDriver,
 	}
 
 	// tenant-aware query
@@ -116,7 +115,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	// do not list label values from series older than maia.label_value_ttl
 	ttl, err := time.ParseDuration(viper.GetString("maia.label_value_ttl"))
 	if err != nil {
-		ReturnPromError(w, errors.New("Invalid Maia configuration (maia.label_value_ttl)"), http.StatusInternalServerError)
+		ReturnPromError(w, errors.New("invalid Maia configuration (maia.label_value_ttl)"), http.StatusInternalServerError)
 		return
 	}
 
@@ -141,7 +140,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 	// read the complete result into memory
 	// could this be avoided (streaming like in Java)?
 	defer resp.Body.Close()
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		ReturnPromError(w, err, resp.StatusCode)
 		return
@@ -149,11 +148,13 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 
 	// unmarshal
 	var sr storage.QueryResponse
-	if err := json.Unmarshal(buf, &sr); err != nil {
+	err = json.Unmarshal(buf, &sr)
+	if err != nil {
 		ReturnPromError(w, err, http.StatusInternalServerError)
 		return
 	}
-	matrix := sr.Data.Value.(model.Matrix)
+	matrix := sr.Data.Value.(model.Matrix) //nolint:errcheck
+
 	// take just the label values from the query result
 	var result storage.LabelValuesResponse
 	result.Status = sr.Status

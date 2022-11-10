@@ -12,8 +12,8 @@ import (
 
 const (
 	baseURL      = "http://identity.local"
-	serviceToken = "gAAAAABZjCvLtw2v36P_Nwn23Vkjl9ZIxK27YsVuGp2_bftQI6RfymVTvnLE_wNtrAzEJSg6Xa7Aoe37DgDp2wrryWs3klgSqjC7ecC6RD9hRxSaQsjd7choIjQVdIbZjph4vmhJzg7cPIQd9CT7x12wNKBYwIbAmCDFEX_CIlzmPXBUyeISI-M"
-	userToken    = "gUUUUUUZjCvLtw2v36P_Nwn23Vkjl9ZIxK27YsVuGp2_bftQI6RfymVTvnLE_wNtrAzEJSg6Xa7Aoe37DgDp2wrryWs3klgSqjC7ecC6RD9hRxSaQsjd7choIjQVdIbZjph4vmhJzg7cPIQd9CT7x12wNKBYwIbAmCDFEX_CIlzmPXBUyeISI-M"
+	serviceToken = "gAAAAABZjCvLtw2v36P_Nwn23Vkjl9ZIxK27YsVuGp2_bftQI6RfymVTvnLE_wNtrAzEJSg6Xa7Aoe37DgDp2wrryWs3klgSqjC7ecC6RD9hRxSaQsjd7choIjQVdIbZjph4vmhJzg7cPIQd9CT7x12wNKBYwIbAmCDFEX_CIlzmPXBUyeISI-M" //nolint:gosec // not real credential
+	userToken    = "gUUUUUUZjCvLtw2v36P_Nwn23Vkjl9ZIxK27YsVuGp2_bftQI6RfymVTvnLE_wNtrAzEJSg6Xa7Aoe37DgDp2wrryWs3klgSqjC7ecC6RD9hRxSaQsjd7choIjQVdIbZjph4vmhJzg7cPIQd9CT7x12wNKBYwIbAmCDFEX_CIlzmPXBUyeISI-M" //nolint:gosec // not real credential
 )
 
 var serviceAuthBody = map[string]interface{}{
@@ -93,7 +93,7 @@ var userAuthScopeBody = map[string]interface{}{
 	},
 }
 
-func setupTest(t *testing.T) Driver {
+func setupTest() Driver {
 	//load test policy (where everything is allowed)
 	viper.Set("maia.auth_driver", "keystone")
 	viper.Set("maia.label_value_ttl", "72h")
@@ -126,18 +126,18 @@ func mocksToStrings(mocks []gock.Mock) []string {
 func TestNewKeystoneDriver(t *testing.T) {
 	defer gock.Off()
 
-	setupTest(t)
+	setupTest()
 
 	assertDone(t)
 }
-func assertDone(t *testing.T) bool {
+func assertDone(t *testing.T) bool { //nolint:unparam
 	return assert.True(t, gock.IsDone(), "pending mocks: %v\nunmatched requests: %v", mocksToStrings(gock.Pending()), gock.GetUnmatchedRequests())
 }
 
 func TestChildProjects(t *testing.T) {
 	defer gock.Off()
 
-	ks := setupTest(t)
+	ks := setupTest()
 
 	gock.New(baseURL).Get("/v3/projects").MatchParams(map[string]string{"enabled": "true", "parent_id": "p00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/child_projects.json").AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/projects").MatchParams(map[string]string{"enabled": "true", "parent_id": "p00002"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).BodyString("{ \"projects\": [] }").AddHeader("Content-Type", "application/json")
@@ -150,15 +150,15 @@ func TestChildProjects(t *testing.T) {
 	assertDone(t)
 }
 
-func TestAuthenticateRequest(t *testing.T) {
+func TestAuthenticateRequest(t *testing.T) { //nolint:dupl // the tests being verbose i think is best. perhaps not
 	defer gock.Off()
 
-	ks := setupTest(t)
+	ks := setupTest()
 
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
-	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", nil)
 	req.SetBasicAuth("testuser@testdomain|testproject@testdomain", "testpw")
 	context, err := ks.AuthenticateRequest(req, false)
 
@@ -168,15 +168,15 @@ func TestAuthenticateRequest(t *testing.T) {
 	assertDone(t)
 }
 
-func TestAuthenticateRequest_urlScope(t *testing.T) {
+func TestAuthenticateRequest_urlScope(t *testing.T) { //nolint:dupl // the tests being verbose i think is best. perhaps not
 	defer gock.Off()
 
-	ks := setupTest(t)
+	ks := setupTest()
 
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthScopeBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
-	req := httptest.NewRequest("GET", "http://maia.local/testdomain/graph?project_id=p00001", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://maia.local/testdomain/graph?project_id=p00001", nil)
 	req.SetBasicAuth("testuser@testdomain", "testpw")
 	context, err := ks.AuthenticateRequest(req, false)
 
@@ -189,11 +189,11 @@ func TestAuthenticateRequest_urlScope(t *testing.T) {
 func TestAuthenticateRequest_token(t *testing.T) {
 	defer gock.Off()
 
-	ks := setupTest(t)
+	ks := setupTest()
 
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
-	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", nil)
 	req.Header.Set("X-Auth-Token", userToken)
 	context, err := ks.AuthenticateRequest(req, false)
 
@@ -206,11 +206,11 @@ func TestAuthenticateRequest_token(t *testing.T) {
 func TestAuthenticateRequest_failed(t *testing.T) {
 	defer gock.Off()
 
-	ks := setupTest(t)
+	ks := setupTest()
 
 	gock.New(baseURL).Post("/v3/auth/tokens").Reply(http.StatusForbidden)
 
-	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", nil)
 	req.SetBasicAuth("testuser@testdomain|testproject@testdomain", "testpw")
 	_, err := ks.AuthenticateRequest(req, false)
 
@@ -222,9 +222,9 @@ func TestAuthenticateRequest_failed(t *testing.T) {
 func TestAuthenticateRequest_failedNoScope(t *testing.T) {
 	defer gock.Off()
 
-	ks := setupTest(t)
+	ks := setupTest()
 
-	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", nil)
 	req.SetBasicAuth("testuser@testdomain", "testpw")
 	_, err := ks.AuthenticateRequest(req, false)
 
@@ -236,7 +236,7 @@ func TestAuthenticateRequest_failedNoScope(t *testing.T) {
 func TestAuthenticateRequest_guessScope(t *testing.T) {
 	defer gock.Off()
 
-	ks := setupTest(t)
+	ks := setupTest()
 
 	gock.New(baseURL).Get("/v3/users").MatchParams(map[string]string{"domain_id": "d00001", "enabled": "true", "name": "testuser"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser.json").AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/role_assignments").MatchParams(map[string]string{"effective": "true", "user.id": "u00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser_roles.json").AddHeader("Content-Type", "application/json")
@@ -244,7 +244,7 @@ func TestAuthenticateRequest_guessScope(t *testing.T) {
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthScopeBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
-	req := httptest.NewRequest("GET", "http://maia.local/federate", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", nil)
 	req.SetBasicAuth("testuser@testdomain", "testpw")
 	context, err := ks.AuthenticateRequest(req, true)
 

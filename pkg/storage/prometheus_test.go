@@ -14,7 +14,7 @@ const (
 	federateURL   = "http://prometheus.local"
 )
 
-func setupTest(t *testing.T) Driver {
+func setupTest(t *testing.T) Driver { //nolint:unparam
 	//load test policy (where everything is allowed)
 	viper.Set("maia.storage_driver", "prometheus")
 	viper.Set("maia.label_value_ttl", "72h")
@@ -40,7 +40,7 @@ func TestNewPrometheusDriver(t *testing.T) {
 
 	assertDone(t)
 }
-func assertDone(t *testing.T) bool {
+func assertDone(t *testing.T) bool { //nolint:unparam
 	return assert.True(t, gock.IsDone(), "pending mocks: %v\nunmatched requests: %v", mocksToStrings(gock.Pending()), gock.GetUnmatchedRequests())
 }
 

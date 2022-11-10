@@ -30,10 +30,11 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/viper"
+
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
 	"github.com/sapcc/maia/pkg/test"
-	"github.com/spf13/viper"
 )
 
 var projectContext = &policy.Context{Request: map[string]string{"project_id": "12345", "domain_id": "77777", "user_id": "u12345"},
@@ -57,19 +58,19 @@ var domainHeader = map[string]string{"X-User-Id": domainContext.Auth["user_id"],
 	"X-User-Domain-Name": domainContext.Auth["user_domain_name"],
 	"X-Domain-Id":        domainContext.Auth["domain_id"], "X-Domain-Name": domainContext.Auth["domain_name"]}
 
-func setupTest(t *testing.T, controller *gomock.Controller) (http.Handler, *keystone.MockDriver, *storage.MockDriver) {
+func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler, keystoneDriver *keystone.MockDriver, storageDriver *storage.MockDriver) { //nolint:unparam
 	//load test policy (where everything is allowed)
 	viper.Set("keystone.policy_file", "../test/policy.json")
 	viper.Set("maia.label_value_ttl", "72h")
 
 	//create test driver with the domains and projects from start-data.sql
-	keystone := keystone.NewMockDriver(controller)
-	storage := storage.NewMockDriver(controller)
+	keystoneDriver = keystone.NewMockDriver(controller)
+	storageDriver = storage.NewMockDriver(controller)
 
 	prometheus.DefaultRegisterer = prometheus.NewPedanticRegistry()
-	router := setupRouter(keystone, storage)
+	router = setupRouter(keystoneDriver, storageDriver)
 
-	return router, keystone, storage
+	return router, keystoneDriver, storageDriver
 }
 
 func expectAuthByProjectID(keystoneMock *keystone.MockDriver) {

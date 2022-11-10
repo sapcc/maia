@@ -1,14 +1,15 @@
 package util
 
 import (
+	"strings"
+
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/storage/metric"
-	"strings"
 )
 
 // AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label
-func AddLabelConstraintToExpression(expression string, key string, values []string) (string, error) {
+func AddLabelConstraintToExpression(expression, key string, values []string) (string, error) {
 	exprNode, err := promql.ParseExpr(expression)
 	if err != nil {
 		return "", err
@@ -25,7 +26,7 @@ func AddLabelConstraintToExpression(expression string, key string, values []stri
 }
 
 // AddLabelConstraintToSelector enhances a PromQL selector with an additional label selector
-func AddLabelConstraintToSelector(metricSelector string, key string, values []string) (string, error) {
+func AddLabelConstraintToSelector(metricSelector, key string, values []string) (string, error) {
 	matcher, err := makeLabelMatcher(key, values)
 	if err != nil {
 		return "", err
@@ -40,7 +41,7 @@ func AddLabelConstraintToSelector(metricSelector string, key string, values []st
 	if err != nil {
 		return "", err
 	}
-	return "{" + metric.LabelMatchers(append(labelMatchers, matcher)).String() + "}", nil
+	return "{" + metric.LabelMatchers(append(labelMatchers, matcher)).String() + "}", nil //nolint:unconvert
 }
 
 func makeLabelMatcher(key string, values []string) (*metric.LabelMatcher, error) {
@@ -59,13 +60,13 @@ type labelInjector struct {
 
 // Visit does the actual modifications to PromQL expression nodes
 func (v labelInjector) Visit(node promql.Node) (w promql.Visitor) {
-	switch node.(type) {
+	switch node := node.(type) {
 	case *promql.MatrixSelector:
-		sel := node.(*promql.MatrixSelector)
-		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher))
+		sel := node
+		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher)) //nolint:unconvert
 	case *promql.VectorSelector:
-		sel := node.(*promql.VectorSelector)
-		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher))
+		sel := node
+		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher)) //nolint:unconvert
 	}
 
 	return v

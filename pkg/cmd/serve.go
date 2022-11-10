@@ -21,10 +21,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/sapcc/maia/pkg/api"
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
+
+	"github.com/sapcc/maia/pkg/api"
 )
 
 // serveCmd represents the get command
@@ -41,13 +43,16 @@ var serveCmd = &cobra.Command{
 		}()
 
 		// just run the server
-		api.Server()
+		err := api.Server()
+		if err != nil {
+			return err
+		}
 
 		return nil
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		if _, err := os.Stat(configFile); err != nil {
-			panic(fmt.Errorf("No config file found at %s (required for server mode)", configFile))
+			panic(fmt.Errorf("no config file found at %s (required for server mode)", configFile))
 		}
 
 		readConfig(configFile)
@@ -62,7 +67,7 @@ func readConfig(configPath string) {
 		viper.SetConfigType("toml")
 		err := viper.ReadInConfig()
 		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("Fatal error config file: %s", err))
+			panic(fmt.Errorf("fatal error config file: %s", err))
 		}
 	}
 }
@@ -87,9 +92,18 @@ func init() {
 	var bindAddr, policyFile string
 
 	serveCmd.PersistentFlags().StringVar(&promURL, "prometheus-url", os.Getenv("MAIA_PROMETHEUS_URL"), "URL of the Prometheus server backing Maia (MAIA_PROMETHEUS_URL)")
-	viper.BindPFlag("maia.prometheus_url", serveCmd.PersistentFlags().Lookup("prometheus-url"))
+	err := viper.BindPFlag("maia.prometheus_url", serveCmd.PersistentFlags().Lookup("prometheus-url"))
+	if err != nil {
+		panic(err)
+	}
 	serveCmd.Flags().StringVar(&bindAddr, "bind-address", "0.0.0.0:9091", "IP-Address and port where Maia is listening for incoming requests (e.g. 0.0.0.0:9091)")
-	viper.BindPFlag("maia.bind_address", serveCmd.Flags().Lookup("bind-address"))
+	err = viper.BindPFlag("maia.bind_address", serveCmd.Flags().Lookup("bind-address"))
+	if err != nil {
+		panic(err)
+	}
 	serveCmd.Flags().StringVar(&policyFile, "policy-file", "", "Location of the OpenStack policy file")
-	viper.BindPFlag("keystone.policy_file", serveCmd.Flags().Lookup("policy-file"))
+	err = viper.BindPFlag("keystone.policy_file", serveCmd.Flags().Lookup("policy-file"))
+	if err != nil {
+		panic(err)
+	}
 }

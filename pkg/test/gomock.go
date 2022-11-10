@@ -2,10 +2,11 @@ package test
 
 import (
 	"fmt"
-	"github.com/golang/mock/gomock"
 	"net/http"
 	"regexp"
 	"time"
+
+	"github.com/golang/mock/gomock"
 )
 
 // HTTPRequestMatcher matches against http.Request parameters
@@ -61,5 +62,5 @@ func (m TimeStringMatcher) Matches(x interface{}) bool {
 }
 
 func (m TimeStringMatcher) String() string {
-	return fmt.Sprintf("is a string with a timestamp")
+	return "is a string with a timestamp"
 }
