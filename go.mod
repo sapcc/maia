@@ -6,7 +6,7 @@ require (
 	github.com/databus23/goslo.policy v0.0.0-20170317131957-3ae74dd07ebf
 	github.com/golang/mock v1.3.1
 	github.com/gophercloud/gophercloud v0.0.0-20190515011819-1992d5238d78
-	github.com/gorilla/mux v1.7.1
+	github.com/gorilla/mux v1.8.0
 	github.com/h2non/gock v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v0.9.1
