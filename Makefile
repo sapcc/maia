@@ -19,6 +19,7 @@ ifdef DEBUG
 endif
 
 build/maia: generate
+static-check: generate
 
 generate: FORCE
 	go install github.com/golang/mock/mockgen@v1.6.0
