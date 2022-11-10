@@ -3,7 +3,7 @@ module github.com/sapcc/maia
 go 1.19
 
 require (
-	github.com/databus23/goslo.policy v0.0.0-20170317131957-3ae74dd07ebf
+	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
 	github.com/golang/mock v1.3.1
 	github.com/gophercloud/gophercloud v0.0.0-20190515011819-1992d5238d78
 	github.com/gorilla/mux v1.7.1
