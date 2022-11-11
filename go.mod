@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/client_golang v0.9.1
 	github.com/prometheus/common v0.4.0
 	github.com/prometheus/prometheus v0.0.0-20171104155738-5211b96d4d12
-	github.com/rs/cors v1.6.1-0.20190116175910-76f58f330d76
+	github.com/rs/cors v1.8.2
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/viper v1.3.2
 	github.com/stretchr/testify v1.2.2
