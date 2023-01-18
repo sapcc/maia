@@ -11,7 +11,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v0.9.1
 	github.com/prometheus/common v0.4.0
-	github.com/prometheus/prometheus v1.8.2
+	github.com/prometheus/prometheus v1.99.0
 	github.com/rs/cors v1.8.2
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
