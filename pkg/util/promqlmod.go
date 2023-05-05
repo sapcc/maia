@@ -29,7 +29,7 @@ func AddLabelConstraintToExpression(expression, key string, values []string) (st
 			if found {
 				replaceChildNode(parent, oldNode, newNode)
 			} else {
-				exprNode = newNode.(parser.Expr)
+				exprNode = newNode.(parser.Expr) //nolint:errcheck
 			}
 		},
 	}
@@ -126,32 +126,31 @@ func replaceChildNode(parent, oldChild, newChild parser.Node) {
 	switch p := parent.(type) {
 	case *parser.AggregateExpr:
 		if p.Expr == oldChild {
-			p.Expr = newChild.(parser.Expr)
+			p.Expr = newChild.(parser.Expr) //nolint:errcheck
 		}
 	case *parser.BinaryExpr:
 		if p.LHS == oldChild {
-			p.LHS = newChild.(parser.Expr)
+			p.LHS = newChild.(parser.Expr) //nolint:errcheck
 		} else if p.RHS == oldChild {
-			p.RHS = newChild.(parser.Expr)
+			p.RHS = newChild.(parser.Expr) //nolint:errcheck
 		}
 	case *parser.Call:
 		for i, e := range p.Args {
 			if e == oldChild {
-				p.Args[i] = newChild.(parser.Expr)
+				p.Args[i] = newChild.(parser.Expr) //nolint:errcheck
 				return
 			}
 		}
 	case *parser.ParenExpr:
 		if p.Expr == oldChild {
-			p.Expr = newChild.(parser.Expr)
+			p.Expr = newChild.(parser.Expr) //nolint:errcheck
 		}
 	case *parser.UnaryExpr:
 		if p.Expr == oldChild {
-			p.Expr = newChild.(parser.Expr)
+			p.Expr = newChild.(parser.Expr) //nolint:errcheck
 		}
 	}
 }
-
 
 // findParentNode finds the parent node of the target node in the given root node
 func findParentNode(root, target parser.Node) (parser.Node, bool) {
