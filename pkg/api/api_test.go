@@ -115,7 +115,6 @@ func expectAuthAndDenyAuthorization(keystoneMock *keystone.MockDriver) {
 
 func TestFederate(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
@@ -133,7 +132,6 @@ func TestFederate(t *testing.T) {
 
 func TestFederate_errorNoMatch(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
 
@@ -149,7 +147,6 @@ func TestFederate_errorNoMatch(t *testing.T) {
 
 func TestFederate_errorInvalidSelector(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
 
@@ -165,7 +162,6 @@ func TestFederate_errorInvalidSelector(t *testing.T) {
 
 func TestFederate_errorBackendFailed(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
@@ -182,7 +178,6 @@ func TestFederate_errorBackendFailed(t *testing.T) {
 
 func TestSeries(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
@@ -200,7 +195,6 @@ func TestSeries(t *testing.T) {
 
 func TestSeries_failAuthentication(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
 
@@ -215,7 +209,6 @@ func TestSeries_failAuthentication(t *testing.T) {
 
 func TestSeries_failAuthorization(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
 
@@ -230,14 +223,13 @@ func TestSeries_failAuthorization(t *testing.T) {
 
 func TestLabelValues(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
 	expectAuthByProjectID(keystoneMock)
 	// Maia's label-values implementation uses the series API and a time-based filter stale series out. The exact start
 	// and end date of the filter cannot be predicted, therefore we accept anything that is a parsable date.
-	storageMock.EXPECT().QueryRange("count({project_id=\"12345\",service!=\"\"}) BY (service)", test.TimeStringMatcher{}, test.TimeStringMatcher{}, viper.Get("maia.label_value_ttl"), "", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/label_values_query_range.json"), nil)
+	storageMock.EXPECT().QueryRange("count by (service) ({project_id=\"12345\",service!=\"\"})", test.TimeStringMatcher{}, test.TimeStringMatcher{}, viper.Get("maia.label_value_ttl"), "", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/label_values_query_range.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},
@@ -250,12 +242,11 @@ func TestLabelValues(t *testing.T) {
 
 func TestQuery(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
 	expectAuthByProjectID(keystoneMock)
-	storageMock.EXPECT().Query("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "24m", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
+	storageMock.EXPECT().Query("sum({__name__=\"blackbox_api_status_gauge\",check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "24m", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},
@@ -268,7 +259,6 @@ func TestQuery(t *testing.T) {
 
 func TestQuery_syntaxError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
 
@@ -285,12 +275,11 @@ func TestQuery_syntaxError(t *testing.T) {
 
 func TestQueryRange(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
 	expectAuthByProjectID(keystoneMock)
-	storageMock.EXPECT().QueryRange("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "5m", "90s", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query_range.json"), nil)
+	storageMock.EXPECT().QueryRange("sum({__name__=\"blackbox_api_status_gauge\",check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", "5m", "90s", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query_range.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},
@@ -303,7 +292,6 @@ func TestQueryRange(t *testing.T) {
 
 func TestAPIMetadata(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
 
@@ -319,7 +307,6 @@ func TestAPIMetadata(t *testing.T) {
 
 func TestServeStaticContent(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, _, _ := setupTest(t, ctrl)
 
@@ -333,7 +320,6 @@ func TestServeStaticContent(t *testing.T) {
 
 func TestServeStaticContent_notFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, _, _ := setupTest(t, ctrl)
 
@@ -346,7 +332,6 @@ func TestServeStaticContent_notFound(t *testing.T) {
 
 func TestGraph(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
 	expectAuthByDefaults(keystoneMock)
@@ -360,7 +345,6 @@ func TestGraph(t *testing.T) {
 
 func TestRoot_redirect(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, _, _ := setupTest(t, ctrl)
 
@@ -373,7 +357,6 @@ func TestRoot_redirect(t *testing.T) {
 
 func TestGraph_redirect(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, _, _ := setupTest(t, ctrl)
 
@@ -386,7 +369,6 @@ func TestGraph_redirect(t *testing.T) {
 
 func TestGraph_otherOSDomain(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	router, keystoneMock, _ := setupTest(t, ctrl)
 	expectPlainBasicAuthAndFail(keystoneMock)
