@@ -1,13 +1,18 @@
 package util
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
 )
 
-// AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label
+// AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label.
+// The function takes three parameters:
+// 1. expression: The original PromQL expression.
+// 2. key: The label key used to limit the series.
+// 3. values: The label values that the series should match.
 func AddLabelConstraintToExpression(expression, key string, values []string) (string, error) {
 	// Parse the given PromQL expression
 	exprNode, err := parser.ParseExpr(expression)
@@ -15,20 +20,26 @@ func AddLabelConstraintToExpression(expression, key string, values []string) (st
 		return "", err
 	}
 
-	// Create a label matcher based on the provided key and values
+	// Create a new label matcher based on the provided key and values.
+	// The label matcher will be used to modify the syntax tree to include the new label constraint.
 	matcher, err := makeLabelMatcher(key, values)
 	if err != nil {
 		return "", err
 	}
 
-	// Initialize labelInjector with the created matcher and a nodeReplacer function
+	// Initialize a labelInjector with the created matcher.
+	// The labelInjector will be used to traverse and modify the syntax tree.
+	// It also includes a nodeReplacer function that will replace nodes in the syntax tree with modified versions.
 	v := labelInjector{
 		matcher: matcher,
 		nodeReplacer: func(oldNode, newNode parser.Node) {
+			// Find the parent of the old node in the syntax tree.
 			parent, found := findParentNode(exprNode, oldNode)
 			if found {
+				// If the old node has a parent (it's not the root of the syntax tree), replace the old node with the new node.
 				replaceChildNode(parent, oldNode, newNode)
 			} else {
+				// If the old node doesn't have a parent (it's the root of the syntax tree), replace the root with the new node.
 				exprNode = newNode.(parser.Expr) //nolint:errcheck
 			}
 		},
@@ -40,7 +51,8 @@ func AddLabelConstraintToExpression(expression, key string, values []string) (st
 		return "", err
 	}
 
-	// Return the modified PromQL expression as a string
+	// Convert the modified syntax tree back into a string and return it.
+	// The returned string is the original PromQL expression with the added label constraint.
 	return exprNode.String(), nil
 }
 
@@ -154,42 +166,55 @@ func replaceChildNode(parent, oldChild, newChild parser.Node) {
 
 // findParentNode finds the parent node of the target node in the given root node
 func findParentNode(root, target parser.Node) (parser.Node, bool) {
-	var parentNode parser.Node
-	var found bool
+	fmt.Printf("Root Node: %v, Target Node: %v\n", root, target)
 	v := &parentNodeFinder{
-		target: target,
-		found:  &found,
+		targetNode: target,
 	}
-
-	// Walk the PromQL expression tree and find the parent node of the target node
-	err := parser.Walk(v, root, nil)
+	err := parser.Walk(v, root, []parser.Node{})
 	if err != nil {
 		return nil, false
 	}
-	parentNode = v.parent
-	return parentNode, found
+	return v.parentNode, v.parentNode != nil
 }
 
 // parentNodeFinder is a parser.Visitor that finds the parent node of a given target node
 type parentNodeFinder struct {
-	target parser.Node
-	parent parser.Node
-	found  *bool
+	targetNode parser.Node
+	parentNode parser.Node
+	stack      []parser.Node
 }
 
 // Visit finds the parent node of the target node
-func (v *parentNodeFinder) Visit(node parser.Node, path []parser.Node) (parser.Visitor, error) {
-	if *v.found {
-		return nil, nil
+func (v *parentNodeFinder) Visit(node parser.Node, next []parser.Node) (w parser.Visitor, err error) {
+	fmt.Println("Entering Visit function")
+
+	// Check if the node is nil, and if it is, return v to continue the traversal
+	if node == nil {
+		fmt.Println("Node is nil")
+		return v, nil
 	}
 
-	// Check if the current node has the target node as a child
-	for _, child := range parser.Children(node) {
-		if child == v.target {
-			v.parent = node
-			*v.found = true
-			break
+	fmt.Printf("Current Node: %v\n", node)
+	fmt.Printf("Current Stack: %v\n", v.stack)
+
+	if node == v.targetNode {
+		// Check if v.stack is not empty before accessing its last element
+		if len(v.stack) > 0 {
+			v.parentNode = v.stack[len(v.stack)-1]
+			fmt.Printf("Parent Node found: %v\n", v.parentNode)
+		} else {
+			fmt.Println("Stack is empty, no parent node found")
 		}
+	} else {
+		v.stack = append(v.stack, node)
+		defer func() {
+			// Similarly, check if v.stack is not empty before reducing its size
+			if len(v.stack) > 0 {
+				v.stack = v.stack[:len(v.stack)-1]
+			}
+		}()
 	}
+
+	fmt.Println("Exiting Visit function")
 	return v, nil
 }

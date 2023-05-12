@@ -284,7 +284,7 @@ func TestQueryRange(t *testing.T) {
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},
 		Method:           "GET",
-		Path:             "/api/v1/query_range?query=sum(blackbox_api_status_gauge{check%3D~%22keystone%22})&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z&step=5m&timeout=90s",
+		Path:             "/api/v1/query_range?query=sum(%7B__name__%3D%22blackbox_api_status_gauge%22%2Ccheck%3D~%22keystone%22%2Cproject_id%3D%2212345%22%7D)&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z&step=5m&timeout=90s",
 		ExpectStatusCode: http.StatusOK,
 		ExpectJSON:       "fixtures/query_range.json",
 	}.Check(t, router)
