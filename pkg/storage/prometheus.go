@@ -103,6 +103,16 @@ func (promCli *prometheusStorageClient) LabelValues(name, acceptContentType stri
 	return res, err
 }
 
+// LabelNames returns all label names that are used in the time series data ingested by the Prometheus instance.
+// https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
+// match[]=<series_selector>: Repeated series selector argument that selects the series to return. At least one match[] argument must be provided.
+// Does this mean we need to use /api/v1/series to get the series selector?
+func (promCli *prometheusStorageClient) Labels(start, end string, match []string, acceptContentType string) (*http.Response, error) {
+	promURL := promCli.buildURL("/api/v1/labels", map[string]interface{}{"start": start, "end": end, "match[]": match})
+
+	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
+}
+
 func (promCli *prometheusStorageClient) Federate(selectors []string, acceptContentType string) (*http.Response, error) {
 	promURL := promCli.buildURL("/federate", map[string]interface{}{"match[]": selectors})
 

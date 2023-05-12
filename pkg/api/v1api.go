@@ -186,3 +186,18 @@ func (p *v1Provider) Series(w http.ResponseWriter, req *http.Request) {
 
 	ReturnResponse(w, resp)
 }
+
+func (p *v1Provider) Labels(w http.ResponseWriter, req *http.Request) {
+	queryParams := req.URL.Query()
+	start := queryParams.Get("start")
+	end := queryParams.Get("end")
+	match := queryParams["match[]"]
+
+	resp, err := p.storage.Labels(start, end, match, req.Header.Get("Accept"))
+	if err != nil {
+		ReturnPromError(w, err, http.StatusServiceUnavailable)
+		return
+	}
+
+	ReturnResponse(w, resp)
+}
