@@ -51,7 +51,8 @@ func TestFederate(t *testing.T) {
 
 	gock.New(federateURL).Get("/federate").
 		MatchParams(map[string]string{"match[]": "{vmware_name=\"win_cifs_13\",project_id=\"p00001\"}"}).
-		Reply(http.StatusOK).File("fixtures/federate.txt").
+		Reply(http.StatusOK).
+		File("fixtures/federate.txt").
 		AddHeader("Content-Type", PlainText)
 
 	_, err := ps.Federate([]string{"{vmware_name=\"win_cifs_13\",project_id=\"p00001\"}"}, PlainText)
