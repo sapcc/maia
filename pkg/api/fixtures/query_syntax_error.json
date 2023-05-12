@@ -1,5 +1,5 @@
 {
   "status": "error",
   "errorType": "bad_data",
-  "error": "parse error at char 49: unclosed left parenthesis"
+  "error": "1:49: parse error: unclosed left parenthesis"
 }

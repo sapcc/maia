@@ -1,73 +1,98 @@
 package util
 
 import (
+	"reflect"
 	"strings"
 
-	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/promql"
-	"github.com/prometheus/prometheus/storage/metric"
+	"github.com/prometheus/prometheus/model/labels"
+	"github.com/prometheus/prometheus/promql/parser"
+	"golang.org/x/exp/slices"
 )
 
-// AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label
+// AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label.
+// The function takes three parameters:
+// 1. expression: The original PromQL expression.
+// 2. key: The label key used to limit the series.
+// 3. values: The label values that the series should match.
 func AddLabelConstraintToExpression(expression, key string, values []string) (string, error) {
-	exprNode, err := promql.ParseExpr(expression)
+	exprNode, err := parser.ParseExpr(expression)
 	if err != nil {
 		return "", err
 	}
+
+	// Create a new label matcher based on the provided key and values.
+	// The label matcher will be used to modify the syntax tree to include the new label constraint.
 	matcher, err := makeLabelMatcher(key, values)
 	if err != nil {
 		return "", err
 	}
 
-	// since to structure of the expression is not modified we can use a visitor, avoiding our own traversal code
-	promql.Walk(labelInjector{matcher: matcher}, exprNode)
+	// new labelInjector used to traverse and modify the syntax tree.
+	v := labelInjector{matcher: matcher}
 
+	// Walk the PromQL expression tree and modify label matchers
+	err = parser.Walk(v, exprNode, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert the modified syntax tree back into a string and return it.
+	// The returned string is the original PromQL expression with the added label constraint.
 	return exprNode.String(), nil
 }
 
-// AddLabelConstraintToSelector enhances a PromQL selector with an additional label selector
+// AddLabelConstraintToSelector adds a label constraint to a metric selector
 func AddLabelConstraintToSelector(metricSelector, key string, values []string) (string, error) {
 	matcher, err := makeLabelMatcher(key, values)
 	if err != nil {
 		return "", err
 	}
 
-	var labelMatchers metric.LabelMatchers
+	// Parse the metric selector to obtain existing label matchers
+	var labelMatchers []*labels.Matcher
 	if metricSelector != "{}" {
-		labelMatchers, err = promql.ParseMetricSelector(metricSelector)
+		labelMatchers, err = parser.ParseMetricSelector(metricSelector)
 	} else {
-		labelMatchers = make(metric.LabelMatchers, 0)
+		labelMatchers = make([]*labels.Matcher, 0)
 	}
 	if err != nil {
 		return "", err
 	}
-	return "{" + metric.LabelMatchers(append(labelMatchers, matcher)).String() + "}", nil //nolint:unconvert
+
+	// Build the new metric selector string with the combination of existing and additional matcher
+	l := make([]string, len(labelMatchers)+1)
+	for i, m := range labelMatchers {
+		l[i] = m.String()
+	}
+	l[len(l)-1] = matcher.String()
+	return "{" + strings.Join(l, ",") + "}", nil
 }
 
-func makeLabelMatcher(key string, values []string) (*metric.LabelMatcher, error) {
+// makeLabelMatcher creates a new labels.Matcher based on the provided key and values
+func makeLabelMatcher(key string, values []string) (*labels.Matcher, error) {
 	if len(values) == 1 {
-		return metric.NewLabelMatcher(metric.Equal, model.LabelName(key), model.LabelValue(values[0]))
+		return labels.NewMatcher(labels.MatchEqual, key, values[0])
 	}
-	return metric.NewLabelMatcher(metric.RegexMatch, model.LabelName(key), model.LabelValue(strings.Join(values, "|")))
+	return labels.NewMatcher(labels.MatchRegexp, key, strings.Join(values, "|"))
 }
 
-// labelInjector enhances every reference to a metric (vector-selector) with an additional label-constraint
-// We use this to restrict a query to metrics belonging to a single OpenStack tenants stored in label 'project_id'
+// labelInjector is a parser.Visitor that enhances every reference to a metric (vector-selector)
+// with an additional label constraint. This is used to restrict a query to metrics
+// belonging to a single OpenStack tenant stored in label 'project_id'.
 type labelInjector struct {
-	promql.Visitor
-	matcher *metric.LabelMatcher
+	matcher *labels.Matcher
 }
 
-// Visit does the actual modifications to PromQL expression nodes
-func (v labelInjector) Visit(node promql.Node) (w promql.Visitor) {
-	switch node := node.(type) {
-	case *promql.MatrixSelector:
-		sel := node
-		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher)) //nolint:unconvert
-	case *promql.VectorSelector:
-		sel := node
-		sel.LabelMatchers = metric.LabelMatchers(append(sel.LabelMatchers, v.matcher)) //nolint:unconvert
+// Visit modifies the label matchers of the visited parser.Node based on the labelInjector's matcher
+func (v labelInjector) Visit(node parser.Node, path []parser.Node) (parser.Visitor, error) {
+	switch n := node.(type) {
+	case *parser.VectorSelector:
+		// label matcher is only modified, if not already present
+		if !slices.ContainsFunc(n.LabelMatchers, func(e *labels.Matcher) bool {
+			return reflect.DeepEqual(e, v.matcher)
+		}) {
+			n.LabelMatchers = append(n.LabelMatchers, v.matcher)
+		}
 	}
-
-	return v
+	return v, nil
 }
