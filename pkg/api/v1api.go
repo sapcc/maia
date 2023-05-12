@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"sort"
 	"time"
@@ -100,7 +99,6 @@ func (p *v1Provider) QueryRange(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Printf("Calling QueryRange with args: %s, %s, %s, %s, %s, %s", newQuery, queryParams.Get("start"), queryParams.Get("end"), queryParams.Get("step"), queryParams.Get("timeout"), req.Header.Get("Accept"))
 	resp, err := p.storage.QueryRange(newQuery, queryParams.Get("start"), queryParams.Get("end"), queryParams.Get("step"), queryParams.Get("timeout"), req.Header.Get("Accept"))
 	if err != nil {
 		ReturnPromError(w, err, http.StatusServiceUnavailable)

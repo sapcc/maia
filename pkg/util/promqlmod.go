@@ -15,7 +15,6 @@ import (
 // 2. key: The label key used to limit the series.
 // 3. values: The label values that the series should match.
 func AddLabelConstraintToExpression(expression, key string, values []string) (string, error) {
-	// Parse the given PromQL expression
 	exprNode, err := parser.ParseExpr(expression)
 	if err != nil {
 		return "", err
@@ -28,8 +27,7 @@ func AddLabelConstraintToExpression(expression, key string, values []string) (st
 		return "", err
 	}
 
-	// Initialize a labelInjector with the created matcher.
-	// The labelInjector will be used to traverse and modify the syntax tree.
+	// new labelInjector used to traverse and modify the syntax tree.
 	v := labelInjector{matcher: matcher}
 
 	// Walk the PromQL expression tree and modify label matchers
@@ -45,7 +43,6 @@ func AddLabelConstraintToExpression(expression, key string, values []string) (st
 
 // AddLabelConstraintToSelector adds a label constraint to a metric selector
 func AddLabelConstraintToSelector(metricSelector, key string, values []string) (string, error) {
-	// Create a label matcher based on the provided key and values
 	matcher, err := makeLabelMatcher(key, values)
 	if err != nil {
 		return "", err
@@ -62,21 +59,13 @@ func AddLabelConstraintToSelector(metricSelector, key string, values []string) (
 		return "", err
 	}
 
-	// Combine the existing matchers with the new matcher
-	combinedMatchers := append(labelMatchers, matcher)
-
-	// Build the new metric selector string with the combined matchers
-	var sb strings.Builder
-	sb.WriteString("{")
-	for i, m := range combinedMatchers {
-		if i > 0 {
-			sb.WriteString(",")
-		}
-		sb.WriteString(m.String())
+	// Build the new metric selector string with the combination of existing and additional matcher
+	l := make([]string, len(labelMatchers)+1)
+	for i, m := range labelMatchers {
+		l[i] = m.String()
 	}
-	sb.WriteString("}")
-
-	return sb.String(), nil
+	l[len(l)-1] = matcher.String()
+	return "{" + strings.Join(l, ",") + "}", nil
 }
 
 // makeLabelMatcher creates a new labels.Matcher based on the provided key and values
@@ -98,6 +87,7 @@ type labelInjector struct {
 func (v labelInjector) Visit(node parser.Node, path []parser.Node) (parser.Visitor, error) {
 	switch n := node.(type) {
 	case *parser.VectorSelector:
+		// label matcher is only modified, if not already present
 		if !slices.ContainsFunc(n.LabelMatchers, func(e *labels.Matcher) bool {
 			return reflect.DeepEqual(e, v.matcher)
 		}) {
