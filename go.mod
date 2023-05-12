@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
 	github.com/golang/mock v1.6.0
-	github.com/gophercloud/gophercloud v1.2.0
+	github.com/gophercloud/gophercloud v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/h2non/gock v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -16,6 +16,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.2
+	golang.org/x/exp v0.0.0-20230307190834-24139beb5833
 )
 
 require (
@@ -61,7 +62,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.14.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/goleak v1.2.1 // indirect
-	golang.org/x/exp v0.0.0-20230307190834-24139beb5833 // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
