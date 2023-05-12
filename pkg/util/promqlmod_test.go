@@ -9,15 +9,34 @@ import (
 
 const expectedSelector = "{check=~\"$api\",project_id=\"ecdc9fc4165d49b78987bbfbd5b4c9e2\"}"
 
-// const expectedExpr = "1 - sum(blackbox_api_status_gauge" + expectedSelector + ")"
-// const expectedSelectorMulti = "{check=~\"$api\",project_id=~\"ecdc9fc4165d49b78987bbfbd5b4c9e2|xyz\"}"
+func TestAddLabelConstraintToExpressionWithUnless(t *testing.T) {
+	modifiedExpr, err := AddLabelConstraintToExpression("limes_swift_size_bytes_per_container{container_name=~\"my-test-container\", project_id=\"caa1337d2c38450f8266311fd0f05446\"} unless (limes_swift_size_bytes_per_container{container_name=~\"my-test-container-segments\", project_id=\"caa1337d2c38450f8266311fd0f05446\"} < 3)", "project_id", []string{"test123"})
+	if err != nil {
+		t.Fatalf("Error modifying expression: %v", err)
+	}
+	expected := "limes_swift_size_bytes_per_container{container_name=~\"my-test-container\",project_id=\"caa1337d2c38450f8266311fd0f05446\",project_id=\"test123\"} unless (limes_swift_size_bytes_per_container{container_name=~\"my-test-container-segments\",project_id=\"caa1337d2c38450f8266311fd0f05446\",project_id=\"test123\"} < 3)"
+	if modifiedExpr != expected {
+		t.Errorf("Expected modified expression to be %q, but got %q", expected, modifiedExpr)
+	}
+}
+
+func TestAddLabelConstraintToExpressionWithSumRateAndUnless(t *testing.T) {
+	modifiedExpr, err := AddLabelConstraintToExpression("sum by (container_name) (rate(limes_swift_size_bytes_per_container{container_name=~\"my-test-container\", project_id=\"caa1337d2c38450f8266311fd0f05446\"}[5m]) unless rate(limes_swift_size_bytes_per_container{container_name=~\"my-test-container-segments\", project_id=\"caa1337d2c38450f8266311fd0f05446\"}[5m]) < 3)",
+		"project_id", []string{"test123"})
+	if err != nil {
+		t.Fatalf("Error modifying expression: %v", err)
+	}
+	expected := "sum by (container_name) (rate(limes_swift_size_bytes_per_container{container_name=~\"my-test-container\",project_id=\"caa1337d2c38450f8266311fd0f05446\",project_id=\"test123\"}[5m]) unless rate(limes_swift_size_bytes_per_container{container_name=~\"my-test-container-segments\",project_id=\"caa1337d2c38450f8266311fd0f05446\",project_id=\"test123\"}[5m]) < 3)"
+	if modifiedExpr != expected {
+		t.Errorf("Expected modified expression to be %q, but got %q", expected, modifiedExpr)
+	}
+}
 
 func TestAddLabelConstraintToExpression(t *testing.T) {
 	modifiedExpr, err := AddLabelConstraintToExpression("sum(rate(http_request_total{job=\"myjob\", code=\"200\"}[5m])) by (job)", "project_id", []string{"12345"})
 	if err != nil {
 		t.Fatalf("Error modifying expression: %v", err)
 	}
-	// This has changed to the new format from the old one
 	expected := "sum by (job) (rate(http_request_total{code=\"200\",job=\"myjob\",project_id=\"12345\"}[5m]))"
 	if modifiedExpr != expected {
 		t.Errorf("Expected modified expression to be %q, but got %q", expected, modifiedExpr)
