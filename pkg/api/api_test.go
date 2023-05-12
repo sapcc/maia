@@ -246,7 +246,7 @@ func TestQuery(t *testing.T) {
 	router, keystoneMock, storageMock := setupTest(t, ctrl)
 
 	expectAuthByProjectID(keystoneMock)
-	storageMock.EXPECT().Query("sum({__name__=\"blackbox_api_status_gauge\",check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "24m", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
+	storageMock.EXPECT().Query("sum(blackbox_api_status_gauge{check=~\"keystone\",project_id=\"12345\"})", "2017-07-01T20:10:30.781Z", "24m", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/query.json"), nil)
 
 	test.APIRequest{
 		Headers:          map[string]string{"Authorization": base64.StdEncoding.EncodeToString([]byte("Basic user_id|12345:password")), "Accept": storage.JSON},

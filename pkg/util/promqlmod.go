@@ -1,11 +1,12 @@
 package util
 
 import (
-	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
+	"golang.org/x/exp/slices"
 )
 
 // AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label.
@@ -29,21 +30,7 @@ func AddLabelConstraintToExpression(expression, key string, values []string) (st
 
 	// Initialize a labelInjector with the created matcher.
 	// The labelInjector will be used to traverse and modify the syntax tree.
-	// It also includes a nodeReplacer function that will replace nodes in the syntax tree with modified versions.
-	v := labelInjector{
-		matcher: matcher,
-		nodeReplacer: func(oldNode, newNode parser.Node) {
-			// Find the parent of the old node in the syntax tree.
-			parent, found := findParentNode(exprNode, oldNode)
-			if found {
-				// If the old node has a parent (it's not the root of the syntax tree), replace the old node with the new node.
-				replaceChildNode(parent, oldNode, newNode)
-			} else {
-				// If the old node doesn't have a parent (it's the root of the syntax tree), replace the root with the new node.
-				exprNode = newNode.(parser.Expr) //nolint:errcheck
-			}
-		},
-	}
+	v := labelInjector{matcher: matcher}
 
 	// Walk the PromQL expression tree and modify label matchers
 	err = parser.Walk(v, exprNode, nil)
@@ -104,117 +91,18 @@ func makeLabelMatcher(key string, values []string) (*labels.Matcher, error) {
 // with an additional label constraint. This is used to restrict a query to metrics
 // belonging to a single OpenStack tenant stored in label 'project_id'.
 type labelInjector struct {
-	matcher      *labels.Matcher
-	nodeReplacer func(parser.Node, parser.Node)
+	matcher *labels.Matcher
 }
 
 // Visit modifies the label matchers of the visited parser.Node based on the labelInjector's matcher
 func (v labelInjector) Visit(node parser.Node, path []parser.Node) (parser.Visitor, error) {
 	switch n := node.(type) {
-	case *parser.MatrixSelector:
-		vs, ok := n.VectorSelector.(*parser.VectorSelector)
-		if !ok {
-			return v, nil
-		}
-		sel := &parser.MatrixSelector{
-			VectorSelector: &parser.VectorSelector{
-				LabelMatchers: append(vs.LabelMatchers, v.matcher),
-			},
-			Range: n.Range,
-		}
-		v.nodeReplacer(node, sel)
 	case *parser.VectorSelector:
-		sel := &parser.VectorSelector{
-			LabelMatchers: append(n.LabelMatchers, v.matcher),
-		}
-		v.nodeReplacer(node, sel)
-	}
-
-	return v, nil
-}
-
-// replaceChildNode replaces the oldChild node with the newChild node in the parent node
-func replaceChildNode(parent, oldChild, newChild parser.Node) {
-	switch p := parent.(type) {
-	case *parser.AggregateExpr:
-		if p.Expr == oldChild {
-			p.Expr = newChild.(parser.Expr) //nolint:errcheck
-		}
-	case *parser.BinaryExpr:
-		if p.LHS == oldChild {
-			p.LHS = newChild.(parser.Expr) //nolint:errcheck
-		} else if p.RHS == oldChild {
-			p.RHS = newChild.(parser.Expr) //nolint:errcheck
-		}
-	case *parser.Call:
-		for i, e := range p.Args {
-			if e == oldChild {
-				p.Args[i] = newChild.(parser.Expr) //nolint:errcheck
-				return
-			}
-		}
-	case *parser.ParenExpr:
-		if p.Expr == oldChild {
-			p.Expr = newChild.(parser.Expr) //nolint:errcheck
-		}
-	case *parser.UnaryExpr:
-		if p.Expr == oldChild {
-			p.Expr = newChild.(parser.Expr) //nolint:errcheck
+		if !slices.ContainsFunc(n.LabelMatchers, func(e *labels.Matcher) bool {
+			return reflect.DeepEqual(e, v.matcher)
+		}) {
+			n.LabelMatchers = append(n.LabelMatchers, v.matcher)
 		}
 	}
-}
-
-// findParentNode finds the parent node of the target node in the given root node
-func findParentNode(root, target parser.Node) (parser.Node, bool) {
-	fmt.Printf("Root Node: %v, Target Node: %v\n", root, target)
-	v := &parentNodeFinder{
-		targetNode: target,
-	}
-	err := parser.Walk(v, root, []parser.Node{})
-	if err != nil {
-		return nil, false
-	}
-	return v.parentNode, v.parentNode != nil
-}
-
-// parentNodeFinder is a parser.Visitor that finds the parent node of a given target node
-type parentNodeFinder struct {
-	targetNode parser.Node
-	parentNode parser.Node
-	stack      []parser.Node
-}
-
-// Visit finds the parent node of the target node
-func (v *parentNodeFinder) Visit(node parser.Node, next []parser.Node) (w parser.Visitor, err error) {
-	fmt.Println("Entering Visit function")
-
-	// Check if the node is nil, and if it is, return v to continue the traversal
-	if node == nil {
-		fmt.Println("Node is nil")
-		return v, nil
-	}
-
-	fmt.Printf("Current Node: %v\n", node)
-	fmt.Printf("Current Stack: %v\n", v.stack)
-
-	if node == v.targetNode {
-		// Check if v.stack is not empty before accessing its last element
-		if len(v.stack) > 0 {
-			v.parentNode = v.stack[len(v.stack)-1]
-			fmt.Printf("Parent Node found: %v\n", v.parentNode)
-		} else {
-			fmt.Println("Stack is empty, no parent node found")
-		}
-	} else {
-		v.stack = append(v.stack, node)
-		defer func() {
-			// Similarly, check if v.stack is not empty before reducing its size
-			if len(v.stack) > 0 {
-				v.stack = v.stack[:len(v.stack)-1]
-			}
-		}()
-	}
-
-	fmt.Println("Exiting Visit function")
 	return v, nil
 }

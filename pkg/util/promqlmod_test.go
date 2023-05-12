@@ -13,20 +13,12 @@ const expectedSelector = "{check=~\"$api\",project_id=\"ecdc9fc4165d49b78987bbfb
 // const expectedSelectorMulti = "{check=~\"$api\",project_id=~\"ecdc9fc4165d49b78987bbfbd5b4c9e2|xyz\"}"
 
 func TestAddLabelConstraintToExpression(t *testing.T) {
-	expr, err := parser.ParseExpr("sum(rate(http_request_total{job=\"myjob\", code=\"200\"}[5m])) by (job)")
-	if err != nil {
-		t.Fatalf("Error parsing expression: %v", err)
-	}
-
-	// Print the parsed expression
-	fmt.Printf("Parsed expression: %+v\n", expr)
-	// I think the input here needs to change from the previous prom library to the new one #TODO IVO?
 	modifiedExpr, err := AddLabelConstraintToExpression("sum(rate(http_request_total{job=\"myjob\", code=\"200\"}[5m])) by (job)", "project_id", []string{"12345"})
 	if err != nil {
 		t.Fatalf("Error modifying expression: %v", err)
 	}
 	// This has changed to the new format from the old one
-	expected := "{__name__=\"http_request_total\",code=\"200\",job=\"myjob\",project_id=\"12345\"}"
+	expected := "sum by (job) (rate(http_request_total{code=\"200\",job=\"myjob\",project_id=\"12345\"}[5m]))"
 	if modifiedExpr != expected {
 		t.Errorf("Expected modified expression to be %q, but got %q", expected, modifiedExpr)
 	}
@@ -68,11 +60,8 @@ func TestVisit(t *testing.T) {
 		t.Fatalf("Error creating label matcher: %v", err)
 	}
 
-	// Create a labelInjector with a dummy nodeReplacer function
-	v := labelInjector{
-		matcher:      matcher,
-		nodeReplacer: func(oldNode, newNode parser.Node) {},
-	}
+	// Create a labelInjector
+	v := labelInjector{matcher: matcher}
 
 	// Parse a PromQL expression that includes a VectorSelector
 	expr, err := parser.ParseExpr("http_request_total{job=\"myjob\"}")
