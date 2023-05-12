@@ -12,10 +12,11 @@ require (
 	github.com/prometheus/client_golang v1.15.1
 	github.com/prometheus/common v0.43.0
 	github.com/prometheus/prometheus v0.43.0
-	github.com/rs/cors v1.8.2
+	github.com/rs/cors v1.9.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.2
+	golang.org/x/exp v0.0.0-20230307190834-24139beb5833
 )
 
 require (
@@ -61,7 +62,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.14.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/goleak v1.2.1 // indirect
-	golang.org/x/exp v0.0.0-20230307190834-24139beb5833 // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
