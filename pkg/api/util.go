@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"os"
@@ -312,7 +313,7 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 		}
 		actRoles := h.Get("X-Roles")
 		reqRoles := viper.GetString("keystone.roles")
-		http.Error(w, fmt.Sprintf("User %s@%s does not have monitoring permissions on %s (actual roles: %s, required roles: %s)", username, userDomain, scope, actRoles, reqRoles), http.StatusForbidden)
+		http.Error(w, html.EscapeString(fmt.Sprintf("User %s@%s does not have monitoring permissions on %s (actual roles: %s, required roles: %s)", username, userDomain, scope, actRoles, reqRoles)), http.StatusForbidden)
 
 		return false
 	}
