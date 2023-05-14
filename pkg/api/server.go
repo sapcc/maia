@@ -21,6 +21,8 @@ package api
 
 import (
 	"net/http"
+	"net/url"
+	"regexp"
 
 	"bytes"
 	"fmt"
@@ -106,17 +108,24 @@ func setupRouter(keystoneDriver keystone.Driver, storageDriver storage.Driver) h
 	return gaugeInflight(mainRouter)
 }
 
+var validDomain = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 // redirectToDomainRootPage will redirect users to the UI start page for their domain
 func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
 	domain, ok := mux.Vars(r)["domain"]
-	if !ok {
+	if !ok || !validDomain.MatchString(domain) {
 		redirectToRootPage(w, r)
 		return
 	}
+
+	// Encode domain to prevent any potential attacks
+	domain = url.PathEscape(domain)
+
 	newPath := "/" + domain + "/graph"
 	if r.URL.RawQuery != "" {
 		newPath += "?" + r.URL.RawQuery // keep the query part since this is where the token might go
 	}
+
 	util.LogDebug("Redirecting %s to %s", r.URL.Path, newPath)
 	http.Redirect(w, r, newPath, http.StatusFound)
 }
