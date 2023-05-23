@@ -101,7 +101,7 @@ func setupRouter(keystoneDriver keystone.Driver, storageDriver storage.Driver) h
 	mainRouter.Handle("/metrics", promhttp.Handler())
 
 	// domain-prefixed paths. Order is relevant! This implies that there must be no domain federate, static or graph :-)
-	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(authorize(graph, true, "metric:show"))
+	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(authorize(observeDuration(observeResponseSize(graph, "graph"), "graph"), true, "metric:show"))
 	mainRouter.Methods(http.MethodGet).Path("/{domain}").HandlerFunc(redirectToDomainRootPage)
 
 	// provide the inflight metrics for all paths
