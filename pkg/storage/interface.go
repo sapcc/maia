@@ -152,6 +152,7 @@ type Driver interface {
 	QueryRange(query, start, end, step, timeout string, acceptContentType string) (*http.Response, error)
 	Series(match []string, start, end string, acceptContentType string) (*http.Response, error)
 	LabelValues(name string, acceptContentType string) (*http.Response, error)
+	Labels(start, end string, match []string, acceptContentType string) (*http.Response, error)
 	DelegateRequest(request *http.Request) (*http.Response, error)
 }
 
