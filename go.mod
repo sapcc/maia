@@ -1,6 +1,6 @@
 module github.com/sapcc/maia
 
-go 1.19
+go 1.21
 
 require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
