@@ -8,7 +8,7 @@ RUN make -C /src install PREFIX=/pkg
 
 ################################################################################
 
-FROM alpine:3.18
+FROM alpine:3.19
 
 RUN addgroup -g 4200 appgroup \
   && adduser -h /home/appuser -s /sbin/nologin -G appgroup -D -u 4200 appuser
