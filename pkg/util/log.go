@@ -55,8 +55,8 @@ func LogDebug(msg string, args ...interface{}) {
 }
 
 func doLog(msg string, args []interface{}) {
-	msg = strings.TrimSpace(msg)                //most importantly, skip trailing '\n'
-	msg = strings.Replace(msg, "\n", "\\n", -1) //avoid multiline log messages
+	msg = strings.TrimSpace(msg)               // most importantly, skip trailing '\n'
+	msg = strings.ReplaceAll(msg, "\n", "\\n") // avoid multiline log messages
 	if len(args) > 0 {
 		log.Printf(msg+"\n", args...)
 	} else {

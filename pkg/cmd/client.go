@@ -21,6 +21,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -69,7 +70,6 @@ func recoverAll() {
 	}
 }
 
-// fetchToken authenticates the client user according to env entries and parameters
 func fetchToken() {
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
@@ -100,23 +100,24 @@ func fetchToken() {
 
 	// ignore any parameters not related to the selected authentication type
 	// to avoid keystone errors for the sake of consumability
-	if authType == "password" {
+	switch authType {
+	case "password":
 		// check mandatory stuff
 		if auth.Password == "" {
-			panic(fmt.Errorf("you must specify --os-password"))
+			panic(errors.New("you must specify --os-password"))
 		}
 		if auth.Username == "" && auth.UserID == "" {
-			panic(fmt.Errorf("you must specify --os-username or --os-user-id"))
+			panic(errors.New("you must specify --os-username or --os-user-id"))
 		}
 		// ignore tokens and application credentials
 		auth.TokenID = ""
 		auth.ApplicationCredentialName = ""
 		auth.ApplicationCredentialID = ""
 		auth.ApplicationCredentialSecret = ""
-	} else if authType == "token" {
+	case "token":
 		// check mandatory stuff
 		if auth.TokenID == "" {
-			panic(fmt.Errorf("you must specify --os-token"))
+			panic(errors.New("you must specify --os-token"))
 		}
 		// ignore anything but scope (to permit rescoping)
 		auth.Password = ""
@@ -127,13 +128,13 @@ func fetchToken() {
 		auth.ApplicationCredentialName = ""
 		auth.ApplicationCredentialID = ""
 		auth.ApplicationCredentialSecret = ""
-	} else if authType == "v3applicationcredential" {
+	case "v3applicationcredential":
 		// check mandatory stuff
 		if auth.ApplicationCredentialSecret == "" {
-			panic(fmt.Errorf("you must specify --os-application-credential-secret"))
+			panic(errors.New("you must specify --os-application-credential-secret"))
 		}
 		if auth.ApplicationCredentialName != "" && auth.Username == "" && auth.UserID == "" {
-			panic(fmt.Errorf("you must specify --os-username or --os-user-id when using" +
+			panic(errors.New("you must specify --os-username or --os-user-id when using" +
 				" --os-application-credential-name"))
 		}
 		// ignore anything user identifiers if specified by application credential ID
@@ -151,13 +152,13 @@ func fetchToken() {
 
 	// error on ambiguous parameters
 	if auth.UserID != "" && auth.Username != "" {
-		panic(fmt.Errorf("use either --os-user-id or --os-user-name but not both"))
+		panic(errors.New("use either --os-user-id or --os-user-name but not both"))
 	}
 	if auth.DomainID != "" && auth.DomainName != "" {
-		panic(fmt.Errorf("user either --os-user-domain-id or --os-user-domain-name but not both"))
+		panic(errors.New("use either --os-user-domain-id or --os-user-domain-name but not both"))
 	}
 	if auth.UserID != "" && (auth.DomainID != "" || auth.DomainName != "") {
-		panic(fmt.Errorf("do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
+		panic(errors.New("do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
 	}
 
 	// finally ... authenticate with keystone
@@ -175,14 +176,15 @@ func fetchToken() {
 // storageInstance creates a new Prometheus driver instance lazily
 func storageInstance() storage.Driver {
 	if storageDriver == nil {
-		if promURL != "" {
+		switch {
+		case promURL != "":
 			storageDriver = storage.NewPrometheusDriver(promURL, map[string]string{})
-		} else if auth.IdentityEndpoint != "" {
+		case auth.IdentityEndpoint != "":
 			// authenticate and set maiaURL if missing
 			fetchToken()
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
-		} else {
-			panic(fmt.Errorf("either --os-auth-url or --prometheus-url need to be specified"))
+		default:
+			panic(errors.New("either --os-auth-url or --prometheus-url need to be specified"))
 		}
 	}
 
@@ -198,6 +200,8 @@ func keystoneInstance() keystone.Driver {
 }
 
 // printValues prints the result of a Maia API as raw values
+//
+//nolint:gocritic
 func printValues(resp *http.Response) {
 	defer resp.Body.Close()
 
@@ -237,6 +241,8 @@ func printValues(resp *http.Response) {
 }
 
 // printTable formats the result of a Maia API call as table
+//
+//nolint:gocritic
 func printTable(resp *http.Response) {
 	defer resp.Body.Close()
 
@@ -455,25 +461,28 @@ func printQueryResponse(resp *http.Response) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Server responsed with error code %d: %s", resp.StatusCode, err.Error())
-	} else {
-		contentType := resp.Header.Get("Content-Type")
-		if contentType == storage.JSON {
-			if strings.EqualFold(outputFormat, "json") {
-				fmt.Print(string(body))
-			} else if strings.EqualFold(outputFormat, "template") {
-				if jsonTemplate == "" {
-					panic(fmt.Errorf("missing --template parameter"))
-				}
-				printTemplate(body, jsonTemplate)
-			} else if strings.EqualFold(outputFormat, "table") {
-				printQueryResultAsTable(body)
-			} else {
-				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
+		return
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	switch contentType {
+	case storage.JSON:
+		switch strings.ToLower(outputFormat) {
+		case "json":
+			fmt.Print(string(body))
+		case "template":
+			if jsonTemplate == "" {
+				panic(errors.New("missing --template parameter"))
 			}
-		} else {
-			util.LogWarning("Response body: %s", string(body))
-			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
+			printTemplate(body, jsonTemplate)
+		case "table":
+			printQueryResultAsTable(body)
+		default:
+			panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 		}
+	default:
+		util.LogWarning("Response body: %s", string(body))
+		panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 	}
 }
 
@@ -504,7 +513,7 @@ func LabelValues(cmd *cobra.Command, args []string) (ret error) {
 
 	// check parameters
 	if len(args) < 1 {
-		return fmt.Errorf("missing argument: label-name")
+		return errors.New("missing argument: label-name")
 	}
 	labelName := args[0]
 
@@ -578,7 +587,7 @@ func Query(cmd *cobra.Command, args []string) (ret error) {
 
 	// check parameters
 	if len(args) < 1 {
-		return fmt.Errorf("missing argument: PromQL Query")
+		return errors.New("missing argument: PromQL Query")
 	}
 	queryExpr := args[0]
 
@@ -749,10 +758,10 @@ func init() {
 	seriesCmd.Flags().StringVar(&endtime, "end", "", "End timestamp (RFC3339 or Unix format; default: now)")
 }
 
-func setKeystoneInstance(KeystoneDriver keystone.Driver) {
-	keystoneDriver = KeystoneDriver // TODO: This is ugly, I know
+func setKeystoneInstance(driver keystone.Driver) {
+	keystoneDriver = driver
 }
 
-func setStorageInstance(StorageDriver storage.Driver) {
-	storageDriver = StorageDriver // TODO: This is ugly, I know
+func setStorageInstance(driver storage.Driver) {
+	storageDriver = driver
 }

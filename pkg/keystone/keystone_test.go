@@ -1,3 +1,17 @@
+// Copyright 2024 SAP SE
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package keystone
 
 import (
@@ -94,7 +108,7 @@ var userAuthScopeBody = map[string]interface{}{
 }
 
 func setupTest() Driver {
-	//load test policy (where everything is allowed)
+	// load test policy (where everything is allowed)
 	viper.Set("maia.auth_driver", "keystone")
 	viper.Set("maia.label_value_ttl", "72h")
 	viper.Set("keystone.auth_url", baseURL+"/v3")
@@ -106,7 +120,7 @@ func setupTest() Driver {
 	viper.Set("keystone.policy_file", "../test/policy.json")
 	viper.Set("keystone.roles", "monitoring_admin,monitoring_viewer")
 
-	//create test driver with the domains and projects from start-data.sql
+	// create test driver with the domains and projects from start-data.sql
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(serviceAuthBody).Reply(http.StatusCreated).File("fixtures/service_token_create.json").AddHeader("X-Subject-Token", serviceToken)
 	gock.New(baseURL).Get("/v3/roles").HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/all_roles.json")
 	// the projects-client does not imply that the response is JSON --> this leads to some confusion when the content-type header is missing from the response
