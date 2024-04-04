@@ -200,98 +200,99 @@ func keystoneInstance() keystone.Driver {
 }
 
 // printValues prints the result of a Maia API as raw values
+//
+//nolint:gocritic
 func printValues(resp *http.Response) {
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(fmt.Errorf("server responsed with error code %d: %s", resp.StatusCode, err.Error()))
-	}
+	} else {
+		contentType := resp.Header.Get("Content-Type")
+		if contentType == storage.JSON {
+			if strings.EqualFold(outputFormat, "json") {
+				fmt.Print(string(body))
+			} else if strings.EqualFold(outputFormat, "value") {
+				var jsonResponse struct {
+					Value []string `json:"data,omitempty"`
+				}
+				if err := json.Unmarshal(body, &jsonResponse); err != nil {
+					panic(err)
+				}
 
-	contentType := resp.Header.Get("Content-Type")
-	switch contentType {
-	case storage.JSON:
-		switch strings.ToLower(outputFormat) {
-		case "json":
-			fmt.Print(string(body))
-		case "value":
-			var jsonResponse struct {
-				Value []string `json:"data,omitempty"`
+				for _, value := range jsonResponse.Value {
+					fmt.Println(value)
+				}
+			} else {
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
-			if err := json.Unmarshal(body, &jsonResponse); err != nil {
-				panic(err)
+		} else if strings.HasPrefix(contentType, "text/plain") {
+			if strings.EqualFold(outputFormat, "value") {
+				fmt.Print(string(body))
+			} else {
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
-
-			for _, value := range jsonResponse.Value {
-				fmt.Println(value)
-			}
-		default:
-			panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
-		}
-	case "text/plain":
-		if strings.EqualFold(outputFormat, "value") {
-			fmt.Print(string(body))
 		} else {
-			panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
+			util.LogError("Response body: %s", string(body))
+			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 		}
-	default:
-		util.LogError("Response body: %s", string(body))
-		panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 	}
 }
 
 // printTable formats the result of a Maia API call as table
+//
+//nolint:gocritic
 func printTable(resp *http.Response) {
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("server responsed with error code %d: %s", resp.StatusCode, err.Error())
-		return
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	switch contentType {
-	case storage.JSON:
-		switch strings.ToLower(outputFormat) {
-		case "json":
-			fmt.Print(string(body))
-		case "table", "value":
-			// unmarshal
-			var jsonResponse struct {
-				Table []model.LabelSet `json:"data,omitempty"`
-			}
-			if err := json.Unmarshal(body, &jsonResponse); err != nil {
-				panic(err)
-			}
-
-			// determine relevant columns
-			var allColumns []string
-			if columns == "" {
-				allColumns = extractSeriesColumns(jsonResponse.Table)
-			} else {
-				allColumns = strings.Split(columns, ",")
-			}
-
-			printHeader(allColumns)
-
-			// Print relevant columns in sorted order
-			for _, series := range jsonResponse.Table {
-				row := map[string]string{}
-				for k, v := range series {
-					row[string(k)] = string(v)
+	} else {
+		contentType := resp.Header.Get("Content-Type")
+		if contentType == storage.JSON {
+			// JSON is not preprocessed
+			if strings.EqualFold(outputFormat, "json") {
+				fmt.Print(string(body))
+				return
+			} else if strings.EqualFold(outputFormat, "table") || strings.EqualFold(outputFormat, "value") {
+				// unmarshal
+				var jsonResponse struct {
+					Table []model.LabelSet `json:"data,omitempty"`
 				}
-				printRow(allColumns, row)
+				if err := json.Unmarshal(body, &jsonResponse); err != nil {
+					panic(err)
+				}
+
+				// determine relevant columns
+				var allColumns []string
+				if columns == "" {
+					allColumns = extractSeriesColumns(jsonResponse.Table)
+				} else {
+					allColumns = strings.Split(columns, ",")
+				}
+
+				printHeader(allColumns)
+
+				// Print relevant columns in sorted order
+				for _, series := range jsonResponse.Table {
+					row := map[string]string{}
+					for k, v := range series {
+						row[string(k)] = string(v)
+					}
+					printRow(allColumns, row)
+				}
+			} else {
+				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 			}
-		default:
-			panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
+		} else if strings.HasPrefix(contentType, "text/plain") {
+			// This affects /federate aka. metrics only. There is no point in filtering this output
+			fmt.Print(string(body))
+		} else {
+			util.LogWarning("Response body: %s", string(body))
+			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 		}
-	case "text/plain":
-		// This affects /federate aka. metrics only. There is no point in filtering this output
-		fmt.Print(string(body))
-	default:
-		util.LogWarning("Response body: %s", string(body))
-		panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 	}
 }
 
