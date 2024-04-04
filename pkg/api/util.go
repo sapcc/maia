@@ -255,7 +255,9 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	if err != nil {
 		code := err.StatusCode()
 		httpCode := http.StatusUnauthorized
-		if code == keystone.StatusWrongCredentials {
+
+		switch code {
+		case keystone.StatusWrongCredentials:
 			authFailuresCounter.Add(1)
 			// expire the cookie and ask for new credentials if they are wrong
 			username, _, ok := req.BasicAuth()
@@ -264,16 +266,17 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 			}
 			util.LogInfo("Request with wrong credentials from %s: %s", username, err.Error())
 			requestReauthentication(w)
-		} else if code == keystone.StatusMissingCredentials {
+		case keystone.StatusMissingCredentials:
 			requestReauthentication(w)
-		} else if code == keystone.StatusNoPermission {
+		case keystone.StatusNoPermission:
 			httpCode = http.StatusForbidden
-		} else {
+		default:
 			// warn of possible technical issues
 			util.LogWarning("Authentication error: %s", err.Error())
 			authErrorsCounter.Add(1)
 			httpCode = http.StatusInternalServerError
 		}
+
 		http.Error(w, err.Error(), httpCode)
 		return false
 	} else if domainSet && req.Header.Get("X-User-Domain-Name") != domain {

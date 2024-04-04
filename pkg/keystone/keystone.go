@@ -452,7 +452,8 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 		}
 
 		// check if the scope is defined by qualified project name or by unique project ID
-		if len(scopeParts) >= 2 {
+		switch {
+		case len(scopeParts) >= 2:
 			// project-name@project-domain-name
 			ba.Scope = new(gophercloud.AuthScope)
 			// assume domains are always prefixed with @
@@ -460,17 +461,17 @@ func (d *keystone) authOptionsFromRequest(r *http.Request, guessScope bool) (*go
 				ba.Scope.ProjectName = scopeParts[0]
 			}
 			ba.Scope.DomainName = scopeParts[1]
-		} else if len(scopeParts) >= 1 {
+		case len(scopeParts) >= 1:
 			// project-id
 			ba.Scope = &gophercloud.AuthScope{ProjectID: scopeParts[0]}
-		} else if guessScope {
+		case guessScope:
 			// not defined: choose an arbitrary project where the user has access (needed for UX reasons)
 			if err := d.guessScope(&ba); err != nil {
 				return nil, err
 			}
 		}
 
-		// finall set the password
+		// finally set the password
 		ba.Password = password
 	} else {
 		return nil, NewAuthenticationError(StatusMissingCredentials, "Authorization header missing (no username/password or token)")
@@ -582,17 +583,19 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser,
 		if err != nil {
 			statusCode := StatusWrongCredentials
 			// this includes 4xx responses, so after this point, we can be sure that the token is valid
-			if authOpts.Username != "" || authOpts.UserID != "" {
+			switch {
+			case authOpts.Username != "" || authOpts.UserID != "":
 				util.LogInfo("Failed login of user name %s%s for scope %+v: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, err.Error())
-			} else if authOpts.TokenID != "" {
+			case authOpts.TokenID != "":
 				util.LogInfo("Failed login of with token %s... for scope %+v: %s", authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope, err.Error())
-			} else if authOpts.ApplicationCredentialID != "" {
+			case authOpts.ApplicationCredentialID != "":
 				util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialID, err.Error())
-			} else if authOpts.ApplicationCredentialName != "" {
+			case authOpts.ApplicationCredentialName != "":
 				util.LogInfo("Failed login of application credential ID %s: %s", authOpts.ApplicationCredentialName, err.Error())
-			} else {
+			default:
 				statusCode = StatusMissingCredentials
 			}
+
 			return nil, "", NewAuthenticationError(statusCode, err.Error())
 		}
 		util.LogDebug("token creation/rescoping successful, authenticating with token")

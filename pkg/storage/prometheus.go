@@ -20,6 +20,7 @@
 package storage
 
 import (
+	"context"
 	"net/http"
 
 	"net/url"
@@ -167,7 +168,7 @@ func (promCli *prometheusStorageClient) mapURL(maiaURL *url.URL) url.URL {
 
 // SendToPrometheus takes care of the request wrapping and delivery to Prometheus
 func (promCli *prometheusStorageClient) sendToPrometheus(method, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
-	req, err := http.NewRequest(method, promURL, body)
+	req, err := http.NewRequestWithContext(context.Background(), method, promURL, body)
 	if err != nil {
 		util.LogError("Could not create request.\n", err.Error())
 		return nil, err

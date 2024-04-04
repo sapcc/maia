@@ -70,7 +70,6 @@ func recoverAll() {
 	}
 }
 
-// fetchToken authenticates the client user according to env entries and parameters
 func fetchToken() {
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
@@ -101,7 +100,8 @@ func fetchToken() {
 
 	// ignore any parameters not related to the selected authentication type
 	// to avoid keystone errors for the sake of consumability
-	if authType == "password" {
+	switch authType {
+	case "password":
 		// check mandatory stuff
 		if auth.Password == "" {
 			panic(errors.New("you must specify --os-password"))
@@ -114,7 +114,7 @@ func fetchToken() {
 		auth.ApplicationCredentialName = ""
 		auth.ApplicationCredentialID = ""
 		auth.ApplicationCredentialSecret = ""
-	} else if authType == "token" {
+	case "token":
 		// check mandatory stuff
 		if auth.TokenID == "" {
 			panic(errors.New("you must specify --os-token"))
@@ -128,7 +128,7 @@ func fetchToken() {
 		auth.ApplicationCredentialName = ""
 		auth.ApplicationCredentialID = ""
 		auth.ApplicationCredentialSecret = ""
-	} else if authType == "v3applicationcredential" {
+	case "v3applicationcredential":
 		// check mandatory stuff
 		if auth.ApplicationCredentialSecret == "" {
 			panic(errors.New("you must specify --os-application-credential-secret"))
@@ -155,7 +155,7 @@ func fetchToken() {
 		panic(errors.New("use either --os-user-id or --os-user-name but not both"))
 	}
 	if auth.DomainID != "" && auth.DomainName != "" {
-		panic(errors.New("user either --os-user-domain-id or --os-user-domain-name but not both"))
+		panic(errors.New("use either --os-user-domain-id or --os-user-domain-name but not both"))
 	}
 	if auth.UserID != "" && (auth.DomainID != "" || auth.DomainName != "") {
 		panic(errors.New("do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
@@ -176,13 +176,14 @@ func fetchToken() {
 // storageInstance creates a new Prometheus driver instance lazily
 func storageInstance() storage.Driver {
 	if storageDriver == nil {
-		if promURL != "" {
+		switch {
+		case promURL != "":
 			storageDriver = storage.NewPrometheusDriver(promURL, map[string]string{})
-		} else if auth.IdentityEndpoint != "" {
+		case auth.IdentityEndpoint != "":
 			// authenticate and set maiaURL if missing
 			fetchToken()
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
-		} else {
+		default:
 			panic(errors.New("either --os-auth-url or --prometheus-url need to be specified"))
 		}
 	}
@@ -205,35 +206,37 @@ func printValues(resp *http.Response) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(fmt.Errorf("server responsed with error code %d: %s", resp.StatusCode, err.Error()))
-	} else {
-		contentType := resp.Header.Get("Content-Type")
-		if contentType == storage.JSON {
-			if strings.EqualFold(outputFormat, "json") {
-				fmt.Print(string(body))
-			} else if strings.EqualFold(outputFormat, "value") {
-				var jsonResponse struct {
-					Value []string `json:"data,omitempty"`
-				}
-				if err := json.Unmarshal(body, &jsonResponse); err != nil {
-					panic(err)
-				}
+	}
 
-				for _, value := range jsonResponse.Value {
-					fmt.Println(value)
-				}
-			} else {
-				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
+	contentType := resp.Header.Get("Content-Type")
+	switch contentType {
+	case storage.JSON:
+		switch strings.ToLower(outputFormat) {
+		case "json":
+			fmt.Print(string(body))
+		case "value":
+			var jsonResponse struct {
+				Value []string `json:"data,omitempty"`
 			}
-		} else if strings.HasPrefix(contentType, "text/plain") {
-			if strings.EqualFold(outputFormat, "value") {
-				fmt.Print(string(body))
-			} else {
-				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
+			if err := json.Unmarshal(body, &jsonResponse); err != nil {
+				panic(err)
 			}
-		} else {
-			util.LogError("Response body: %s", string(body))
-			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
+
+			for _, value := range jsonResponse.Value {
+				fmt.Println(value)
+			}
+		default:
+			panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 		}
+	case "text/plain":
+		if strings.EqualFold(outputFormat, "value") {
+			fmt.Print(string(body))
+		} else {
+			panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
+		}
+	default:
+		util.LogError("Response body: %s", string(body))
+		panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 	}
 }
 
@@ -244,50 +247,51 @@ func printTable(resp *http.Response) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("server responsed with error code %d: %s", resp.StatusCode, err.Error())
-	} else {
-		contentType := resp.Header.Get("Content-Type")
-		if contentType == storage.JSON {
-			// JSON is not preprocessed
-			if strings.EqualFold(outputFormat, "json") {
-				fmt.Print(string(body))
-				return
-			} else if strings.EqualFold(outputFormat, "table") || strings.EqualFold(outputFormat, "value") {
-				// unmarshal
-				var jsonResponse struct {
-					Table []model.LabelSet `json:"data,omitempty"`
-				}
-				if err := json.Unmarshal(body, &jsonResponse); err != nil {
-					panic(err)
-				}
+		return
+	}
 
-				// determine relevant columns
-				var allColumns []string
-				if columns == "" {
-					allColumns = extractSeriesColumns(jsonResponse.Table)
-				} else {
-					allColumns = strings.Split(columns, ",")
-				}
-
-				printHeader(allColumns)
-
-				// Print relevant columns in sorted order
-				for _, series := range jsonResponse.Table {
-					row := map[string]string{}
-					for k, v := range series {
-						row[string(k)] = string(v)
-					}
-					printRow(allColumns, row)
-				}
-			} else {
-				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
-			}
-		} else if strings.HasPrefix(contentType, "text/plain") {
-			// This affects /federate aka. metrics only. There is no point in filtering this output
+	contentType := resp.Header.Get("Content-Type")
+	switch contentType {
+	case storage.JSON:
+		switch strings.ToLower(outputFormat) {
+		case "json":
 			fmt.Print(string(body))
-		} else {
-			util.LogWarning("Response body: %s", string(body))
-			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
+		case "table", "value":
+			// unmarshal
+			var jsonResponse struct {
+				Table []model.LabelSet `json:"data,omitempty"`
+			}
+			if err := json.Unmarshal(body, &jsonResponse); err != nil {
+				panic(err)
+			}
+
+			// determine relevant columns
+			var allColumns []string
+			if columns == "" {
+				allColumns = extractSeriesColumns(jsonResponse.Table)
+			} else {
+				allColumns = strings.Split(columns, ",")
+			}
+
+			printHeader(allColumns)
+
+			// Print relevant columns in sorted order
+			for _, series := range jsonResponse.Table {
+				row := map[string]string{}
+				for k, v := range series {
+					row[string(k)] = string(v)
+				}
+				printRow(allColumns, row)
+			}
+		default:
+			panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 		}
+	case "text/plain":
+		// This affects /federate aka. metrics only. There is no point in filtering this output
+		fmt.Print(string(body))
+	default:
+		util.LogWarning("Response body: %s", string(body))
+		panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 	}
 }
 
@@ -456,25 +460,28 @@ func printQueryResponse(resp *http.Response) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Server responsed with error code %d: %s", resp.StatusCode, err.Error())
-	} else {
-		contentType := resp.Header.Get("Content-Type")
-		if contentType == storage.JSON {
-			if strings.EqualFold(outputFormat, "json") {
-				fmt.Print(string(body))
-			} else if strings.EqualFold(outputFormat, "template") {
-				if jsonTemplate == "" {
-					panic(errors.New("missing --template parameter"))
-				}
-				printTemplate(body, jsonTemplate)
-			} else if strings.EqualFold(outputFormat, "table") {
-				printQueryResultAsTable(body)
-			} else {
-				panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
+		return
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	switch contentType {
+	case storage.JSON:
+		switch strings.ToLower(outputFormat) {
+		case "json":
+			fmt.Print(string(body))
+		case "template":
+			if jsonTemplate == "" {
+				panic(errors.New("missing --template parameter"))
 			}
-		} else {
-			util.LogWarning("Response body: %s", string(body))
-			panic(fmt.Errorf("unsupported response type from server: %s", contentType))
+			printTemplate(body, jsonTemplate)
+		case "table":
+			printQueryResultAsTable(body)
+		default:
+			panic(fmt.Errorf("unsupported --format value for this command: %s", outputFormat))
 		}
+	default:
+		util.LogWarning("Response body: %s", string(body))
+		panic(fmt.Errorf("unsupported response type from server: %s", contentType))
 	}
 }
 
@@ -750,10 +757,10 @@ func init() {
 	seriesCmd.Flags().StringVar(&endtime, "end", "", "End timestamp (RFC3339 or Unix format; default: now)")
 }
 
-func setKeystoneInstance(KeystoneDriver keystone.Driver) {
-	keystoneDriver = KeystoneDriver // TODO: This is ugly, I know
+func setKeystoneInstance(driver keystone.Driver) {
+	keystoneDriver = driver
 }
 
-func setStorageInstance(StorageDriver storage.Driver) {
-	storageDriver = StorageDriver // TODO: This is ugly, I know
+func setStorageInstance(driver storage.Driver) {
+	storageDriver = driver
 }
