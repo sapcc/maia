@@ -169,10 +169,10 @@ func (promCli *prometheusStorageClient) mapURL(maiaURL *url.URL) url.URL {
 // SendToPrometheus takes care of the request wrapping and delivery to Prometheus
 func (promCli *prometheusStorageClient) sendToPrometheus(method, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
 	// Validate the URL before proceeding with the request.
-    if !isValidURL(promURL) {
-        return nil, fmt.Errorf("invalid URL: %s", promURL)
-    }
-	
+	if !isValidURL(promURL) {
+		return nil, fmt.Errorf("invalid URL: %s", promURL)
+	}
+
 	req, err := http.NewRequestWithContext(context.Background(), method, promURL, body)
 	if err != nil {
 		util.LogError("Could not create request.\n", err.Error())
@@ -198,20 +198,20 @@ func (promCli *prometheusStorageClient) sendToPrometheus(method, promURL string,
 
 // isValidURL checks if the provided URL is well-formed and adheres to basic validation rules.
 func isValidURL(urlStr string) bool {
-    parsedURL, err := url.Parse(urlStr)
-    if err != nil {
-        return false
-    }
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
 
-    // Check if the scheme is http or https.
-    if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-        return false
-    }
+	// Check if the scheme is http or https.
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return false
+	}
 
-    // Check if the host is non-empty.
-    if parsedURL.Host == "" {
-        return false
-    }
+	// Check if the host is non-empty.
+	if parsedURL.Host == "" {
+		return false
+	}
 
-    return true
+	return true
 }
