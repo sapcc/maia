@@ -21,6 +21,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -103,10 +104,10 @@ func fetchToken() {
 	if authType == "password" {
 		// check mandatory stuff
 		if auth.Password == "" {
-			panic(fmt.Errorf("you must specify --os-password"))
+			panic(errors.New("you must specify --os-password"))
 		}
 		if auth.Username == "" && auth.UserID == "" {
-			panic(fmt.Errorf("you must specify --os-username or --os-user-id"))
+			panic(errors.New("you must specify --os-username or --os-user-id"))
 		}
 		// ignore tokens and application credentials
 		auth.TokenID = ""
@@ -116,7 +117,7 @@ func fetchToken() {
 	} else if authType == "token" {
 		// check mandatory stuff
 		if auth.TokenID == "" {
-			panic(fmt.Errorf("you must specify --os-token"))
+			panic(errors.New("you must specify --os-token"))
 		}
 		// ignore anything but scope (to permit rescoping)
 		auth.Password = ""
@@ -130,10 +131,10 @@ func fetchToken() {
 	} else if authType == "v3applicationcredential" {
 		// check mandatory stuff
 		if auth.ApplicationCredentialSecret == "" {
-			panic(fmt.Errorf("you must specify --os-application-credential-secret"))
+			panic(errors.New("you must specify --os-application-credential-secret"))
 		}
 		if auth.ApplicationCredentialName != "" && auth.Username == "" && auth.UserID == "" {
-			panic(fmt.Errorf("you must specify --os-username or --os-user-id when using" +
+			panic(errors.New("you must specify --os-username or --os-user-id when using" +
 				" --os-application-credential-name"))
 		}
 		// ignore anything user identifiers if specified by application credential ID
@@ -151,13 +152,13 @@ func fetchToken() {
 
 	// error on ambiguous parameters
 	if auth.UserID != "" && auth.Username != "" {
-		panic(fmt.Errorf("use either --os-user-id or --os-user-name but not both"))
+		panic(errors.New("use either --os-user-id or --os-user-name but not both"))
 	}
 	if auth.DomainID != "" && auth.DomainName != "" {
-		panic(fmt.Errorf("user either --os-user-domain-id or --os-user-domain-name but not both"))
+		panic(errors.New("user either --os-user-domain-id or --os-user-domain-name but not both"))
 	}
 	if auth.UserID != "" && (auth.DomainID != "" || auth.DomainName != "") {
-		panic(fmt.Errorf("do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
+		panic(errors.New("do not specify --os-user-domain-id or --os-user-domain-name when using --os-user-id since the user ID implies the domain"))
 	}
 
 	// finally ... authenticate with keystone
@@ -182,7 +183,7 @@ func storageInstance() storage.Driver {
 			fetchToken()
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
 		} else {
-			panic(fmt.Errorf("either --os-auth-url or --prometheus-url need to be specified"))
+			panic(errors.New("either --os-auth-url or --prometheus-url need to be specified"))
 		}
 	}
 
@@ -462,7 +463,7 @@ func printQueryResponse(resp *http.Response) {
 				fmt.Print(string(body))
 			} else if strings.EqualFold(outputFormat, "template") {
 				if jsonTemplate == "" {
-					panic(fmt.Errorf("missing --template parameter"))
+					panic(errors.New("missing --template parameter"))
 				}
 				printTemplate(body, jsonTemplate)
 			} else if strings.EqualFold(outputFormat, "table") {
@@ -504,7 +505,7 @@ func LabelValues(cmd *cobra.Command, args []string) (ret error) {
 
 	// check parameters
 	if len(args) < 1 {
-		return fmt.Errorf("missing argument: label-name")
+		return errors.New("missing argument: label-name")
 	}
 	labelName := args[0]
 
@@ -578,7 +579,7 @@ func Query(cmd *cobra.Command, args []string) (ret error) {
 
 	// check parameters
 	if len(args) < 1 {
-		return fmt.Errorf("missing argument: PromQL Query")
+		return errors.New("missing argument: PromQL Query")
 	}
 	queryExpr := args[0]
 

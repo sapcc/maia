@@ -24,7 +24,7 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 
 	tmplFuncs := html_template.FuncMap{
 		"since": func(t time.Time) time.Duration {
-			return time.Since(t) / time.Millisecond * time.Millisecond
+			return time.Since(t).Round(time.Millisecond)
 		},
 		"pathPrefix":   func() string { return "" },
 		"buildVersion": func() string { return "0.1" },
@@ -41,13 +41,13 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		"domainName":     func() string { return req.Header.Get("X-Domain-Name") },
 		"domainId":       func() string { return req.Header.Get("X-Domain-Id") },
 		"userDomainName": func() string { return req.Header.Get("X-User-Domain-Name") },
-		//"authRules": func() []string {
-		//	rules, ok := data.([]string)
-		//	if ok {
-		//		return rules
-		//	}
-		//	return []string{}
-		//},
+		// "authRules": func() []string {
+		//	 rules, ok := data.([]string)
+		//	 if ok {
+		//	 	return rules
+		//	 }
+		//	 return []string{}
+		// },
 		"childProjects": func() []string {
 			children, err := keystoneDriver.ChildProjects(req.Header.Get("X-Project-Id"))
 			if err != nil {
@@ -83,11 +83,11 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 func getTemplate(name string) (string, error) {
 	baseTmpl, err := Asset("web/templates/_base.html")
 	if err != nil {
-		return "", fmt.Errorf("error reading base template: %s", err)
+		return "", fmt.Errorf("error reading base template: %w", err)
 	}
 	pageTmpl, err := Asset(filepath.Join("web/templates", name))
 	if err != nil {
-		return "", fmt.Errorf("error reading page template %s: %s", name, err)
+		return "", fmt.Errorf("error reading page template %s: %w", name, err)
 	}
 	return string(baseTmpl) + string(pageTmpl), nil
 }
@@ -104,12 +104,12 @@ func expandHTMLTemplate(name, text string, data interface{}, funcMap html_templa
 	})
 	tmpl, err := tmpl.Parse(text)
 	if err != nil {
-		return "", fmt.Errorf("error parsing template %v: %v", name, err)
+		return "", fmt.Errorf("error parsing template %v: %w", name, err)
 	}
 	var buffer bytes.Buffer
 	err = tmpl.Execute(&buffer, data)
 	if err != nil {
-		return "", fmt.Errorf("error executing template %v: %v", name, err)
+		return "", fmt.Errorf("error executing template %v: %w", name, err)
 	}
 	return buffer.String(), nil
 }

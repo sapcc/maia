@@ -40,11 +40,11 @@ type APIRequest struct {
 	Headers          map[string]string
 	Method           string
 	Path             string
-	RequestJSON      interface{} //if non-nil, will be encoded as JSON
+	RequestJSON      interface{} // if non-nil, will be encoded as JSON
 	ExpectStatusCode int
-	ExpectBody       *string //raw content (not a file path)
-	ExpectJSON       string  //path to JSON file
-	ExpectFile       string  //path to arbitrary file
+	ExpectBody       *string // raw content (not a file path)
+	ExpectJSON       string  // path to JSON file
+	ExpectFile       string  // path to arbitrary file
 }
 
 // Check performs the HTTP request described by this APIRequest against the
@@ -103,8 +103,8 @@ func (r APIRequest) Check(t *testing.T, handler http.Handler) {
 }
 
 func (r APIRequest) compareBodyToFixture(t *testing.T, fixturePath string, data []byte) {
-	//write actual content to file to make it easy to copy the computed result over
-	//to the fixture path when a new test is added or an existing one is modified
+	// write actual content to file to make it easy to copy the computed result over
+	// to the fixture path when a new test is added or an existing one is modified
 	fixturePathAbs, err := filepath.Abs(fixturePath)
 	if err != nil {
 		t.Fatal(err)

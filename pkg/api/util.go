@@ -121,7 +121,7 @@ func ReturnJSON(w http.ResponseWriter, code int, data interface{}) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		// restore "&" in links that are broken by the json.Marshaller
-		payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
+		payload = bytes.ReplaceAll(payload, []byte("\\u0026"), []byte("&"))
 		_, err = w.Write(payload)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -166,7 +166,7 @@ func scopeToLabelConstraint(req *http.Request, keystoneDriver keystone.Driver) (
 		return "domain_id", []string{domainID}
 	}
 
-	panic(fmt.Errorf("missing OpenStack scope attributes in request header"))
+	panic(errors.New("missing OpenStack scope attributes in request header"))
 }
 
 // buildSelectors takes the selectors contained in the "match[]" URL query parameter(s)
@@ -200,7 +200,7 @@ func policyEngine() *policy.Enforcer {
 	// set up policy engine lazily
 	filebytes, err := os.ReadFile(viper.GetString("keystone.policy_file"))
 	if err != nil {
-		panic(fmt.Errorf("policy file %s not found: %s", viper.GetString("keystone.policy_file"), err))
+		panic(fmt.Errorf("policy file %s not found: %w", viper.GetString("keystone.policy_file"), err))
 	}
 	var rules map[string]string
 	err = json.Unmarshal(filebytes, &rules)

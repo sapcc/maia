@@ -85,8 +85,7 @@ type labelInjector struct {
 
 // Visit modifies the label matchers of the visited parser.Node based on the labelInjector's matcher
 func (v labelInjector) Visit(node parser.Node, path []parser.Node) (parser.Visitor, error) {
-	switch n := node.(type) {
-	case *parser.VectorSelector:
+	if n, ok := node.(*parser.VectorSelector); ok {
 		// label matcher is only modified, if not already present
 		if !slices.ContainsFunc(n.LabelMatchers, func(e *labels.Matcher) bool {
 			return reflect.DeepEqual(e, v.matcher)

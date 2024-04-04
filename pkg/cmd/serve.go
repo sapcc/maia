@@ -67,7 +67,7 @@ func readConfig(configPath string) {
 		viper.SetConfigType("toml")
 		err := viper.ReadInConfig()
 		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("fatal error config file: %s", err))
+			panic(fmt.Errorf("fatal error config file: %w", err))
 		}
 	}
 }

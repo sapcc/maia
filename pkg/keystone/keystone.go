@@ -111,7 +111,7 @@ func (d *keystone) serviceKeystoneClient() (*gophercloud.ServiceClient, error) {
 func newKeystoneClient(authOpts gophercloud.AuthOptions) (*gophercloud.ServiceClient, error) {
 	provider, err := openstack.AuthenticatedClient(authOpts)
 	if err != nil {
-		return nil, fmt.Errorf("cannot initialize OpenStack service user provider client: %v", err)
+		return nil, fmt.Errorf("cannot initialize OpenStack service user provider client: %w", err)
 	}
 	if viper.IsSet("maia.proxy") {
 		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
@@ -123,7 +123,7 @@ func newKeystoneClient(authOpts gophercloud.AuthOptions) (*gophercloud.ServiceCl
 	}
 	client, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("cannot initialize OpenStack service user identity V3 client: %v", err)
+		return nil, fmt.Errorf("cannot initialize OpenStack service user identity V3 client: %w", err)
 	}
 
 	return client, nil
@@ -544,7 +544,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser,
 		util.LogDebug("verify token")
 		response := tokens.Get(d.providerClient, authOpts.TokenID)
 		if response.Err != nil {
-			//this includes 4xx responses, so after this point, we can be sure that the token is valid
+			// this includes 4xx responses, so after this point, we can be sure that the token is valid
 			return nil, "", NewAuthenticationError(StatusWrongCredentials, response.Err.Error())
 		}
 		err := response.ExtractInto(&tokenData)
@@ -581,7 +581,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser,
 		}
 		if err != nil {
 			statusCode := StatusWrongCredentials
-			//this includes 4xx responses, so after this point, we can be sure that the token is valid
+			// this includes 4xx responses, so after this point, we can be sure that the token is valid
 			if authOpts.Username != "" || authOpts.UserID != "" {
 				util.LogInfo("Failed login of user name %s%s for scope %+v: %s", authOpts.Username, authOpts.UserID, authOpts.Scope, err.Error())
 			} else if authOpts.TokenID != "" {

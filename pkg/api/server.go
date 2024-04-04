@@ -20,12 +20,12 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"regexp"
 
 	"bytes"
-	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -48,12 +48,11 @@ var keystoneInstance keystone.Driver
 func Server() error {
 	prometheusAPIURL := viper.GetString("maia.prometheus_url")
 	if prometheusAPIURL == "" {
-		panic(fmt.Errorf("prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
+		panic(errors.New("prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
 	}
 
 	// the main router dispatches all incoming requests
 	mainRouter := setupRouter(keystone.NewKeystoneDriver(), storage.NewPrometheusDriver(prometheusAPIURL, map[string]string{}))
-	http.Handle("/", mainRouter)
 
 	bindAddress := viper.GetString("maia.bind_address")
 	util.LogInfo("listening on %s", bindAddress)
@@ -64,7 +63,7 @@ func Server() error {
 	})
 	handler := c.Handler(mainRouter)
 
-	//start HTTP server and block
+	// start HTTP server and block
 	return http.ListenAndServe(bindAddress, handler) //nolint:gosec // TODO: use httpext.ListenAndServeContext() from go-bits
 }
 
@@ -84,8 +83,8 @@ func setupRouter(keystoneDriver keystone.Driver, storageDriver storage.Driver) h
 		}{[]VersionData{versionData()}}
 		ReturnJSON(w, http.StatusMultipleChoices, allVersions)
 	})
-	//hook up the v1 API (this code is structured so that a newer API version can
-	//be added easily later)
+	// hook up the v1 API (this code is structured so that a newer API version can
+	// be added easily later)
 	v1Handler := NewV1Handler(keystoneDriver, storageDriver)
 	apiRouter.PathPrefix("/v1/").Handler(http.StripPrefix("/api/v1", v1Handler))
 
@@ -160,7 +159,7 @@ func serveStaticContent(w http.ResponseWriter, req *http.Request) {
 	}
 	file, err := ui.Asset(fp)
 	if err != nil {
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			util.LogWarning("Could not get file info: %v", err)
 		}
 		w.WriteHeader(http.StatusNotFound)

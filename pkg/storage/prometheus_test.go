@@ -15,7 +15,7 @@ const (
 )
 
 func setupTest(t *testing.T) Driver { //nolint:unparam
-	//load test policy (where everything is allowed)
+	// load test policy (where everything is allowed)
 	viper.Set("maia.storage_driver", "prometheus")
 	viper.Set("maia.label_value_ttl", "72h")
 	viper.Set("maia.prometheus_url", prometheusURL)
