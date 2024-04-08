@@ -95,7 +95,7 @@ license-headers: FORCE prepare-static-check
 
 check-license-headers: FORCE prepare-static-check
 	@printf "\e[1;36m>> addlicense --check\e[0m\n"
-	@find . -name '*.go' ! -name 'bindata.go' | xargs addlicense --check
+	@addlicense --check  -- $(patsubst $(shell awk '$$1 == "module" {print $$2}' go.mod)%,.%/*.go,$(shell go list ./...))
 
 check-dependency-licenses: FORCE prepare-static-check
 	@printf "\e[1;36m>> go-licence-detector\e[0m\n"
