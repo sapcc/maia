@@ -22,8 +22,8 @@ build/maia: generate
 static-check: generate
 
 generate: FORCE
-	go install github.com/golang/mock/mockgen@v1.6.0
-	go install github.com/go-bindata/go-bindata/go-bindata@v3.1.2+incompatible
+	if ! hash mockgen 2>/dev/null; then go install github.com/golang/mock/mockgen@v1.6.0; fi
+	if ! hash go-bindata 2>/dev/null; then go install github.com/go-bindata/go-bindata/go-bindata@v3.1.2+incompatible; fi
 
 	mockgen --source pkg/storage/interface.go --destination pkg/storage/genmock.go --package storage
 	mockgen --source pkg/keystone/interface.go --destination pkg/keystone/genmock.go --package keystone
