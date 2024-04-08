@@ -27,10 +27,10 @@ import (
 	"errors"
 
 	policy "github.com/databus23/goslo.policy"
-	"github.com/golang/mock/gomock"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
+	"go.uber.org/mock/gomock"
 
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"
