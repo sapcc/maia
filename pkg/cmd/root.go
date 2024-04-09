@@ -42,11 +42,14 @@ var RootCmd = &cobra.Command{
         can be used both as server and as a client to access a Maia service running elsewhere.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if showVersion {
-			fmt.Println("Maia Version", version)
+			fmt.Println("Maia version", version)
 			os.Exit(0)
 		} else {
 			// If no command is provided, show the help message
-			cmd.Help()
+			if err := cmd.Help(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error showing help: %v\n", err)
+				os.Exit(1)
+			}
 			os.Exit(0)
 		}
 	},
