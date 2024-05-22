@@ -8,7 +8,7 @@ RUN make -C /src install PREFIX=/pkg GOTOOLCHAIN=local
 
 ################################################################################
 
-FROM alpine:3.19
+FROM alpine:3.20
 
 RUN addgroup -g 4200 appgroup \
   && adduser -h /home/appuser -s /sbin/nologin -G appgroup -D -u 4200 appuser
