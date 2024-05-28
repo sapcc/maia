@@ -73,7 +73,7 @@ func TestAddLabelConstraintToExpression_InvalidExpression(t *testing.T) {
 
 func TestAddLabelConstraintToExpression_LargeValues(t *testing.T) {
 	values := make([]string, 100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		values[i] = fmt.Sprintf("value%d", i)
 	}
 	_, err := AddLabelConstraintToExpression("sum(rate(http_request_total{job=\"myjob\"}[5m])) by (job)", "project_id", values)

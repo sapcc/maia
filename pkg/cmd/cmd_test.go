@@ -26,8 +26,8 @@ import (
 	"time"
 
 	policy "github.com/databus23/goslo.policy"
-	"github.com/golang/mock/gomock"
 	"github.com/gophercloud/gophercloud"
+	"go.uber.org/mock/gomock"
 
 	"github.com/sapcc/maia/pkg/keystone"
 	"github.com/sapcc/maia/pkg/storage"

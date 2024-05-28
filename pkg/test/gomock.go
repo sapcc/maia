@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 // HTTPRequestMatcher matches against http.Request parameters
