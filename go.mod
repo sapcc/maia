@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/common v0.45.0
 	github.com/prometheus/prometheus v0.48.0
 	github.com/rs/cors v1.11.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0
