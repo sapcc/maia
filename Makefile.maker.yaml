@@ -41,8 +41,9 @@ verbatim: |
     if ! hash mockgen 2>/dev/null; then go install go.uber.org/mock/mockgen@latest; fi
     if ! hash go-bindata 2>/dev/null; then go install github.com/go-bindata/go-bindata/go-bindata@v3.1.2+incompatible; fi
 
-    mockgen --source pkg/storage/interface.go --destination pkg/storage/genmock.go --package storage
-    mockgen --source pkg/keystone/interface.go --destination pkg/keystone/genmock.go --package keystone
+    mockgen --source=pkg/storage/interface.go --destination=pkg/storage/genmock.go --package=storage
+    mockgen --source=pkg/keystone/interface.go --destination=pkg/keystone/genmock.go --package=keystone
+
 
     go-bindata $(BINDDATA_FLAGS) -pkg ui -o pkg/ui/bindata.go -ignore '(.*\.map|bootstrap\.js|bootstrap-theme\.css|bootstrap\.css)'  web/templates/... web/static/...
     gofmt -s -w ./pkg/ui/bindata.go

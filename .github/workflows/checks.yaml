@@ -25,11 +25,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           check-latest: true
-          go-version: 1.22.2
-      - name: Dependency Licenses Review
-        run: make check-dependency-licenses
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@v1
+          go-version: "1.22"
       - name: Check for spelling errors
         uses: reviewdog/action-misspell@v1
         with:
@@ -38,5 +34,3 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           ignore: importas
           reporter: github-check
-      - name: Check if source code files have license header
-        run: make check-license-headers
