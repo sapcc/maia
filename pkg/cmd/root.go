@@ -29,30 +29,23 @@ import (
 
 var configFile string
 var promURL string
-
-// Version of the Maia server
-var version string = "1.0.6"
-var showVersion bool
+var version = "1.0.7"
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "maia",
 	Short: "OpenStack controlled access to Prometheus metrics",
 	Long: `Maia provides multi-tenancy access to Prometheus metrics through an OpenStack service. The maia command
-        can be used both as server and as a client to access a Maia service running elsewhere.`,
+	can be used both as server and as a client to access a Maia service running elsewhere.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if showVersion {
-			fmt.Println("Maia version", version)
-			os.Exit(0)
-		} else {
-			// If no command is provided, show the help message
-			if err := cmd.Help(); err != nil {
-				fmt.Fprintf(os.Stderr, "Error showing help: %v\n", err)
-				os.Exit(1)
-			}
+		if cmd.Flags().Lookup("version").Changed {
+			fmt.Println("Maia Version:", version)
 			os.Exit(0)
 		}
 	},
+	// Uncomment the following line if your bare application
+	// has an action associated with it:
+	//	Run: func(cmd *cobra.Command, args []string) { },
 }
 
 // Execute adds all child commands to the root command sets flags appropriately.
@@ -79,5 +72,5 @@ func init() {
 	})
 
 	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "", "/etc/maia/maia.conf", "Configuration file to use")
-	RootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Print the version number of Maia")
+	RootCmd.PersistentFlags().Bool("version", false, "Print version information and quit")
 }

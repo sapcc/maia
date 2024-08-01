@@ -1,10 +1,9 @@
 module github.com/sapcc/maia
 
-go 1.21
+go 1.22
 
 require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
-	github.com/golang/mock v1.6.0
 	github.com/gophercloud/gophercloud v1.9.0
 	github.com/gorilla/mux v1.8.1
 	github.com/h2non/gock v1.2.0
@@ -16,6 +15,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
+	go.uber.org/mock v0.4.0
 	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0
 )
 

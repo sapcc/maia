@@ -19,17 +19,24 @@ ifdef DEBUG
 endif
 
 build/maia: generate
+build-all: generate
 static-check: generate
+build/cover.out: generate
 
 generate: FORCE
-	go install github.com/golang/mock/mockgen@v1.6.0
-	go install github.com/go-bindata/go-bindata/go-bindata@v3.1.2+incompatible
+	if ! hash mockgen 2>/dev/null; then go install go.uber.org/mock/mockgen@latest; fi
+	if ! hash go-bindata 2>/dev/null; then go install github.com/go-bindata/go-bindata/go-bindata@v3.1.2+incompatible; fi
+	if ! hash addlicense 2>/dev/null; then go install github.com/google/addlicense@latest; fi
 
-	mockgen --source pkg/storage/interface.go --destination pkg/storage/genmock.go --package storage
-	mockgen --source pkg/keystone/interface.go --destination pkg/keystone/genmock.go --package keystone
+	mockgen --source=pkg/storage/interface.go --destination=pkg/storage/genmock.go --package=storage
+	mockgen --source=pkg/keystone/interface.go --destination=pkg/keystone/genmock.go --package=keystone
+
 
 	go-bindata $(BINDDATA_FLAGS) -pkg ui -o pkg/ui/bindata.go -ignore '(.*\.map|bootstrap\.js|bootstrap-theme\.css|bootstrap\.css)'  web/templates/... web/static/...
 	gofmt -s -w ./pkg/ui/bindata.go
+
+	# Add license header to the generated bindata.go file
+	addlicense -c "SAP SE" ./pkg/ui/bindata.go
 
 prepare-static-check: FORCE
 	@if ! hash golangci-lint 2>/dev/null; then printf "\e[1;36m>> Installing golangci-lint (this may take a while)...\e[0m\n"; go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; fi
