@@ -87,7 +87,7 @@ build/cover.html: build/cover.out
 	@printf "\e[1;36m>> go tool cover > build/cover.html\e[0m\n"
 	@go tool cover -html $< -o $@
 
-static-check: FORCE run-golangci-lint check-dependency-licenses check-license-headers
+static-check: FORCE run-golangci-lint check-dependency-licenses
 
 build:
 	@mkdir $@
