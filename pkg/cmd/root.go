@@ -29,6 +29,7 @@ import (
 
 var configFile string
 var promURL string
+var version = "1.0.7"
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -36,6 +37,12 @@ var RootCmd = &cobra.Command{
 	Short: "OpenStack controlled access to Prometheus metrics",
 	Long: `Maia provides multi-tenancy access to Prometheus metrics through an OpenStack service. The maia command
 	can be used both as server and as a client to access a Maia service running elsewhere.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if cmd.Flags().Lookup("version").Changed {
+			fmt.Println("Maia Version:", version)
+			os.Exit(0)
+		}
+	},
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
@@ -65,4 +72,5 @@ func init() {
 	})
 
 	RootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "", "/etc/maia/maia.conf", "Configuration file to use")
+	RootCmd.PersistentFlags().Bool("version", false, "Print version information and quit")
 }
