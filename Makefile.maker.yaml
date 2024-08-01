@@ -49,3 +49,7 @@ verbatim: |
 
     go-bindata $(BINDDATA_FLAGS) -pkg ui -o pkg/ui/bindata.go -ignore '(.*\.map|bootstrap\.js|bootstrap-theme\.css|bootstrap\.css)'  web/templates/... web/static/...
     gofmt -s -w ./pkg/ui/bindata.go
+
+    # Add license header to the generated bindata.go file
+    addlicense -c "SAP SE" ./pkg/ui/bindata.go
+

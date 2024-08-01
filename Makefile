@@ -34,6 +34,9 @@ generate: FORCE
 	go-bindata $(BINDDATA_FLAGS) -pkg ui -o pkg/ui/bindata.go -ignore '(.*\.map|bootstrap\.js|bootstrap-theme\.css|bootstrap\.css)'  web/templates/... web/static/...
 	gofmt -s -w ./pkg/ui/bindata.go
 
+	# Add license header to the generated bindata.go file
+	addlicense -c "SAP SE" ./pkg/ui/bindata.go
+
 prepare-static-check: FORCE
 	@if ! hash golangci-lint 2>/dev/null; then printf "\e[1;36m>> Installing golangci-lint (this may take a while)...\e[0m\n"; go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; fi
 	@if ! hash go-licence-detector 2>/dev/null; then printf "\e[1;36m>> Installing go-licence-detector...\e[0m\n"; go install go.elastic.co/go-licence-detector@latest; fi
