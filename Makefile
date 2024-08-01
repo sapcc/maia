@@ -19,6 +19,7 @@ ifdef DEBUG
 endif
 
 build/maia: generate
+build-all: generate
 static-check: generate
 
 generate: FORCE
