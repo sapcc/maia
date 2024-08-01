@@ -26,6 +26,7 @@ build/cover.out: generate
 generate: FORCE
 	if ! hash mockgen 2>/dev/null; then go install go.uber.org/mock/mockgen@latest; fi
 	if ! hash go-bindata 2>/dev/null; then go install github.com/go-bindata/go-bindata/go-bindata@v3.1.2+incompatible; fi
+	if ! hash addlicense 2>/dev/null; then go install github.com/google/addlicense@latest; fi
 
 	mockgen --source=pkg/storage/interface.go --destination=pkg/storage/genmock.go --package=storage
 	mockgen --source=pkg/keystone/interface.go --destination=pkg/keystone/genmock.go --package=keystone
