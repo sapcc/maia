@@ -31,10 +31,6 @@ var configFile string
 var promURL string
 var version = "1.0.7"
 
-// Version of the Maia server
-var version string = "1.0.6"
-var showVersion bool
-
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "maia",
