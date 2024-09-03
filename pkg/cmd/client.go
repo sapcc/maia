@@ -31,7 +31,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/v2"
 	"github.com/prometheus/common/model"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

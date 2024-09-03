@@ -27,7 +27,7 @@ import (
 	"errors"
 
 	policy "github.com/databus23/goslo.policy"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/tokens"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"go.uber.org/mock/gomock"
