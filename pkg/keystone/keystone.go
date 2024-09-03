@@ -499,12 +499,12 @@ func (d *keystone) guessScope(ba *gophercloud.AuthOptions) AuthenticationError {
 	if userID == "" {
 		userID, err = d.UserID(ba.Username, ba.DomainName)
 		if err != nil {
-			return NewAuthenticationError(StatusWrongCredentials, err.Error())
+			return NewAuthenticationError(StatusWrongCredentials, err.Error()) //nolint:govet
 		}
 	}
 	userprojects, err := d.UserProjects(userID)
 	if err != nil {
-		return NewAuthenticationError(StatusNotAvailable, err.Error())
+		return NewAuthenticationError(StatusNotAvailable, err.Error()) //nolint:govet
 	} else if len(userprojects) == 0 {
 		return NewAuthenticationError(StatusNoPermission, "User %s (%s@%s) does not have monitoring authorization on any project in any domain (required roles: %s)", userID, ba.Username, ba.DomainName, viper.GetString("keystone.roles"))
 	}
@@ -546,11 +546,11 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser,
 		response := tokens.Get(d.providerClient, authOpts.TokenID)
 		if response.Err != nil {
 			// this includes 4xx responses, so after this point, we can be sure that the token is valid
-			return nil, "", NewAuthenticationError(StatusWrongCredentials, response.Err.Error())
+			return nil, "", NewAuthenticationError(StatusWrongCredentials, response.Err.Error()) //nolint:govet
 		}
 		err := response.ExtractInto(&tokenData)
 		if err != nil {
-			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error()) //nolint:govet
 		}
 		// detect rescoping
 		if authOpts.Scope != nil && authOpts.Scope.ProjectID != tokenData.ProjectScope.ID {
@@ -559,17 +559,17 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser,
 		}
 		tokenInfo, err := response.ExtractToken()
 		if err != nil {
-			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error()) //nolint:govet
 		}
 		tokenData.Token = tokenInfo.ID
 		catalog, err := response.ExtractServiceCatalog()
 		if err != nil {
-			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error()) //nolint:govet
 		}
 		// service endpoint
 		endpointURL, err = openstack.V3EndpointURL(catalog, gophercloud.EndpointOpts{Type: "metrics", Availability: gophercloud.AvailabilityPublic})
 		if err != nil {
-			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error()) //nolint:govet
 		}
 	} else {
 		// no token or changed scoped: need to authenticate user
@@ -596,7 +596,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser,
 				statusCode = StatusMissingCredentials
 			}
 
-			return nil, "", NewAuthenticationError(statusCode, err.Error())
+			return nil, "", NewAuthenticationError(statusCode, err.Error()) //nolint:govet
 		}
 		util.LogDebug("token creation/rescoping successful, authenticating with token")
 
@@ -630,7 +630,7 @@ func (d *keystone) authenticate(authOpts gophercloud.AuthOptions, asServiceUser,
 
 		endpointURL, err = client.EndpointLocator(metricsEndpointOpts)
 		if err != nil {
-			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error())
+			return nil, "", NewAuthenticationError(StatusNotAvailable, err.Error()) //nolint:govet
 		}
 	}
 
