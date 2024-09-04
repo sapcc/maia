@@ -20,6 +20,7 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"testing"
@@ -74,41 +75,48 @@ func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler
 }
 
 func expectAuthByProjectID(keystoneMock *keystone.MockDriver) {
+	ctx := context.Background()
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(projectContext, nil)
-	keystoneMock.EXPECT().ChildProjects(projectContext.Auth["project_id"]).Return([]string{}, nil).After(authCall)
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(ctx, httpReqMatcher, false).Return(projectContext, nil)
+	keystoneMock.EXPECT().ChildProjects(ctx, projectContext.Auth["project_id"]).Return([]string{}, nil).After(authCall)
 }
 
 func expectAuthByDomainName(keystoneMock *keystone.MockDriver) {
+	ctx := context.Background()
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: domainHeader}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(domainContext, nil)
+	keystoneMock.EXPECT().AuthenticateRequest(ctx, httpReqMatcher, false).Return(domainContext, nil)
 }
 
 func expectAuthWithChildren(keystoneMock *keystone.MockDriver) {
+	ctx := context.Background()
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(projectContext, nil)
-	keystoneMock.EXPECT().ChildProjects(projectContext.Auth["project_id"]).Return([]string{"67890"}, nil).After(authCall)
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(ctx, httpReqMatcher, false).Return(projectContext, nil)
+	keystoneMock.EXPECT().ChildProjects(ctx, projectContext.Auth["project_id"]).Return([]string{"67890"}, nil).After(authCall)
 }
 
 func expectAuthByDefaults(keystoneMock *keystone.MockDriver) {
+	ctx := context.Background()
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	authCall := keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(projectContext, nil)
-	keystoneMock.EXPECT().UserProjects(projectContext.Auth["user_id"]).Return([]tokens.Scope{{ProjectID: projectContext.Auth["project_id"], DomainID: projectContext.Auth["project_domain_id"]}}, nil).After(authCall)
+	authCall := keystoneMock.EXPECT().AuthenticateRequest(ctx, httpReqMatcher, true).Return(projectContext, nil)
+	keystoneMock.EXPECT().UserProjects(ctx, projectContext.Auth["user_id"]).Return([]tokens.Scope{{ProjectID: projectContext.Auth["project_id"], DomainID: projectContext.Auth["project_domain_id"]}}, nil).After(authCall)
 }
 
 func expectAuthAndFail(keystoneMock *keystone.MockDriver) {
+	ctx := context.Background()
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(nil, keystone.NewAuthenticationError(keystone.StatusWrongCredentials, "negativetesterror"))
+	keystoneMock.EXPECT().AuthenticateRequest(ctx, httpReqMatcher, false).Return(nil, keystone.NewAuthenticationError(keystone.StatusWrongCredentials, "negativetesterror"))
 }
 
 func expectPlainBasicAuthAndFail(keystoneMock *keystone.MockDriver) {
+	ctx := context.Background()
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, true).Return(nil, keystone.NewAuthenticationError(keystone.StatusWrongCredentials, "negativetesterror"))
+	keystoneMock.EXPECT().AuthenticateRequest(ctx, httpReqMatcher, true).Return(nil, keystone.NewAuthenticationError(keystone.StatusWrongCredentials, "negativetesterror"))
 }
 
 func expectAuthAndDenyAuthorization(keystoneMock *keystone.MockDriver) {
+	ctx := context.Background()
 	httpReqMatcher := test.HTTPRequestMatcher{InjectHeader: projectHeader}
-	keystoneMock.EXPECT().AuthenticateRequest(httpReqMatcher, false).Return(projectInsufficientRolesContext, nil)
+	keystoneMock.EXPECT().AuthenticateRequest(ctx, httpReqMatcher, false).Return(projectInsufficientRolesContext, nil)
 }
 
 // HTTP based tests

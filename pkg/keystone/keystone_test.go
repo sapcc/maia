@@ -15,6 +15,7 @@
 package keystone
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -153,10 +154,12 @@ func TestChildProjects(t *testing.T) {
 
 	ks := setupTest()
 
+	ctx := context.Background()
+
 	gock.New(baseURL).Get("/v3/projects").MatchParams(map[string]string{"enabled": "true", "parent_id": "p00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/child_projects.json").AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/projects").MatchParams(map[string]string{"enabled": "true", "parent_id": "p00002"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).BodyString("{ \"projects\": [] }").AddHeader("Content-Type", "application/json")
 
-	ids, err := ks.ChildProjects("p00001")
+	ids, err := ks.ChildProjects(ctx, "p00001")
 
 	assert.Nil(t, err, "ChildProjects should not return error")
 	assert.EqualValues(t, []string{"p00002"}, ids)
@@ -169,15 +172,17 @@ func TestAuthenticateRequest(t *testing.T) { //nolint:dupl // the tests being ve
 
 	ks := setupTest()
 
+	ctx := context.Background()
+
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
 	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", http.NoBody)
 	req.SetBasicAuth("testuser@testdomain|testproject@testdomain", "testpw")
-	context, err := ks.AuthenticateRequest(req, false)
+	policyContext, err := ks.AuthenticateRequest(ctx, req, false)
 
 	assert.Nil(t, err, "AuthenticateRequest should not fail")
-	assert.EqualValues(t, []string{"monitoring_viewer"}, context.Roles, "AuthenticateRequest should return the right roles in the context")
+	assert.EqualValues(t, []string{"monitoring_viewer"}, policyContext.Roles, "AuthenticateRequest should return the right roles in the context")
 
 	assertDone(t)
 }
@@ -186,16 +191,17 @@ func TestAuthenticateRequest_urlScope(t *testing.T) { //nolint:dupl // the tests
 	defer gock.Off()
 
 	ks := setupTest()
+	ctx := context.Background()
 
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthScopeBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
 	req := httptest.NewRequest(http.MethodGet, "http://maia.local/testdomain/graph?project_id=p00001", http.NoBody)
 	req.SetBasicAuth("testuser@testdomain", "testpw")
-	context, err := ks.AuthenticateRequest(req, false)
+	policyContext, err := ks.AuthenticateRequest(ctx, req, false)
 
 	assert.Nil(t, err, "AuthenticateRequest should not fail")
-	assert.EqualValues(t, []string{"monitoring_viewer"}, context.Roles, "AuthenticateRequest should return the right roles in the context")
+	assert.EqualValues(t, []string{"monitoring_viewer"}, policyContext.Roles, "AuthenticateRequest should return the right roles in the context")
 
 	assertDone(t)
 }
@@ -204,15 +210,16 @@ func TestAuthenticateRequest_token(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
+	ctx := context.Background()
 
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
 	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", http.NoBody)
 	req.Header.Set("X-Auth-Token", userToken)
-	context, err := ks.AuthenticateRequest(req, false)
+	policyContext, err := ks.AuthenticateRequest(ctx, req, false)
 
 	assert.Nil(t, err, "AuthenticateRequest should not fail")
-	assert.EqualValues(t, []string{"monitoring_viewer"}, context.Roles, "AuthenticateRequest should return the right roles in the context")
+	assert.EqualValues(t, []string{"monitoring_viewer"}, policyContext.Roles, "AuthenticateRequest should return the right roles in the context")
 
 	assertDone(t)
 }
@@ -221,12 +228,13 @@ func TestAuthenticateRequest_failed(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
+	ctx := context.Background()
 
 	gock.New(baseURL).Post("/v3/auth/tokens").Reply(http.StatusForbidden)
 
 	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", http.NoBody)
 	req.SetBasicAuth("testuser@testdomain|testproject@testdomain", "testpw")
-	_, err := ks.AuthenticateRequest(req, false)
+	_, err := ks.AuthenticateRequest(ctx, req, false)
 
 	assert.NotNil(t, err, "AuthenticateRequest should fail with error when Keystone responds with 4xx")
 
@@ -237,10 +245,11 @@ func TestAuthenticateRequest_failedNoScope(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
+	ctx := context.Background()
 
 	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", http.NoBody)
 	req.SetBasicAuth("testuser@testdomain", "testpw")
-	_, err := ks.AuthenticateRequest(req, false)
+	_, err := ks.AuthenticateRequest(ctx, req, false)
 
 	assert.NotNil(t, err, "AuthenticateRequest should fail with error when scope information is missing for /federate")
 
@@ -251,6 +260,7 @@ func TestAuthenticateRequest_guessScope(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
+	ctx := context.Background()
 
 	gock.New(baseURL).Get("/v3/users").MatchParams(map[string]string{"domain_id": "d00001", "enabled": "true", "name": "testuser"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser.json").AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/role_assignments").MatchParams(map[string]string{"effective": "true", "user.id": "u00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser_roles.json").AddHeader("Content-Type", "application/json")
@@ -260,10 +270,10 @@ func TestAuthenticateRequest_guessScope(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", http.NoBody)
 	req.SetBasicAuth("testuser@testdomain", "testpw")
-	context, err := ks.AuthenticateRequest(req, true)
+	policyContext, err := ks.AuthenticateRequest(ctx, req, true)
 
 	assert.Nil(t, err, "AuthenticateRequest should not fail")
-	assert.EqualValues(t, []string{"monitoring_viewer"}, context.Roles, "AuthenticateRequest should return the right roles in the context")
+	assert.EqualValues(t, []string{"monitoring_viewer"}, policyContext.Roles, "AuthenticateRequest should return the right roles in the context")
 
 	assertDone(t)
 }

@@ -63,7 +63,8 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		//	 return []string{}
 		// },
 		"childProjects": func() []string {
-			children, err := keystoneDriver.ChildProjects(req.Header.Get("X-Project-Id"))
+			ctx := req.Context()
+			children, err := keystoneDriver.ChildProjects(ctx, req.Header.Get("X-Project-Id"))
 			if err != nil {
 				return []string{}
 			}
@@ -71,8 +72,9 @@ func ExecuteTemplate(w http.ResponseWriter, req *http.Request, name string, keys
 		},
 		// return list of user's projects with monitoring role: name --> id
 		"userProjects": func() map[string]string {
+			ctx := req.Context()
 			result := map[string]string{}
-			projects, err := keystoneDriver.UserProjects(req.Header.Get("X-User-Id"))
+			projects, err := keystoneDriver.UserProjects(ctx, req.Header.Get("X-User-Id"))
 			if err == nil {
 				for _, p := range projects {
 					result[p.ProjectName] = p.ProjectID

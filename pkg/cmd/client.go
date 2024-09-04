@@ -20,6 +20,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,6 +72,8 @@ func recoverAll() {
 }
 
 func fetchToken() {
+	ctx := context.Background()
+
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
 	}
@@ -162,12 +165,12 @@ func fetchToken() {
 	}
 
 	// finally ... authenticate with keystone
-	context, url, err := keystoneInstance().Authenticate(auth)
+	policyContext, url, err := keystoneInstance().Authenticate(ctx, auth)
 	if err != nil {
 		panic(err)
 	}
 	// keep the token and use the URL from the catalog (unless set explicitly)
-	auth.TokenID = context.Auth["token"]
+	auth.TokenID = policyContext.Auth["token"]
 	if maiaURL == "" {
 		maiaURL = url
 	}

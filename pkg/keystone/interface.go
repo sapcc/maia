@@ -20,6 +20,7 @@
 package keystone
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -79,17 +80,17 @@ type Driver interface {
 	// After successful authentication, additional context information is added to the request header
 	// In addition a Context object is returned for policy evaluation.
 	// When guessScope is set to true, the method will try to find a suitible project when the scope is not defined (basic auth. only)
-	AuthenticateRequest(req *http.Request, guessScope bool) (*policy.Context, AuthenticationError)
+	AuthenticateRequest(ctx context.Context, req *http.Request, guessScope bool) (*policy.Context, AuthenticationError)
 
 	// Authenticate authenticates a user using the provided authOptions.
 	// It returns a context for policy evaluation and the public endpoint retrieved from the service catalog
-	Authenticate(options gophercloud.AuthOptions) (*policy.Context, string, AuthenticationError)
+	Authenticate(ctx context.Context, options gophercloud.AuthOptions) (*policy.Context, string, AuthenticationError)
 
 	// ChildProjects returns the IDs of all child-projects of the project denoted by projectID
-	ChildProjects(projectID string) ([]string, error)
+	ChildProjects(ctx context.Context, projectID string) ([]string, error)
 
 	// UserProjects returns the project IDs and name of all projects where the current user has a monitoring role
-	UserProjects(userID string) ([]tokens.Scope, error)
+	UserProjects(ctx context.Context, userID string) ([]tokens.Scope, error)
 
 	// ServiceURL returns the service's global catalog entry
 	// The result is empty when called from a client
