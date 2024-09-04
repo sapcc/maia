@@ -21,6 +21,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -252,8 +253,8 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	}
 
 	// 2. authenticate
-	ctx := req.Context()
-	context, err := keystoneInstance.AuthenticateRequest(ctx, req, guessScope)
+	ctx := context.Background()
+	policyContext, err := keystoneInstance.AuthenticateRequest(ctx, req, guessScope)
 	if err != nil {
 		code := err.StatusCode()
 		httpCode := http.StatusUnauthorized
@@ -299,7 +300,7 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	// 3. authorize
 	pe := policyEngine()
 	for _, rule := range rules {
-		if pe.Enforce(rule, *context) {
+		if pe.Enforce(rule, *policyContext) {
 			matchedRules = append(matchedRules, rule)
 		}
 	}
