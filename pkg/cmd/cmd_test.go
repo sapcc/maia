@@ -85,7 +85,7 @@ func expectAuth(keystoneMock *keystone.MockDriver) {
 		"password": auth.Password, "user_domain_name": "domainname", "project_id": auth.Scope.ProjectID},
 		Auth: map[string]string{"project_id": auth.Scope.ProjectID}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
 	// call this explicitly since the mocked storage does not
-	fetchToken()
+	fetchToken(ctx)
 }
 
 // HTTP based tests
@@ -515,7 +515,7 @@ func authentication(tokenid, authtype, username, userid, password, appcredid, ap
 		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
 		Roles: []string{"monitoring_viewer"},
 	}, "http://localhost:9091", nil)
-	fetchToken()
+	fetchToken(ctx)
 
 	return paniced
 }

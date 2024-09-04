@@ -35,6 +35,8 @@ var serveCmd = &cobra.Command{
 	Short: "Start the Maia service",
 	Long:  "Run the Maia service against a Prometheus backend collecting the metrics.",
 	RunE: func(cmd *cobra.Command, args []string) (ret error) {
+		ctx := cmd.Context()
+
 		// transform panics with error params into errors
 		defer func() {
 			if r := recover(); r != nil {
@@ -43,7 +45,7 @@ var serveCmd = &cobra.Command{
 		}()
 
 		// just run the server
-		err := api.Server()
+		err := api.Server(ctx)
 		if err != nil {
 			return err
 		}

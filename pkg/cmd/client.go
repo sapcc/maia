@@ -71,9 +71,7 @@ func recoverAll() {
 	}
 }
 
-func fetchToken() {
-	ctx := context.Background()
-
+func fetchToken(ctx context.Context) {
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
 	}
@@ -178,13 +176,14 @@ func fetchToken() {
 
 // storageInstance creates a new Prometheus driver instance lazily
 func storageInstance() storage.Driver {
+	ctx := context.Background()
 	if storageDriver == nil {
 		switch {
 		case promURL != "":
 			storageDriver = storage.NewPrometheusDriver(promURL, map[string]string{})
 		case auth.IdentityEndpoint != "":
 			// authenticate and set maiaURL if missing
-			fetchToken()
+			fetchToken(ctx)
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
 		default:
 			panic(errors.New("either --os-auth-url or --prometheus-url need to be specified"))

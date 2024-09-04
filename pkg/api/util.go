@@ -21,7 +21,6 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -253,7 +252,7 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	}
 
 	// 2. authenticate
-	ctx := context.Background()
+	ctx := req.Context()
 	policyContext, err := keystoneInstance.AuthenticateRequest(ctx, req, guessScope)
 	if err != nil {
 		code := err.StatusCode()
