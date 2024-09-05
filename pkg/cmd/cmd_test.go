@@ -20,13 +20,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	policy "github.com/databus23/goslo.policy"
-	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/v2"
 	"go.uber.org/mock/gomock"
 
 	"github.com/sapcc/maia/pkg/keystone"
@@ -78,12 +79,13 @@ func setupTest(controller *gomock.Controller) (keystoneDriver *keystone.MockDriv
 }
 
 func expectAuth(keystoneMock *keystone.MockDriver) {
-	keystoneMock.EXPECT().Authenticate(gophercloud.AuthOptions{IdentityEndpoint: auth.IdentityEndpoint, Username: auth.Username, UserID: auth.UserID,
+	ctx := context.Background()
+	keystoneMock.EXPECT().Authenticate(ctx, gophercloud.AuthOptions{IdentityEndpoint: auth.IdentityEndpoint, Username: auth.Username, UserID: auth.UserID,
 		Password: auth.Password, DomainName: auth.DomainName, Scope: auth.Scope}).Return(&policy.Context{Request: map[string]string{"username": auth.Username,
 		"password": auth.Password, "user_domain_name": "domainname", "project_id": auth.Scope.ProjectID},
 		Auth: map[string]string{"project_id": auth.Scope.ProjectID}, Roles: []string{"monitoring_viewer"}}, "http://localhost:9091", nil)
 	// call this explicitly since the mocked storage does not
-	fetchToken()
+	fetchToken(ctx)
 }
 
 // HTTP based tests
@@ -450,6 +452,7 @@ func Test_Auth(t *testing.T) {
 
 func authentication(tokenid, authtype, username, userid, password, appcredid, appcredname, appcredsecret string) (paniced bool) {
 	paniced = false
+	ctx := context.Background()
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -501,7 +504,7 @@ func authentication(tokenid, authtype, username, userid, password, appcredid, ap
 	// create dummy keystone and storage mock
 	keystoneMock := keystone.NewMockDriver(ctrl)
 	setKeystoneInstance(keystoneMock)
-	keystoneMock.EXPECT().Authenticate(expectedAuth).Return(&policy.Context{
+	keystoneMock.EXPECT().Authenticate(ctx, expectedAuth).Return(&policy.Context{
 		Request: map[string]string{
 			"user_id":                       auth.UserID,
 			"project_id":                    "12345",
@@ -512,7 +515,7 @@ func authentication(tokenid, authtype, username, userid, password, appcredid, ap
 		Auth:  map[string]string{"project_id": auth.Scope.ProjectID},
 		Roles: []string{"monitoring_viewer"},
 	}, "http://localhost:9091", nil)
-	fetchToken()
+	fetchToken(ctx)
 
 	return paniced
 }

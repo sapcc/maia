@@ -20,6 +20,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -51,8 +52,19 @@ var RootCmd = &cobra.Command{
 // Execute adds all child commands to the root command sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		fmt.Fprint(os.Stderr, err)
+	ExecuteWithContext(context.Background())
+}
+
+// ExecuteWithContext is similar to Execute but takes a context
+func ExecuteWithContext(ctx context.Context) {
+	// Add the context to the root command
+	RootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		// You can use the context here if needed
+		cmd.SetContext(ctx)
+	}
+
+	if err := RootCmd.ExecuteContext(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(-1)
 	}
 }

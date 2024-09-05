@@ -20,6 +20,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,7 +32,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/v2"
 	"github.com/prometheus/common/model"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -70,7 +71,7 @@ func recoverAll() {
 	}
 }
 
-func fetchToken() {
+func fetchToken(ctx context.Context) {
 	if scopedDomain != "" {
 		auth.Scope.DomainName = scopedDomain
 	}
@@ -162,12 +163,12 @@ func fetchToken() {
 	}
 
 	// finally ... authenticate with keystone
-	context, url, err := keystoneInstance().Authenticate(auth)
+	policyContext, url, err := keystoneInstance().Authenticate(ctx, auth)
 	if err != nil {
 		panic(err)
 	}
 	// keep the token and use the URL from the catalog (unless set explicitly)
-	auth.TokenID = context.Auth["token"]
+	auth.TokenID = policyContext.Auth["token"]
 	if maiaURL == "" {
 		maiaURL = url
 	}
@@ -175,13 +176,14 @@ func fetchToken() {
 
 // storageInstance creates a new Prometheus driver instance lazily
 func storageInstance() storage.Driver {
+	ctx := context.Background()
 	if storageDriver == nil {
 		switch {
 		case promURL != "":
 			storageDriver = storage.NewPrometheusDriver(promURL, map[string]string{})
 		case auth.IdentityEndpoint != "":
 			// authenticate and set maiaURL if missing
-			fetchToken()
+			fetchToken(ctx)
 			storageDriver = storage.NewPrometheusDriver(maiaURL, map[string]string{"X-Auth-Token": auth.TokenID})
 		default:
 			panic(errors.New("either --os-auth-url or --prometheus-url need to be specified"))

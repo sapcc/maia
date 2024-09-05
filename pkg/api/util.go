@@ -156,8 +156,9 @@ func ReturnPromError(w http.ResponseWriter, err error, code int) {
 }
 
 func scopeToLabelConstraint(req *http.Request, keystoneDriver keystone.Driver) (string, []string) { //nolint:gocritic
+	ctx := req.Context()
 	if projectID := req.Header.Get("X-Project-Id"); projectID != "" {
-		children, err := keystoneDriver.ChildProjects(projectID)
+		children, err := keystoneDriver.ChildProjects(ctx, projectID)
 		if err != nil {
 			panic(err)
 		}
@@ -251,7 +252,8 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	}
 
 	// 2. authenticate
-	context, err := keystoneInstance.AuthenticateRequest(req, guessScope)
+	ctx := req.Context()
+	policyContext, err := keystoneInstance.AuthenticateRequest(ctx, req, guessScope)
 	if err != nil {
 		code := err.StatusCode()
 		httpCode := http.StatusUnauthorized
@@ -297,7 +299,7 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 	// 3. authorize
 	pe := policyEngine()
 	for _, rule := range rules {
-		if pe.Enforce(rule, *context) {
+		if pe.Enforce(rule, *policyContext) {
 			matchedRules = append(matchedRules, rule)
 		}
 	}
