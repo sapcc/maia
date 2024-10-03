@@ -21,6 +21,10 @@ githubWorkflow:
   ci:
     enabled: true
     coveralls: true
+  license:
+    enabled: true
+  securityChecks:
+    enabled: true
 
 renovate:
   enabled: true
