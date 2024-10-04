@@ -17,10 +17,7 @@ issues:
     # Ref: https://go.dev/doc/effective_go#redeclaration
     - 'declaration of "err" shadows declaration at'
   exclude-dirs:
-    - vendor
-    - web/static
-    - web/templates
-    - pkg/api/ui
+    - pkg/api/ui/*
   exclude-rules:
     - path: _test\.go
       linters:
