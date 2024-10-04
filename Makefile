@@ -46,11 +46,12 @@ prepare-static-check: FORCE
 GO_BUILDFLAGS =
 GO_LDFLAGS =
 GO_TESTENV =
+GO_BUILDENV =
 
 build-all: build/maia
 
 build/maia: FORCE
-	go build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -o build/maia .
+	@env $(GO_BUILDENV) go build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -o build/maia .
 
 DESTDIR =
 ifeq ($(shell uname -s),Darwin)
@@ -65,6 +66,9 @@ install: FORCE build/maia
 
 # which packages to test with test runner
 GO_TESTPKGS := $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
+ifeq ($(GO_TESTPKGS),)
+GO_TESTPKGS := ./...
+endif
 # which packages to measure coverage for
 GO_COVERPKGS := $(shell go list ./...)
 # to get around weird Makefile syntax restrictions, we need variables containing nothing, a space and comma
@@ -98,11 +102,11 @@ tidy-deps: FORCE
 
 license-headers: FORCE prepare-static-check
 	@printf "\e[1;36m>> addlicense\e[0m\n"
-	@addlicense -c "SAP SE"  -- $(patsubst $(shell awk '$$1 == "module" {print $$2}' go.mod)%,.%/*.go,$(shell go list ./...))
+	@addlicense -c "SAP SE" -- $(patsubst $(shell awk '$$1 == "module" {print $$2}' go.mod)%,.%/*.go,$(shell go list ./...))
 
 check-license-headers: FORCE prepare-static-check
 	@printf "\e[1;36m>> addlicense --check\e[0m\n"
-	@addlicense --check  -- $(patsubst $(shell awk '$$1 == "module" {print $$2}' go.mod)%,.%/*.go,$(shell go list ./...))
+	@addlicense --check -- $(patsubst $(shell awk '$$1 == "module" {print $$2}' go.mod)%,.%/*.go,$(shell go list ./...))
 
 check-dependency-licenses: FORCE prepare-static-check
 	@printf "\e[1;36m>> go-licence-detector\e[0m\n"
@@ -113,6 +117,7 @@ clean: FORCE
 
 vars: FORCE
 	@printf "DESTDIR=$(DESTDIR)\n"
+	@printf "GO_BUILDENV=$(GO_BUILDENV)\n"
 	@printf "GO_BUILDFLAGS=$(GO_BUILDFLAGS)\n"
 	@printf "GO_COVERPKGS=$(GO_COVERPKGS)\n"
 	@printf "GO_LDFLAGS=$(GO_LDFLAGS)\n"
@@ -145,7 +150,7 @@ help: FORCE
 	@printf "\n"
 	@printf "\e[1mDevelopment\e[0m\n"
 	@printf "  \e[36mtidy-deps\e[0m                  Run go mod tidy and go mod verify.\n"
-	@printf "  \e[36mlicense-headers\e[0m            Add license headers to all non-vendored .go files.\n"
+	@printf "  \e[36mlicense-headers\e[0m            Add license headers to all non-vendored source code files.\n"
 	@printf "  \e[36mcheck-license-headers\e[0m      Check license headers in all non-vendored .go files.\n"
 	@printf "  \e[36mcheck-dependency-licenses\e[0m  Check all dependency licenses using go-licence-detector.\n"
 	@printf "  \e[36mclean\e[0m                      Run git clean.\n"
