@@ -17,10 +17,7 @@ dockerfile:
 golangciLint:
   createConfig: true
   skipDirs:
-    - vendor
-    - web/static
-    - web/templates
-    - pkg/api/ui
+    - pkg/api/ui/*
 
 githubWorkflow:
   ci:
