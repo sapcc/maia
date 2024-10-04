@@ -167,7 +167,7 @@ func TestChildProjects(t *testing.T) {
 	assertDone(t)
 }
 
-func TestAuthenticateRequest(t *testing.T) { //nolint:dupl // the tests being verbose i think is best. perhaps not
+func TestAuthenticateRequest(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
@@ -187,7 +187,7 @@ func TestAuthenticateRequest(t *testing.T) { //nolint:dupl // the tests being ve
 	assertDone(t)
 }
 
-func TestAuthenticateRequest_urlScope(t *testing.T) { //nolint:dupl // the tests being verbose i think is best. perhaps not
+func TestAuthenticateRequest_urlScope(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
