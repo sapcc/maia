@@ -2,7 +2,7 @@ module github.com/sapcc/maia
 
 go 1.22.0
 
-toolchain go1.22.8
+toolchain go1.23.2
 
 require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
