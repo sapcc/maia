@@ -2,11 +2,11 @@ module github.com/sapcc/maia
 
 go 1.22.0
 
-toolchain go1.22.8
+toolchain go1.23.2
 
 require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
-	github.com/gophercloud/gophercloud/v2 v2.1.1
+	github.com/gophercloud/gophercloud/v2 v2.2.0
 	github.com/gorilla/mux v1.8.1
 	github.com/h2non/gock v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
