@@ -2,23 +2,23 @@ module github.com/sapcc/maia
 
 go 1.22.0
 
-toolchain go1.23.2
+toolchain go1.23.4
 
 require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
-	github.com/gophercloud/gophercloud/v2 v2.2.0
+	github.com/gophercloud/gophercloud/v2 v2.3.0
 	github.com/gorilla/mux v1.8.1
 	github.com/h2non/gock v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.20.5
-	github.com/prometheus/common v0.60.1
-	github.com/prometheus/prometheus v0.55.0
+	github.com/prometheus/common v0.61.0
+	github.com/prometheus/prometheus v0.300.1
 	github.com/rs/cors v1.11.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+	golang.org/x/exp b2144cdd0a67
 )
 
 require (
