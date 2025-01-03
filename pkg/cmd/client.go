@@ -402,7 +402,7 @@ func printQueryResultAsTable(body []byte) {
 
 	switch valueObject.Type() {
 	case model.ValMatrix:
-		matrix := valueObject.(model.Matrix) //nolint:errcheck
+		matrix := valueObject.(model.Matrix)
 		tsSet := map[string]bool{}
 		// if no columns have been specified by user then collect them all
 		set := buildColumnSet(matrix)
@@ -426,7 +426,7 @@ func printQueryResultAsTable(body []byte) {
 		}
 		allColumns = append(allColumns, makeColumns(tsSet)...)
 	case model.ValVector:
-		matrix := valueObject.(model.Vector) //nolint:errcheck
+		matrix := valueObject.(model.Vector)
 		set := buildColumnSet(matrix)
 		for _, el := range matrix {
 			collectKeys(set, model.LabelSet(el.Metric))
@@ -446,7 +446,7 @@ func printQueryResultAsTable(body []byte) {
 		}
 		allColumns = append(allColumns, []string{timestampKey, valueKey}...)
 	case model.ValScalar:
-		scalarValue := valueObject.(*model.Scalar) //nolint:errcheck
+		scalarValue := valueObject.(*model.Scalar)
 		allColumns = []string{timestampKey, valueKey}
 		rows = []map[string]string{{timestampKey: scalarValue.Timestamp.Time().In(tzLocation).Format(time.RFC3339Nano), valueKey: scalarValue.String()}}
 	}
