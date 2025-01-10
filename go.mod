@@ -2,8 +2,6 @@ module github.com/sapcc/maia
 
 go 1.23
 
-toolchain go1.23.2
-
 require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
 	github.com/gophercloud/gophercloud/v2 v2.2.0
