@@ -40,7 +40,7 @@ linters-settings:
     # We disable this because it makes a ton of useless noise esp. in test code.
     check-type-assertions: false
   forbidigo:
-    #analyze-types: true # required for pkg:
+    analyze-types: true # required for pkg:
     forbid:
       # ioutil package has been deprecated: https://github.com/golang/go/issues/42026
       - ^ioutil\..*$
