@@ -16,11 +16,11 @@ package util
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
-	"golang.org/x/exp/slices"
 )
 
 // AddLabelConstraintToExpression enhances a PromQL expression to limit it to series matching a certain label.

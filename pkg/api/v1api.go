@@ -153,7 +153,7 @@ func (p *v1Provider) LabelValues(w http.ResponseWriter, req *http.Request) {
 		ReturnPromError(w, err, http.StatusInternalServerError)
 		return
 	}
-	matrix := sr.Data.Value.(model.Matrix) //nolint:errcheck
+	matrix := sr.Data.Value.(model.Matrix)
 
 	// take just the label values from the query result
 	var result storage.LabelValuesResponse
