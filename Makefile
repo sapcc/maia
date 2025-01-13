@@ -24,6 +24,7 @@ endif
 build/maia: generate
 build-all: generate
 static-check: generate
+prepare-static-check: generate
 build/cover.out: generate
 
 generate: FORCE
