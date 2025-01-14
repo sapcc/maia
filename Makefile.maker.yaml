@@ -21,6 +21,7 @@ githubWorkflow:
   ci:
     enabled: true
     coveralls: true
+    prepareMakeTarget: generate
 
 renovate:
   enabled: true
