@@ -22,9 +22,7 @@ ifdef DEBUG
 endif
 
 build/maia: generate
-build-all: generate
 static-check: generate
-build/cover.out: generate
 
 generate: FORCE
 	if ! hash mockgen 2>/dev/null; then go install go.uber.org/mock/mockgen@latest; fi
