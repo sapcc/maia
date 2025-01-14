@@ -8,10 +8,12 @@ with pkgs;
 mkShell {
   nativeBuildInputs = [
     addlicense
+    go-bindata
     go-licence-detector
     go_1_23
     golangci-lint
     gotools # goimports
+    mockgen
 
     # keep this line if you use bash
     bashInteractive

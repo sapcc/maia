@@ -23,6 +23,11 @@ githubWorkflow:
     coveralls: true
     prepareMakeTarget: generate
 
+nix:
+  extraPackages:
+    - go-bindata
+    - mockgen
+
 renovate:
   enabled: true
   assignees:
