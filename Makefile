@@ -58,7 +58,7 @@ GO_BUILDENV =
 build-all: build/maia
 
 build/maia: FORCE
-	@env $(GO_BUILDENV) go build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -o build/maia .
+	env $(GO_BUILDENV) go build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -o build/maia .
 
 DESTDIR =
 ifeq ($(shell uname -s),Darwin)
