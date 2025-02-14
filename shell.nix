@@ -10,7 +10,7 @@ mkShell {
     addlicense
     go-bindata
     go-licence-detector
-    go_1_23
+    go_1_24
     golangci-lint
     gotools # goimports
     mockgen
