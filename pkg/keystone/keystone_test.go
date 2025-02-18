@@ -15,7 +15,6 @@
 package keystone
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -154,7 +153,7 @@ func TestChildProjects(t *testing.T) {
 
 	ks := setupTest()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	gock.New(baseURL).Get("/v3/projects").MatchParams(map[string]string{"enabled": "true", "parent_id": "p00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/child_projects.json").AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/projects").MatchParams(map[string]string{"enabled": "true", "parent_id": "p00002"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).BodyString("{ \"projects\": [] }").AddHeader("Content-Type", "application/json")
@@ -172,7 +171,7 @@ func TestAuthenticateRequest(t *testing.T) {
 
 	ks := setupTest()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
@@ -191,7 +190,7 @@ func TestAuthenticateRequest_urlScope(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthScopeBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
@@ -210,7 +209,7 @@ func TestAuthenticateRequest_token(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
@@ -228,7 +227,7 @@ func TestAuthenticateRequest_failed(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	gock.New(baseURL).Post("/v3/auth/tokens").Reply(http.StatusForbidden)
 
@@ -245,7 +244,7 @@ func TestAuthenticateRequest_failedNoScope(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", http.NoBody)
 	req.SetBasicAuth("testuser@testdomain", "testpw")
@@ -260,7 +259,7 @@ func TestAuthenticateRequest_guessScope(t *testing.T) {
 	defer gock.Off()
 
 	ks := setupTest()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	gock.New(baseURL).Get("/v3/users").MatchParams(map[string]string{"domain_id": "d00001", "enabled": "true", "name": "testuser"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser.json").AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/role_assignments").MatchParams(map[string]string{"effective": "true", "user.id": "u00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser_roles.json").AddHeader("Content-Type", "application/json")
