@@ -22,6 +22,7 @@ package api
 import (
 	"encoding/base64"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"errors"
@@ -30,6 +31,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/tokens"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
 	"github.com/sapcc/maia/pkg/keystone"
@@ -58,7 +60,7 @@ var domainHeader = map[string]string{"X-User-Id": domainContext.Auth["user_id"],
 	"X-User-Domain-Name": domainContext.Auth["user_domain_name"],
 	"X-Domain-Id":        domainContext.Auth["domain_id"], "X-Domain-Name": domainContext.Auth["domain_name"]}
 
-func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler, keystoneDriver *keystone.MockDriver, storageDriver *storage.MockDriver) { //nolint:unparam
+func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler, keystoneDriver *keystone.MockDriver, storageDriver *storage.MockDriver) {
 	// load test policy (where everything is allowed)
 	viper.Set("keystone.policy_file", "../test/policy.json")
 	viper.Set("maia.label_value_ttl", "72h")
@@ -68,7 +70,9 @@ func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler
 	storageDriver = storage.NewMockDriver(controller)
 
 	prometheus.DefaultRegisterer = prometheus.NewPedanticRegistry()
-	router = setupRouter(keystoneDriver, storageDriver)
+	
+	// Pass nil as globalKeystoneDriver for tests that don't need it
+	router = setupRouter(keystoneDriver, nil, storageDriver)
 
 	return router, keystoneDriver, storageDriver
 }
@@ -379,4 +383,48 @@ func TestGraph_otherOSDomain(t *testing.T) {
 		Path:             "/nottestdomain/graph?project_id=" + projectContext.Auth["project_id"],
 		ExpectStatusCode: http.StatusUnauthorized,
 	}.Check(t, router)
+}
+
+func TestGetKeystoneForRequest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mock keystones
+	regularKeystone := keystone.NewMockDriver(ctrl)
+	globalKeystone := keystone.NewMockDriver(ctrl)
+
+	// Set global instance for testing
+	keystoneInstance = regularKeystone
+	globalKeystoneInstance = globalKeystone
+
+	// Test cases
+	testCases := []struct {
+		name           string
+		globalParam    string
+		globalHeader   string
+		expectedDriver keystone.Driver
+	}{
+		{"Regular request", "", "", regularKeystone},
+		{"Global param true", "true", "", globalKeystone},
+		{"Global header true", "", "true", globalKeystone},
+		{"Both param and header", "true", "true", globalKeystone},
+		{"Param false", "false", "", regularKeystone},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+			if tc.globalParam != "" {
+				q := req.URL.Query()
+				q.Add("global", tc.globalParam)
+				req.URL.RawQuery = q.Encode()
+			}
+			if tc.globalHeader != "" {
+				req.Header.Set("X-Global-Region", tc.globalHeader)
+			}
+
+			result := getKeystoneForRequest(req)
+			assert.Equal(t, tc.expectedDriver, result)
+		})
+	}
 }
