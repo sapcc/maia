@@ -44,6 +44,7 @@ import (
 
 var storageInstance storage.Driver
 var keystoneInstance keystone.Driver
+var globalKeystoneInstance keystone.Driver
 
 // Server initializes and starts the API server, hooking it up to the API router
 func Server(ctx context.Context) error {
@@ -122,6 +123,15 @@ func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
 	domain = url.PathEscape(domain)
 
 	newPath := "/" + domain + "/graph"
+
+	// Preserve global parameter if present
+	if r.URL.Query().Get("global") == "true" {
+		if strings.Contains(newPath, "?") {
+			newPath += "&global=true"
+		} else {
+			newPath += "?global=true"
+		}
+	}
 	if r.URL.RawQuery != "" {
 		newPath += "?" + r.URL.RawQuery // keep the query part since this is where the token might go
 	}
@@ -139,6 +149,26 @@ func redirectToRootPage(w http.ResponseWriter, r *http.Request) {
 		util.LogDebug("Username contains domain info. Redirecting to domain %s", domain)
 	}
 	newPath := "/" + domain + "/graph"
+
+	// Preserve global parameter if present
+	if r.URL.Query().Get("global") == "true" {
+		if strings.Contains(newPath, "?") {
+			newPath += "&global=true"
+		} else {
+			newPath += "?global=true"
+		}
+	}
+
+	// Add other query parameters
+	if r.URL.RawQuery != "" && !strings.Contains(newPath, "?"+r.URL.RawQuery) &&
+		!strings.Contains(newPath, "&"+r.URL.RawQuery) {
+		if strings.Contains(newPath, "?") {
+			newPath += "&" + r.URL.RawQuery
+		} else {
+			newPath += "?" + r.URL.RawQuery
+		}
+	}
+
 	util.LogDebug("Redirecting to %s", newPath)
 	http.Redirect(w, r, newPath, http.StatusFound)
 }
@@ -172,7 +202,10 @@ func serveStaticContent(w http.ResponseWriter, req *http.Request) {
 
 // Federate handles GET /federate.
 func Federate(w http.ResponseWriter, req *http.Request) {
-	selectors, err := buildSelectors(req, keystoneInstance)
+	// Get appropriate keystone for this request
+	ks := getKeystoneForRequest(req)
+
+	selectors, err := buildSelectors(req, ks)
 	if err != nil {
 		util.LogInfo("Invalid request params %s", req.URL)
 		ReturnPromError(w, err, http.StatusBadRequest)
@@ -191,5 +224,6 @@ func Federate(w http.ResponseWriter, req *http.Request) {
 
 // graph returns the Prometheus UI page
 func graph(w http.ResponseWriter, req *http.Request) {
-	ui.ExecuteTemplate(w, req, "graph.html", keystoneInstance, nil)
+	ks := getKeystoneForRequest(req)
+	ui.ExecuteTemplate(w, req, "graph.html", ks, nil)
 }
