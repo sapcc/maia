@@ -53,15 +53,26 @@ func Server(ctx context.Context) error {
 		panic(errors.New("prometheus endpoint not configured (maia.prometheus_url / MAIA_PROMETHEUS_URL)"))
 	}
 
-	// the main router dispatches all incoming requests
-	mainRouter := setupRouter(keystone.NewKeystoneDriver(), storage.NewPrometheusDriver(prometheusAPIURL, map[string]string{}))
+	// Initialize regular keystone driver
+	keystoneDriver := keystone.NewKeystoneDriver()
+
+	// Initialize global keystone if configured
+	var globalKeystone keystone.Driver
+	if viper.IsSet("keystone.global.auth_url") {
+		util.LogInfo("Initializing global Keystone connection to %s", viper.GetString("keystone.global.auth_url"))
+		globalKeystone = keystone.NewKeystoneDriverWithSection("global")
+		globalKeystoneInstance = globalKeystone
+	}
+
+	// The main router dispatches all incoming requests
+	mainRouter := setupRouter(keystoneDriver, globalKeystone, storage.NewPrometheusDriver(prometheusAPIURL, map[string]string{}))
 
 	bindAddress := viper.GetString("maia.bind_address")
 	util.LogInfo("listening on %s", bindAddress)
 
 	// enable CORS
 	c := cors.New(cors.Options{
-		AllowedHeaders: []string{"X-Auth-Token"},
+		AllowedHeaders: []string{"X-Auth-Token", "X-Global-Region"},
 	})
 	handler := c.Handler(mainRouter)
 
@@ -70,9 +81,10 @@ func Server(ctx context.Context) error {
 }
 
 // setupRouter initializes the main http router
-func setupRouter(keystoneDriver keystone.Driver, storageDriver storage.Driver) http.Handler {
+func setupRouter(keystoneDriver, globalKeystoneDriver keystone.Driver, storageDriver storage.Driver) http.Handler {
 	storageInstance = storageDriver
 	keystoneInstance = keystoneDriver
+	globalKeystoneInstance = globalKeystoneDriver
 
 	mainRouter := mux.NewRouter()
 	mainRouter.Methods(http.MethodGet).Path("/").HandlerFunc(redirectToRootPage)

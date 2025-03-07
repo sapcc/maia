@@ -60,7 +60,7 @@ var domainHeader = map[string]string{"X-User-Id": domainContext.Auth["user_id"],
 	"X-User-Domain-Name": domainContext.Auth["user_domain_name"],
 	"X-Domain-Id":        domainContext.Auth["domain_id"], "X-Domain-Name": domainContext.Auth["domain_name"]}
 
-func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler, keystoneDriver *keystone.MockDriver, storageDriver *storage.MockDriver) {
+func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler, keystoneDriver *keystone.MockDriver, storageDriver *storage.MockDriver) { //nolint:unparam
 	// load test policy (where everything is allowed)
 	viper.Set("keystone.policy_file", "../test/policy.json")
 	viper.Set("maia.label_value_ttl", "72h")
@@ -70,7 +70,7 @@ func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler
 	storageDriver = storage.NewMockDriver(controller)
 
 	prometheus.DefaultRegisterer = prometheus.NewPedanticRegistry()
-	
+
 	// Pass nil as globalKeystoneDriver for tests that don't need it
 	router = setupRouter(keystoneDriver, nil, storageDriver)
 
