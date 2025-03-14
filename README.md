@@ -14,6 +14,12 @@ If you don't use OpenStack, you can still use Maia CLI as a feature-complete she
 
 ## Features
 
+- Multi-tenant Prometheus API offering isolation and resource restriction
+- Supports both project and domain-based authentication from OpenStack
+- **Global region support** for virtual region metric queries using global keystone authentication
+- Fetches required service endpoints from Keystone service catalog
+- JSON Web Token validation for the OpenStack Elektra UI
+
 [Maia Service](docs/operators-guide.md)
 * OpenStack Identity v3 authentication and authorization
 * Project- and domain-level access control (scoping)

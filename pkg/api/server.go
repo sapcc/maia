@@ -25,11 +25,11 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"bytes"
 	"io"
 	"path/filepath"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -127,29 +127,30 @@ var validDomain = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 func redirectToDomainRootPage(w http.ResponseWriter, r *http.Request) {
 	domain, ok := mux.Vars(r)["domain"]
 	if !ok || !validDomain.MatchString(domain) {
+		util.LogDebug("Invalid domain: %s", domain)
 		redirectToRootPage(w, r)
 		return
+	}
+
+	// Preserve existing query parameters
+	q := r.URL.Query()
+
+	// Check if global flag is set in header but not in query params
+	if r.Header.Get("X-Global-Region") == "true" && q.Get("global") == "" {
+		q.Set("global", "true")
 	}
 
 	// Encode domain to prevent any potential attacks
 	domain = url.PathEscape(domain)
 
-	newPath := "/" + domain + "/graph"
-
-	// Preserve global parameter if present
-	if r.URL.Query().Get("global") == "true" {
-		if strings.Contains(newPath, "?") {
-			newPath += "&global=true"
-		} else {
-			newPath += "?global=true"
-		}
-	}
-	if r.URL.RawQuery != "" {
-		newPath += "?" + r.URL.RawQuery // keep the query part since this is where the token might go
+	// Construct redirect URL with preserved query parameters
+	target := "//" + r.Host + "/" + domain + "/graph"
+	if len(q) > 0 {
+		target += "?" + q.Encode()
 	}
 
-	util.LogDebug("Redirecting %s to %s", r.URL.Path, newPath)
-	http.Redirect(w, r, newPath, http.StatusFound)
+	util.LogDebug("Redirecting %s to %s", r.URL.Path, target)
+	http.Redirect(w, r, target, http.StatusFound)
 }
 
 // redirectToRootPage will redirect users to the global start page
@@ -160,29 +161,23 @@ func redirectToRootPage(w http.ResponseWriter, r *http.Request) {
 		domain = strings.Split(username, "@")[1]
 		util.LogDebug("Username contains domain info. Redirecting to domain %s", domain)
 	}
-	newPath := "/" + domain + "/graph"
 
-	// Preserve global parameter if present
-	if r.URL.Query().Get("global") == "true" {
-		if strings.Contains(newPath, "?") {
-			newPath += "&global=true"
-		} else {
-			newPath += "?global=true"
-		}
+	// Preserve existing query parameters
+	q := r.URL.Query()
+
+	// Check if global flag is set in header but not in query params
+	if r.Header.Get("X-Global-Region") == "true" && q.Get("global") == "" {
+		q.Set("global", "true")
 	}
 
-	// Add other query parameters
-	if r.URL.RawQuery != "" && !strings.Contains(newPath, "?"+r.URL.RawQuery) &&
-		!strings.Contains(newPath, "&"+r.URL.RawQuery) {
-		if strings.Contains(newPath, "?") {
-			newPath += "&" + r.URL.RawQuery
-		} else {
-			newPath += "?" + r.URL.RawQuery
-		}
+	// Construct redirect URL with preserved query parameters
+	target := "//" + r.Host + "/" + domain + "/graph"
+	if len(q) > 0 {
+		target += "?" + q.Encode()
 	}
 
-	util.LogDebug("Redirecting to %s", newPath)
-	http.Redirect(w, r, newPath, http.StatusFound)
+	util.LogDebug("Redirecting to %s", target)
+	http.Redirect(w, r, target, http.StatusFound)
 }
 
 // serveStaticContent serves all the static assets of the web UI (pages, js, images)

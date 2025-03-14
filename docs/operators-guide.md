@@ -137,6 +137,32 @@ this amount can be changed:
 token_cache_time = "3600s"
 ```
 
+## Global Keystone Configuration
+
+Maia supports virtual region querying via a global keystone instance. This allows users to authenticate once and query metrics for a virtual global region.
+
+### Configuration
+
+To enable global keystone support, add the following to your configuration file:
+
+```yaml
+keystone:
+  auth_url: https://identity-3.example.com/v3
+  username: maia
+  password: secret
+  user_domain_name: Default
+  project_name: service
+  project_domain_name: Default
+  
+global_keystone:
+  auth_url: https://global-identity.example.com/v3
+  username: maia-global
+  password: global-secret
+  user_domain_name: Default
+  project_name: service
+  project_domain_name: Default
+```
+
 ## Starting the Service
 
 Once you have finalized the configuration file, you are set to go
