@@ -22,6 +22,7 @@ package api
 import (
 	"encoding/base64"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"errors"
@@ -30,6 +31,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/tokens"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
 	"github.com/sapcc/maia/pkg/keystone"
@@ -68,7 +70,9 @@ func setupTest(t *testing.T, controller *gomock.Controller) (router http.Handler
 	storageDriver = storage.NewMockDriver(controller)
 
 	prometheus.DefaultRegisterer = prometheus.NewPedanticRegistry()
-	router = setupRouter(keystoneDriver, storageDriver)
+
+	// Pass nil as globalKeystoneDriver for tests that don't need it
+	router = setupRouter(keystoneDriver, nil, storageDriver)
 
 	return router, keystoneDriver, storageDriver
 }
@@ -379,4 +383,192 @@ func TestGraph_otherOSDomain(t *testing.T) {
 		Path:             "/nottestdomain/graph?project_id=" + projectContext.Auth["project_id"],
 		ExpectStatusCode: http.StatusUnauthorized,
 	}.Check(t, router)
+}
+
+func TestGetKeystoneForRequest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mock keystones
+	regularKeystone := keystone.NewMockDriver(ctrl)
+	globalKeystone := keystone.NewMockDriver(ctrl)
+
+	// Set global instance for testing
+	keystoneInstance = regularKeystone
+	globalKeystoneInstance = globalKeystone
+
+	// Test cases
+	testCases := []struct {
+		name           string
+		globalParam    string
+		globalHeader   string
+		expectedDriver keystone.Driver
+	}{
+		{"Regular request", "", "", regularKeystone},
+		{"Global param true", "true", "", globalKeystone},
+		{"Global header true", "", "true", globalKeystone},
+		{"Both param and header", "true", "true", globalKeystone},
+		{"Param false", "false", "", regularKeystone},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+			if tc.globalParam != "" {
+				q := req.URL.Query()
+				q.Add("global", tc.globalParam)
+				req.URL.RawQuery = q.Encode()
+			}
+			if tc.globalHeader != "" {
+				req.Header.Set("X-Global-Region", tc.globalHeader)
+			}
+
+			result := getKeystoneForRequest(req)
+			assert.Equal(t, tc.expectedDriver, result)
+		})
+	}
+}
+
+func TestGlobalKeystoneRouting(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Set policy file path - this is crucial
+	viper.Set("keystone.policy_file", "../test/policy.json")
+	viper.Set("maia.label_value_ttl", "72h")
+
+	// Create mock keystones
+	regularKeystone := keystone.NewMockDriver(ctrl)
+	globalKeystone := keystone.NewMockDriver(ctrl)
+
+	// Save original instances
+	originalKeystone := keystoneInstance
+	originalGlobalKeystone := globalKeystoneInstance
+
+	// Set global instances for testing
+	keystoneInstance = regularKeystone
+	globalKeystoneInstance = globalKeystone
+
+	// Restore original instances after test
+	defer func() {
+		keystoneInstance = originalKeystone
+		globalKeystoneInstance = originalGlobalKeystone
+	}()
+
+	// Setup storage mock
+	storageMock := storage.NewMockDriver(ctrl)
+
+	// Reset prometheus registry to avoid conflicts
+	prometheus.DefaultRegisterer = prometheus.NewPedanticRegistry()
+
+	// Setup router with both keystones
+	router := setupRouter(regularKeystone, globalKeystone, storageMock)
+
+	// Test cases
+	testCases := []struct {
+		name           string
+		path           string
+		globalParam    string
+		globalHeader   string
+		expectedDriver *keystone.MockDriver
+	}{
+		{"Regular request", "/api/v1/query", "", "", regularKeystone},
+		{"Global param request", "/api/v1/query", "true", "", globalKeystone},
+		{"Global header request", "/api/v1/query", "", "true", globalKeystone},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create request with appropriate global params/headers
+			url := tc.path
+			if tc.globalParam != "" {
+				url += "?global=" + tc.globalParam
+			}
+			req := httptest.NewRequest(http.MethodGet, url, http.NoBody)
+			if tc.globalHeader != "" {
+				req.Header.Set("X-Global-Region", tc.globalHeader)
+			}
+
+			// Set appropriate expectations on the expected driver
+			tc.expectedDriver.EXPECT().AuthenticateRequest(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(&policy.Context{}, nil)
+
+			// Execute request
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, req)
+		})
+	}
+}
+
+func TestRedirectPreservesGlobalFlag(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Save original instances
+	originalKeystone := keystoneInstance
+	originalGlobalKeystone := globalKeystoneInstance
+
+	// Create mock keystones
+	regularKeystone := keystone.NewMockDriver(ctrl)
+	globalKeystone := keystone.NewMockDriver(ctrl)
+
+	// Set keystones
+	keystoneInstance = regularKeystone
+	globalKeystoneInstance = globalKeystone
+
+	// Restore original instances after test
+	defer func() {
+		keystoneInstance = originalKeystone
+		globalKeystoneInstance = originalGlobalKeystone
+	}()
+
+	// Set policy file path - this is crucial
+	viper.Set("keystone.policy_file", "../test/policy.json")
+	viper.Set("maia.label_value_ttl", "72h")
+
+	// Setup storage mock
+	storageMock := storage.NewMockDriver(ctrl)
+
+	// Reset prometheus registry to avoid conflicts
+	prometheus.DefaultRegisterer = prometheus.NewPedanticRegistry()
+
+	// Setup router with both keystones
+	router := setupRouter(regularKeystone, globalKeystone, storageMock)
+
+	// Test case: redirect with global param preserves the param
+	t.Run("Redirect preserves global param", func(t *testing.T) {
+		// Create request with global parameter
+		req := httptest.NewRequest(http.MethodGet, "/graph?global=true", http.NoBody)
+
+		// Execute request
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+
+		// Check status code
+		resp := recorder.Result()
+		assert.Equal(t, http.StatusFound, resp.StatusCode, "Expected redirect")
+
+		// Check Location header contains global parameter
+		location := resp.Header.Get("Location")
+		assert.Contains(t, location, "global=true", "Redirect should preserve global flag")
+	})
+
+	// Test case: redirect with global header adds global param
+	t.Run("Redirect with global header", func(t *testing.T) {
+		// Create request with global header
+		req := httptest.NewRequest(http.MethodGet, "/graph", http.NoBody)
+		req.Header.Set("X-Global-Region", "true")
+
+		// Execute request
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+
+		// Check status code
+		resp := recorder.Result()
+		assert.Equal(t, http.StatusFound, resp.StatusCode, "Expected redirect")
+
+		// Check Location header contains global parameter
+		location := resp.Header.Get("Location")
+		assert.Contains(t, location, "global=true", "Redirect should add global flag from header")
+	})
 }
