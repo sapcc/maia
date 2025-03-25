@@ -491,11 +491,13 @@ func authentication(tokenid, authtype, username, userid, password, appcredid, ap
 		TokenID:                     tokenid,
 		Scope:                       scope}
 	expectedAuth := auth
-	if authtype == "v3applicationcredential" {
+
+	switch authtype {
+	case "v3applicationcredential":
 		expectedAuth.Scope = nil
 		expectedAuth.TokenID = ""
 		expectedAuth.Password = ""
-	} else if authtype == "token" {
+	case "token":
 		expectedAuth.Username = ""
 		expectedAuth.UserID = ""
 		expectedAuth.Password = ""
