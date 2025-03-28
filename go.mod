@@ -3,7 +3,7 @@ module github.com/sapcc/maia
 go 1.24
 
 require (
-	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
+	github.com/databus23/goslo.policy v0.0.0-20250326134918-4afc2c56a903
 	github.com/gophercloud/gophercloud/v2 v2.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/h2non/gock v1.2.0
@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/prometheus v0.302.1
 	github.com/rs/cors v1.11.1
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/viper v1.20.0
+	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
 )
