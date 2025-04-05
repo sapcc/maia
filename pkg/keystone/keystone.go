@@ -55,6 +55,15 @@ func Keystone() Driver {
 	return &ks
 }
 
+// KeystoneWithSection creates a keystone driver with a specific config section
+func KeystoneWithSection(configSection string) Driver {
+	ks := keystone{
+		configSection: configSection,
+	}
+	ks.init()
+	return &ks
+}
+
 type keystone struct {
 	// these locks are used to make sure the connection or token is not altered while somebody is working on it
 	serviceConnMutex, serviceTokenMutex *sync.Mutex
@@ -68,6 +77,8 @@ type keystone struct {
 	domainNames map[string]string
 	// domain-name --> domain-id
 	domainIDs map[string]string
+	// Configuration section for viper keys
+	configSection string
 }
 
 func (d *keystone) init() {
@@ -95,8 +106,13 @@ func (d *keystone) serviceKeystoneClient(ctx context.Context) (*gophercloud.Serv
 	defer d.serviceConnMutex.Unlock()
 
 	if d.providerClient == nil {
-		util.LogInfo("Setting up identity connection to %s", viper.GetString("keystone.auth_url"))
-		client, err := newKeystoneClient(ctx, authOptionsFromConfig())
+		section := "keystone"
+		if d.configSection != "" {
+			section = "keystone." + d.configSection
+		}
+
+		util.LogInfo("Setting up identity connection to %s", viper.GetString(section+".auth_url"))
+		client, err := newKeystoneClient(ctx, d.authOptionsFromConfig())
 		if err != nil {
 			return nil, err
 		}
@@ -270,17 +286,22 @@ func (d *keystone) loadDomainsAndRoles(ctx context.Context) {
 }
 
 // authOptionsFromConfig builds the AuthOptions struct for the service user from the configuration
-func authOptionsFromConfig() gophercloud.AuthOptions {
+func (d *keystone) authOptionsFromConfig() gophercloud.AuthOptions {
+	section := "keystone"
+	if d.configSection != "" {
+		section = "keystone." + d.configSection
+	}
+
 	return gophercloud.AuthOptions{
-		IdentityEndpoint: viper.GetString("keystone.auth_url"),
-		TokenID:          viper.GetString("keystone.token"),
-		Username:         viper.GetString("keystone.username"),
-		Password:         viper.GetString("keystone.password"),
-		DomainName:       viper.GetString("keystone.user_domain_name"),
+		IdentityEndpoint: viper.GetString(section + ".auth_url"),
+		TokenID:          viper.GetString(section + ".token"),
+		Username:         viper.GetString(section + ".username"),
+		Password:         viper.GetString(section + ".password"),
+		DomainName:       viper.GetString(section + ".user_domain_name"),
 		AllowReauth:      true,
 		Scope: &gophercloud.AuthScope{
-			ProjectName: viper.GetString("keystone.project_name"),
-			DomainName:  viper.GetString("keystone.project_domain_name"),
+			ProjectName: viper.GetString(section + ".project_name"),
+			DomainName:  viper.GetString(section + ".project_domain_name"),
 		},
 	}
 }

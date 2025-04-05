@@ -223,7 +223,7 @@ func isPlainBasicAuth(req *http.Request) bool {
 	return false
 }
 
-func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, rules []string) bool {
+func authorizeRules(keystoneDriver keystone.Driver, w http.ResponseWriter, req *http.Request, guessScope bool, rules []string) bool {
 	util.LogDebug("authenticate")
 	matchedRules := []string{}
 
@@ -253,7 +253,7 @@ func authorizeRules(w http.ResponseWriter, req *http.Request, guessScope bool, r
 
 	// 2. authenticate
 	ctx := req.Context()
-	policyContext, err := keystoneInstance.AuthenticateRequest(ctx, req, guessScope)
+	policyContext, err := keystoneDriver.AuthenticateRequest(ctx, req, guessScope)
 	if err != nil {
 		code := err.StatusCode()
 		httpCode := http.StatusUnauthorized
@@ -334,6 +334,7 @@ func requestReauthentication(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{Name: authTokenCookieName, Path: "/", Value: "", MaxAge: -1, Secure: false})
 	w.Header().Set("WWW-Authenticate", "Basic")
 }
+
 func setAuthCookies(req *http.Request, w http.ResponseWriter) {
 	token := req.Header.Get(authTokenHeader)
 	if token == "" {
@@ -356,12 +357,27 @@ func setAuthCookies(req *http.Request, w http.ResponseWriter) {
 		MaxAge: 60 * 60 * 24, Secure: false})
 }
 
-func authorize(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request), guessScope bool, rule string) func(w http.ResponseWriter, req *http.Request) {
+func authorize(wrappedHandlerFunc func(w http.ResponseWriter, req *http.Request),
+	guessScope bool, rule string) func(w http.ResponseWriter, req *http.Request) {
+
 	return func(w http.ResponseWriter, req *http.Request) {
-		if authorizeRules(w, req, guessScope, []string{rule}) {
+		ks := getKeystoneForRequest(req)
+		if authorizeRules(ks, w, req, guessScope, []string{rule}) {
 			wrappedHandlerFunc(w, req)
 		}
 	}
+}
+
+// getKeystoneForRequest returns the keystone driver instance to use for the given request
+func getKeystoneForRequest(r *http.Request) keystone.Driver {
+	// Check if this is a global region request
+	if (r.URL.Query().Get("global") == "true" ||
+		r.Header.Get("X-Global-Region") == "true") &&
+		globalKeystoneInstance != nil {
+		util.LogDebug("Using global keystone for request")
+		return globalKeystoneInstance
+	}
+	return keystoneInstance
 }
 
 func gaugeInflight(handler http.Handler) http.Handler {

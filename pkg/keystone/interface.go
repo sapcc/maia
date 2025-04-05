@@ -107,3 +107,14 @@ func NewKeystoneDriver() Driver {
 		panic(fmt.Errorf("couldn't match a keystone driver for configured value \"%s\"", driverName))
 	}
 }
+
+// NewKeystoneDriverWithSection creates a keystone driver using a specific configuration section
+func NewKeystoneDriverWithSection(configSection string) Driver {
+	driverName := viper.GetString("maia.auth_driver")
+	switch driverName {
+	case "keystone":
+		return KeystoneWithSection(configSection)
+	default:
+		panic(fmt.Errorf("couldn't match a keystone driver for configured value \"%s\"", driverName))
+	}
+}
