@@ -33,7 +33,7 @@ jobs:
       - name: Run prepare make target
         run: make generate
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
       - name: Dependency Licenses Review
