@@ -20,6 +20,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -51,6 +52,28 @@ func NewV1Handler(keystoneDriver keystone.Driver, storageDriver storage.Driver) 
 		keystone: keystoneDriver,
 		storage:  storageDriver,
 	}
+
+	// Update to wrap handlers with middleware that selects the appropriate keystone
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// Get appropriate keystone for this request
+			ks := getKeystoneForRequest(req)
+
+			// Create provider with selected keystone
+			provider := &v1Provider{
+				keystone: ks,
+				storage:  storageDriver,
+			}
+
+			// Store in request context
+			type contextKey string
+			const providerKey contextKey = "provider"
+
+			// Use the custom typed key instead of string literal
+			ctx := context.WithValue(req.Context(), providerKey, provider)
+			next.ServeHTTP(w, req.WithContext(ctx))
+		})
+	})
 
 	// tenant-aware query
 	r.Methods(http.MethodGet).Path("/query").HandlerFunc(authorize(
