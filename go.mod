@@ -10,12 +10,12 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/common v0.63.0
-	github.com/prometheus/prometheus v0.303.0
+	github.com/prometheus/prometheus v0.303.1
 	github.com/rs/cors v1.11.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
-	go.uber.org/mock v0.5.1
+	go.uber.org/mock v0.5.2
 )
 
 require (
