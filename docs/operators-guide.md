@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Maia Operators Guide
 
 This guide describes how to set-up Maia as an OpenStack service and connect it to a Prometheus TSDB.

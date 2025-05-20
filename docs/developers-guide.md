@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Maia Developer Guide
 
 Maia is a multi-tenant OpenStack-service for accessing metrics and alarms collected through Prometheus. It offers
