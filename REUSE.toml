@@ -18,3 +18,31 @@ path = [
 ]
 SPDX-FileCopyrightText = "SAP SE or an SAP affiliate company"
 SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [
+  "build/*.txt",
+  "etc/*.conf",
+  "etc/*.json",
+  "pkg/*/fixtures/*.json",
+  "pkg/*/fixtures/*.txt",
+  "pkg/test/*.json",
+  "docs/*.png",
+  "docs/*.svg",
+  "web/static/vendor/bootstrap-3.3.1/css/*.css",
+  "web/static/vendor/bootstrap-3.3.1/css/*.map",
+  "web/static/vendor/bootstrap-3.3.1/fonts/*.eot",
+  "web/static/vendor/bootstrap-3.3.1/fonts/*.svg",
+  "web/static/vendor/bootstrap-3.3.1/fonts/*.ttf",
+  "web/static/vendor/bootstrap-3.3.1/fonts/*.woff",
+  "web/static/vendor/bootstrap-3.3.1/js/*.js",
+  "web/static/vendor/eonasdan-bootstrap-datetimepicker/bootstrap-datetimepicker.min.js",
+  "web/static/vendor/eonasdan-bootstrap-datetimepicker/bootstrap-datetimepicker.min.css",
+  "web/static/vendor/**/*.js",
+  "web/static/js/graph_template.handlebar",
+  "web/static/vendor/rickshaw/*.css",
+  "web/static/img/*.gif",
+  "web/static/img/*.ico",
+]
+SPDX-FileCopyrightText = "SAP SE or an SAP affiliate company"
+SPDX-License-Identifier = "Apache-2.0"
