@@ -56,6 +56,8 @@ reuse:
       - web/static/vendor/**/*.js
       - web/static/js/graph_template.handlebar
       - web/static/vendor/rickshaw/*.css
+      - web/static/img/*.gif 
+      - web/static/img/*.ico
       SPDX-FileCopyrightText: SAP SE or an SAP affiliate company
       SPDX-License-Identifier: Apache-2.0
 
