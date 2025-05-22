@@ -38,8 +38,10 @@ reuse:
     - paths:
       - build/*.txt
       - etc/*.conf
+      - etc/*.json
       - pkg/*/fixtures/*.json
       - pkg/*/fixtures/*.txt
+      - pkg/test/*.json
       - docs/*.png
       - docs/*.svg
       - web/static/vendor/bootstrap-3.3.1/css/*.css
