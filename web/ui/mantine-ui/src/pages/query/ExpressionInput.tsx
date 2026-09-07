@@ -4,7 +4,6 @@ import {
   Button,
   Group,
   InputBase,
-  Loader,
   Menu,
   Modal,
   Skeleton,
@@ -52,16 +51,14 @@ import {
 import { highlightSelectionMatches } from "@codemirror/search";
 import { lintKeymap } from "@codemirror/lint";
 import {
-  IconAlignJustified,
-  IconBinaryTree,
   IconCopy,
   IconDotsVertical,
   IconSearch,
   IconTerminal,
   IconTrash,
 } from "@tabler/icons-react";
-import { useAPIQuery } from "../../api/api";
-import { notifications } from "@mantine/notifications";
+// MAIA: "Format expression" and "Show/Hide tree view" removed — require
+// /api/v1/format_query and /api/v1/parse_query which are not available on Thanos.
 import { useSettings } from "../../state/settingsSlice";
 import MetricsExplorer from "./MetricsExplorer/MetricsExplorer";
 import ErrorBoundary from "../../components/ErrorBoundary";
@@ -76,8 +73,6 @@ interface ExpressionInputProps {
   initialExpr: string;
   metricNames: string[];
   executeQuery: (expr: string) => void;
-  treeShown: boolean;
-  setShowTree: (showTree: boolean) => void;
   duplicatePanel: (expr: string) => void;
   removePanel: () => void;
 }
@@ -88,8 +83,6 @@ const ExpressionInput: FC<ExpressionInputProps> = ({
   executeQuery,
   duplicatePanel,
   removePanel,
-  treeShown,
-  setShowTree,
 }) => {
   const theme = useComputedColorScheme();
   const { queryHistory } = useAppSelector((state) => state.queryPage);
@@ -104,38 +97,6 @@ const ExpressionInput: FC<ExpressionInputProps> = ({
   useEffect(() => {
     setExpr(initialExpr);
   }, [initialExpr]);
-
-  const {
-    data: formatResult,
-    error: formatError,
-    isFetching: isFormatting,
-    refetch: formatQuery,
-  } = useAPIQuery<string>({
-    path: "/format_query",
-    params: {
-      query: expr,
-    },
-    enabled: false,
-  });
-
-  useEffect(() => {
-    if (formatError) {
-      notifications.show({
-        color: "red",
-        title: "Error formatting query",
-        message: formatError.message,
-      });
-      return;
-    }
-
-    if (formatResult) {
-      setExpr(formatResult.data);
-      notifications.show({
-        title: "Expression formatted",
-        message: "Expression formatted successfully!",
-      });
-    }
-  }, [formatResult, formatError]);
 
   const cmRef = useRef<ReactCodeMirrorRef>(null);
 
@@ -175,9 +136,7 @@ const ExpressionInput: FC<ExpressionInputProps> = ({
     <Group align="flex-start" wrap="nowrap" gap="xs">
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <InputBase<any>
-        leftSection={
-          isFormatting ? <Loader size="xs" color="gray.5" /> : <IconTerminal />
-        }
+        leftSection={<IconTerminal />}
         rightSection={
           <Menu shadow="md" width={200}>
             <Menu.Target>
@@ -197,21 +156,6 @@ const ExpressionInput: FC<ExpressionInputProps> = ({
                 onClick={() => setShowMetricsExplorer(true)}
               >
                 Explore metrics
-              </Menu.Item>
-              <Menu.Item
-                leftSection={<IconAlignJustified style={menuIconStyle} />}
-                onClick={() => formatQuery()}
-                disabled={
-                  isFormatting || expr === "" || expr === formatResult?.data
-                }
-              >
-                Format expression
-              </Menu.Item>
-              <Menu.Item
-                leftSection={<IconBinaryTree style={menuIconStyle} />}
-                onClick={() => setShowTree(!treeShown)}
-              >
-                {treeShown ? "Hide" : "Show"} tree view
               </Menu.Item>
               <Menu.Item
                 leftSection={<IconCopy style={menuIconStyle} />}

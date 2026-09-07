@@ -74,18 +74,6 @@ describe("decodePanelOptionsFromURLParams", () => {
     expect(panels[1].expr).toBe("node_cpu_seconds_total");
   });
 
-  test("decodes show_tree parameter", () => {
-    const panelsWithTree = decodePanelOptionsFromURLParams(
-      "g0.expr=up&g0.show_tree=1"
-    );
-    expect(panelsWithTree[0].showTree).toBe(true);
-
-    const panelsWithoutTree = decodePanelOptionsFromURLParams(
-      "g0.expr=up&g0.show_tree=0"
-    );
-    expect(panelsWithoutTree[0].showTree).toBe(false);
-  });
-
   describe("tab parameter", () => {
     test("decodes numeric tab value 0 as graph", () => {
       const panels = decodePanelOptionsFromURLParams("g0.expr=up&g0.tab=0");
@@ -285,7 +273,6 @@ describe("decodePanelOptionsFromURLParams", () => {
     const panels = decodePanelOptionsFromURLParams(queryString);
     expect(panels).toHaveLength(1);
     expect(panels[0].expr).toBe("rate(http_requests_total[5m])");
-    expect(panels[0].showTree).toBe(true);
     expect(panels[0].visualizer.activeTab).toBe("graph");
     expect(panels[0].visualizer.displayMode).toBe(GraphDisplayMode.Stacked);
     expect(panels[0].visualizer.yAxisMin).toBe(0);
@@ -303,7 +290,6 @@ describe("encodePanelOptionsToURLParams", () => {
   const createPanel = (overrides: Partial<Panel> = {}): Panel => ({
     id: "test-id",
     expr: "up",
-    showTree: false,
     showMetricsExplorer: false,
     visualizer: {
       activeTab: "table",
@@ -322,7 +308,6 @@ describe("encodePanelOptionsToURLParams", () => {
     const params = encodePanelOptionsToURLParams([panel]);
 
     expect(params.get("g0.expr")).toBe("up");
-    expect(params.get("g0.show_tree")).toBe("0");
     expect(params.get("g0.tab")).toBe("table");
     expect(params.get("g0.range_input")).toBe("1h");
     expect(params.get("g0.display_mode")).toBe("lines");
@@ -336,13 +321,6 @@ describe("encodePanelOptionsToURLParams", () => {
 
     expect(params.get("g0.expr")).toBe("up");
     expect(params.get("g1.expr")).toBe("node_cpu_seconds_total");
-  });
-
-  test("encodes show_tree as 1 when true", () => {
-    const panel = createPanel({ showTree: true });
-    const params = encodePanelOptionsToURLParams([panel]);
-
-    expect(params.get("g0.show_tree")).toBe("1");
   });
 
   test("encodes different tab values", () => {
@@ -546,7 +524,6 @@ describe("encode and decode roundtrip", () => {
   const createPanel = (overrides: Partial<Panel> = {}): Panel => ({
     id: "test-id",
     expr: "up",
-    showTree: false,
     showMetricsExplorer: false,
     visualizer: {
       activeTab: "table",
@@ -563,14 +540,12 @@ describe("encode and decode roundtrip", () => {
   test("roundtrip preserves basic panel settings", () => {
     const original = createPanel({
       expr: "rate(http_requests_total[5m])",
-      showTree: true,
     });
     const encoded = encodePanelOptionsToURLParams([original]);
     const decoded = decodePanelOptionsFromURLParams(encoded.toString());
 
     expect(decoded).toHaveLength(1);
     expect(decoded[0].expr).toBe(original.expr);
-    expect(decoded[0].showTree).toBe(original.showTree);
   });
 
   test("roundtrip preserves visualizer settings", () => {
@@ -607,7 +582,7 @@ describe("encode and decode roundtrip", () => {
   test("roundtrip preserves multiple panels", () => {
     const panels = [
       createPanel({ expr: "up" }),
-      createPanel({ expr: "node_cpu_seconds_total", showTree: true }),
+      createPanel({ expr: "node_cpu_seconds_total" }),
       createPanel({
         expr: "rate(http_requests_total[5m])",
         visualizer: {
@@ -623,7 +598,6 @@ describe("encode and decode roundtrip", () => {
     expect(decoded).toHaveLength(3);
     expect(decoded[0].expr).toBe("up");
     expect(decoded[1].expr).toBe("node_cpu_seconds_total");
-    expect(decoded[1].showTree).toBe(true);
     expect(decoded[2].expr).toBe("rate(http_requests_total[5m])");
     expect(decoded[2].visualizer.displayMode).toBe(GraphDisplayMode.Heatmap);
   });

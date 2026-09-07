@@ -65,7 +65,6 @@ export type Panel = {
   // The id is helpful as a stable key for React.
   id: string;
   expr: string;
-  showTree: boolean;
   showMetricsExplorer: boolean;
   visualizer: Visualizer;
 };
@@ -78,7 +77,6 @@ interface QueryPageState {
 export const newDefaultPanel = (): Panel => ({
   id: randomId(),
   expr: "",
-  showTree: false,
   showMetricsExplorer: false,
   visualizer: {
     activeTab: "table",
@@ -145,13 +143,6 @@ export const queryPageSlice = createSlice({
         ...state.queryHistory.filter((q) => q !== query),
       ].slice(0, 50);
     },
-    setShowTree: (
-      state,
-      { payload }: PayloadAction<{ idx: number; showTree: boolean }>
-    ) => {
-      state.panels[payload.idx].showTree = payload.showTree;
-      updateURL(state.panels);
-    },
     setVisualizer: (
       state,
       { payload }: PayloadAction<{ idx: number; visualizer: Visualizer }>
@@ -169,7 +160,6 @@ export const {
   duplicatePanel,
   setExpr,
   addQueryToHistory,
-  setShowTree,
   setVisualizer,
 } = queryPageSlice.actions;
 

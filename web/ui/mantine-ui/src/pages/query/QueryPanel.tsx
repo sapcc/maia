@@ -6,7 +6,6 @@ import {
   Box,
   SegmentedControl,
   Stack,
-  Skeleton,
   ActionIcon,
   Popover,
   Checkbox,
@@ -18,7 +17,7 @@ import {
   IconGraph,
   IconTable,
 } from "@tabler/icons-react";
-import { FC, Suspense, useCallback, useMemo, useState } from "react";
+import { FC, useCallback, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
 import {
   addQueryToHistory,
@@ -27,7 +26,6 @@ import {
   GraphResolution,
   removePanel,
   setExpr,
-  setShowTree,
   setVisualizer,
 } from "../../state/queryPageSlice";
 import TimeInput from "./TimeInput";
@@ -36,11 +34,7 @@ import ExpressionInput from "./ExpressionInput";
 import Graph from "./Graph";
 import ResolutionInput from "./ResolutionInput";
 import TableTab from "./TableTab";
-import TreeView from "./TreeView";
-import ErrorBoundary from "../../components/ErrorBoundary";
-import ASTNode from "../../promql/ast";
-import serializeNode from "../../promql/serialize";
-// MAIA: ExplainView removed — parse_query not available on Thanos backends
+// MAIA: TreeView removed — requires /api/v1/parse_query which is not available on Thanos
 import { actionIconStyle } from "../../styles";
 
 export interface PanelProps {
@@ -60,16 +54,7 @@ const QueryPanel: FC<PanelProps> = ({ idx, metricNames }) => {
   const panel = useAppSelector((state) => state.queryPage.panels[idx]);
   const dispatch = useAppDispatch();
 
-  const [selectedNode, setSelectedNode] = useState<{
-    id: string;
-    node: ASTNode;
-  } | null>(null);
-
-  const expr = useMemo(
-    () =>
-      selectedNode !== null ? serializeNode(selectedNode.node) : panel.expr,
-    [selectedNode, panel.expr]
-  );
+  const expr = panel.expr;
 
   const onSelectRange = useCallback(
     (start: number, end: number) =>
@@ -104,13 +89,6 @@ const QueryPanel: FC<PanelProps> = ({ idx, metricNames }) => {
             dispatch(addQueryToHistory(expr));
           }
         }}
-        treeShown={panel.showTree}
-        setShowTree={(showTree: boolean) => {
-          dispatch(setShowTree({ idx, showTree }));
-          if (!showTree) {
-            setSelectedNode(null);
-          }
-        }}
         duplicatePanel={(expr: string) => {
           dispatch(duplicatePanel({ idx, expr }));
         }}
@@ -118,29 +96,6 @@ const QueryPanel: FC<PanelProps> = ({ idx, metricNames }) => {
           dispatch(removePanel(idx));
         }}
       />
-      {panel.expr.trim() !== "" && panel.showTree && (
-        <ErrorBoundary key={retriggerIdx} title="Error showing tree view">
-          <Suspense
-            fallback={
-              <Box mt="lg">
-                {Array.from(Array(20), (_, i) => (
-                  <Skeleton key={i} height={30} mb={15} width="100%" />
-                ))}
-              </Box>
-            }
-          >
-            <TreeView
-              panelIdx={idx}
-              selectedNode={selectedNode}
-              setSelectedNode={setSelectedNode}
-              closeTreeView={() => {
-                dispatch(setShowTree({ idx, showTree: false }));
-                setSelectedNode(null);
-              }}
-            />
-          </Suspense>
-        </ErrorBoundary>
-      )}
       <Tabs
         value={panel.visualizer.activeTab}
         onChange={(v) =>
@@ -332,7 +287,7 @@ const QueryPanel: FC<PanelProps> = ({ idx, metricNames }) => {
           <Space h="lg" />
           <Graph
             expr={expr}
-            node={selectedNode?.node ?? null}
+            node={null}
             endTime={panel.visualizer.endTime}
             range={panel.visualizer.range}
             resolution={panel.visualizer.resolution}
