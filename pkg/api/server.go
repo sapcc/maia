@@ -128,14 +128,34 @@ func setupRouter(keystoneDriver, globalKeystoneDriver keystone.Driver, storageDr
 
 	// /{domain} — login entry point. Authenticates via any supported method
 	// (X-Auth-Token cookie, Basic Auth, application credentials, x-auth-token
-	// query param), sets the auth cookie, then redirects to /ui/query.
-	// This is the Elektra deep-link entry point:
-	//   https://maia.example.com/monsoon3?x-auth-token=<token>
+	// query param, or POST body field), sets the auth cookie, then redirects.
+	// Supported entry points:
+	//   GET  /{domain}?x-auth-token=<token>  — Elektra deep-link (existing)
+	//   POST /{domain}  body: x-auth-token=<token>  — Elektra form POST (new)
 	// Both /{domain} and /{domain}/graph route here for backwards compatibility.
 	mainRouter.Methods(http.MethodGet).Path("/{domain}").HandlerFunc(
 		authorize(loginAndRedirect, true, "metric:show"))
 	mainRouter.Methods(http.MethodGet).Path("/{domain}/graph").HandlerFunc(
 		authorize(loginAndRedirect, true, "metric:show"))
+
+	// POST /{domain} — Elektra submits a form POST (application/x-www-form-urlencoded)
+	// with x-auth-token in the body. The token is promoted to X-Auth-Token header
+	// (priority: existing header > body field) before the standard auth+cookie flow runs.
+	// On success, redirects to GET /{domain} (Post-Redirect-Get) so the browser
+	// URL is clean and the token is no longer visible in the address bar.
+	postDomainLogin := authorize(func(w http.ResponseWriter, req *http.Request) {
+		domain := mux.Vars(req)["domain"]
+		http.Redirect(w, req, "/"+domain, http.StatusFound)
+	}, true, "metric:show")
+	mainRouter.Methods(http.MethodPost).Path("/{domain}").HandlerFunc(
+		func(w http.ResponseWriter, req *http.Request) {
+			if req.Header.Get("X-Auth-Token") == "" {
+				if token := req.PostFormValue("x-auth-token"); token != "" {
+					req.Header.Set("X-Auth-Token", token)
+				}
+			}
+			postDomainLogin(w, req)
+		})
 
 	// New React UI routes
 	mainRouter.Methods(http.MethodGet).Path("/ui").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
