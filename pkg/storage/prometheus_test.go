@@ -5,6 +5,7 @@ package storage
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/h2non/gock"
@@ -161,4 +162,65 @@ func TestSendToPrometheusRejectsUntrustedHost(t *testing.T) {
 	assert.Nil(t, resp)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "untrusted host")
+}
+
+// TestBuildURLNoDoubleSlash verifies that a trailing slash on the configured
+// prometheus_url does not produce a double-slash path segment.
+// A double slash caused HTTP 301 redirects which stripped the POST body.
+func TestBuildURLNoDoubleSlash(t *testing.T) {
+	cases := []struct {
+		base string
+		path string
+		want string
+	}{
+		{"http://thanos.local/thanos/", "/api/v1/query_range", "http://thanos.local/thanos/api/v1/query_range"},
+		{"http://thanos.local/thanos", "/api/v1/query_range", "http://thanos.local/thanos/api/v1/query_range"},
+		{"http://thanos.local/", "/api/v1/query", "http://thanos.local/api/v1/query"},
+		{"http://thanos.local", "/api/v1/query", "http://thanos.local/api/v1/query"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.base, func(t *testing.T) {
+			u, _ := url.Parse(tc.base)
+			client := &prometheusStorageClient{url: u, federateURL: u, httpClient: &http.Client{}}
+			got := client.buildURL(tc.path, map[string]any{})
+			assert.Equal(t, tc.want, got.String())
+			assert.NotContains(t, got.Path, "//", "path must not contain double slashes")
+		})
+	}
+}
+
+// TestQueryUsesPost verifies that Query sends a POST request with the query
+// in the form body rather than in the URL, bypassing proxy URL length limits.
+func TestQueryUsesPost(t *testing.T) {
+	defer gock.Off()
+	ps := setupTest(t)
+
+	gock.New(prometheusURL).
+		Post("/api/v1/query").
+		MatchHeader("Content-Type", "application/x-www-form-urlencoded").
+		Reply(http.StatusOK).
+		BodyString("{}").
+		AddHeader("Content-Type", JSON)
+
+	_, err := ps.Query("up", "", "", JSON)
+	assert.Nil(t, err)
+	assertDone(t)
+}
+
+// TestQueryRangeUsesPost verifies that QueryRange sends a POST request with
+// parameters in the form body, bypassing proxy URL length limits.
+func TestQueryRangeUsesPost(t *testing.T) {
+	defer gock.Off()
+	ps := setupTest(t)
+
+	gock.New(prometheusURL).
+		Post("/api/v1/query_range").
+		MatchHeader("Content-Type", "application/x-www-form-urlencoded").
+		Reply(http.StatusOK).
+		BodyString("{}").
+		AddHeader("Content-Type", JSON)
+
+	_, err := ps.QueryRange("up", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z", "1h", "", JSON)
+	assert.Nil(t, err)
+	assertDone(t)
 }
