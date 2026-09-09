@@ -180,7 +180,10 @@ func TestBuildURLNoDoubleSlash(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.base, func(t *testing.T) {
-			u, _ := url.Parse(tc.base)
+			u, err := url.Parse(tc.base)
+			if err != nil {
+				t.Fatalf("url.Parse(%q): %v", tc.base, err)
+			}
 			client := &prometheusStorageClient{url: u, federateURL: u, httpClient: &http.Client{}}
 			got := client.buildURL(tc.path, map[string]any{})
 			assert.Equal(t, tc.want, got.String())

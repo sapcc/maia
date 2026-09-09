@@ -162,7 +162,6 @@ func (promCli *prometheusStorageClient) buildURL(path string, params map[string]
 }
 
 // sendToPrometheus takes care of the request wrapping and delivery to Prometheus.
-//
 func (promCli *prometheusStorageClient) sendToPrometheus(method, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
 	// Defense-in-depth: verify the URL targets a trusted upstream before sending.
 	// All Driver methods construct URLs via buildURL() which uses only the
