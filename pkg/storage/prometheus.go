@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 
 	"github.com/spf13/viper"
 
@@ -61,16 +62,41 @@ func (promCli *prometheusStorageClient) init() {
 }
 
 func (promCli *prometheusStorageClient) Query(query, time, timeout, acceptContentType string) (*http.Response, error) {
-	promURL := promCli.buildURL("/api/v1/query", map[string]any{"query": query, "time": time, "timeout": timeout})
-
-	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
+	promURL := promCli.buildURL("/api/v1/query", map[string]any{})
+	form := url.Values{}
+	if query != "" {
+		form.Set("query", query)
+	}
+	if time != "" {
+		form.Set("time", time)
+	}
+	if timeout != "" {
+		form.Set("timeout", timeout)
+	}
+	return promCli.sendToPrometheus("POST", promURL.String(), strings.NewReader(form.Encode()),
+		map[string]string{"Accept": acceptContentType, "Content-Type": "application/x-www-form-urlencoded"})
 }
 
 func (promCli *prometheusStorageClient) QueryRange(query, start, end, step, timeout, acceptContentType string) (*http.Response, error) {
-	promURL := promCli.buildURL("/api/v1/query_range", map[string]any{"query": query, "start": start, "end": end,
-		"step": step, "timeout": timeout})
-
-	return promCli.sendToPrometheus("GET", promURL.String(), nil, map[string]string{"Accept": acceptContentType})
+	promURL := promCli.buildURL("/api/v1/query_range", map[string]any{})
+	form := url.Values{}
+	if query != "" {
+		form.Set("query", query)
+	}
+	if start != "" {
+		form.Set("start", start)
+	}
+	if end != "" {
+		form.Set("end", end)
+	}
+	if step != "" {
+		form.Set("step", step)
+	}
+	if timeout != "" {
+		form.Set("timeout", timeout)
+	}
+	return promCli.sendToPrometheus("POST", promURL.String(), strings.NewReader(form.Encode()),
+		map[string]string{"Accept": acceptContentType, "Content-Type": "application/x-www-form-urlencoded"})
 }
 
 func (promCli *prometheusStorageClient) Series(match []string, start, end, acceptContentType string) (*http.Response, error) {
@@ -117,7 +143,7 @@ func (promCli *prometheusStorageClient) buildURL(path string, params map[string]
 	}
 
 	// change original request to point to our backing Prometheus
-	promURL.Path += path
+	promURL.Path = strings.TrimRight(promURL.Path, "/") + path
 	queryParams := url.Values{}
 	for k, v := range params {
 		if s, ok := v.(string); ok {
@@ -137,7 +163,6 @@ func (promCli *prometheusStorageClient) buildURL(path string, params map[string]
 
 // sendToPrometheus takes care of the request wrapping and delivery to Prometheus.
 //
-//nolint:unparam // method is currently always "GET" but kept generic for API flexibility
 func (promCli *prometheusStorageClient) sendToPrometheus(method, promURL string, body io.Reader, headers map[string]string) (*http.Response, error) {
 	// Defense-in-depth: verify the URL targets a trusted upstream before sending.
 	// All Driver methods construct URLs via buildURL() which uses only the
