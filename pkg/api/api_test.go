@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"errors"
@@ -892,4 +893,67 @@ func TestRedirectPreservesGlobalFlag(t *testing.T) {
 		location := resp.Header.Get("Location")
 		assert.Equal(t, "/ui/query", location, "Should redirect to /ui/query")
 	})
+}
+
+func TestPostDomainLogin_bodyToken(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	// Expect the body token to be promoted to X-Auth-Token header before auth.
+	matcher := test.HTTPRequestMatcher{
+		ExpectHeader: map[string]string{"X-Auth-Token": "someverylongtokenindeed"},
+		InjectHeader: projectHeader,
+	}
+	keystoneMock.EXPECT().AuthenticateRequest(test.MatchContext(), matcher, true).Return(projectContext, nil)
+
+	body := strings.NewReader("x-auth-token=someverylongtokenindeed")
+	req := httptest.NewRequest(http.MethodPost, "/testdomain", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	resp := rec.Result()
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, "/testdomain", resp.Header.Get("Location"))
+}
+
+func TestPostDomainLogin_headerTakesPrecedenceOverBody(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	// Header token must win; body token must be ignored.
+	matcher := test.HTTPRequestMatcher{
+		ExpectHeader: map[string]string{"X-Auth-Token": "headertoken"},
+		InjectHeader: projectHeader,
+	}
+	keystoneMock.EXPECT().AuthenticateRequest(test.MatchContext(), matcher, true).Return(projectContext, nil)
+
+	body := strings.NewReader("x-auth-token=bodytoken")
+	req := httptest.NewRequest(http.MethodPost, "/testdomain", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Auth-Token", "headertoken")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	resp := rec.Result()
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, "/testdomain", resp.Header.Get("Location"))
+}
+
+func TestPostDomainLogin_missingToken(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	router, keystoneMock, _ := setupTest(t, ctrl)
+
+	keystoneMock.EXPECT().AuthenticateRequest(test.MatchContext(), gomock.Any(), true).
+		Return(nil, keystone.NewAuthenticationError(keystone.StatusMissingCredentials, "no credentials"))
+
+	req := httptest.NewRequest(http.MethodPost, "/testdomain", http.NoBody)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Result().StatusCode)
 }
