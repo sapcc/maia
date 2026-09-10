@@ -4,6 +4,7 @@
 package storage
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"testing"
@@ -44,6 +45,101 @@ func TestNewPrometheusDriver(t *testing.T) {
 
 	assertDone(t)
 }
+
+func TestPrometheusInitFederateURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		federateURL string
+		wantURL     string
+	}{
+		{
+			name:        "configured federate URL",
+			federateURL: federateURL,
+			wantURL:     federateURL,
+		},
+		{
+			name:    "fallback to Prometheus URL",
+			wantURL: prometheusURL,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			viper.Set("maia.proxy", "http://proxy.example.com:8080")
+			if test.federateURL != "" {
+				viper.Set("maia.federate_url", test.federateURL)
+			}
+
+			driver := Prometheus(prometheusURL, nil).(*prometheusStorageClient)
+			if _, ok := driver.httpClient.Transport.(*http.Transport); !ok {
+				t.Fatalf("transport type = %T, want *http.Transport", driver.httpClient.Transport)
+			}
+			if got := driver.federateURL.String(); got != test.wantURL {
+				t.Errorf("federate URL = %q, want %q", got, test.wantURL)
+			}
+		})
+	}
+}
+
+func TestPrometheusInitProxy(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("maia.proxy", "http://proxy.example.com:8080")
+
+	driver := Prometheus(prometheusURL, nil).(*prometheusStorageClient)
+	transport, ok := driver.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("transport type = %T, want *http.Transport", driver.httpClient.Transport)
+	}
+	defaultTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		t.Fatalf("default transport type = %T, want *http.Transport", http.DefaultTransport)
+	}
+	if transport == defaultTransport {
+		t.Fatal("transport must clone http.DefaultTransport before setting the proxy")
+	}
+	if got, want := transport.IdleConnTimeout, defaultTransport.IdleConnTimeout; got != want {
+		t.Errorf("IdleConnTimeout = %v, want default transport value %v", got, want)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, prometheusURL, http.NoBody)
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	gotProxyURL, err := transport.Proxy(req)
+	if err != nil {
+		t.Fatalf("get proxy URL: %v", err)
+	}
+	if got, want := gotProxyURL.String(), "http://proxy.example.com:8080"; got != want {
+		t.Errorf("proxy URL = %q, want %q", got, want)
+	}
+}
+
+func TestPrometheusInitInvalidProxy(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("maia.proxy", "http://%zz")
+
+	var recovered any
+	func() {
+		defer func() {
+			recovered = recover()
+		}()
+		Prometheus(prometheusURL, nil)
+	}()
+
+	err, ok := recovered.(error)
+	if !ok {
+		t.Fatalf("panic value type = %T, want error", recovered)
+	}
+	if errors.Unwrap(err) == nil {
+		t.Errorf("proxy parse error = %v, want a wrapped parse error", err)
+	}
+	assert.Contains(t, err.Error(), "parse proxy URL \"http://%zz\"")
+}
+
 func assertDone(t *testing.T) bool { //nolint:unparam
 	return assert.True(t, gock.IsDone(), "pending mocks: %v\nunmatched requests: %v", mocksToStrings(gock.Pending()), gock.GetUnmatchedRequests())
 }

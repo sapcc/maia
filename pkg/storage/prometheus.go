@@ -38,17 +38,6 @@ func Prometheus(prometheusAPIURL string, customHeaders map[string]string) Driver
 }
 
 func (promCli *prometheusStorageClient) init() {
-	if viper.IsSet("maia.proxy") {
-		proxyURL, err := url.Parse(viper.GetString("maia.proxy"))
-		if err != nil {
-			panic(fmt.Errorf("could not set proxy: %s .\n%s", proxyURL, err.Error()))
-		} else {
-			promCli.httpClient = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
-			return
-		}
-	}
-	promCli.httpClient = &http.Client{}
-
 	// if federateURL is configured, this will direct /federate requests to another host URL
 	if viper.IsSet("maia.federate_url") {
 		parsedURL, err := url.Parse(viper.GetString("maia.federate_url"))
@@ -59,6 +48,19 @@ func (promCli *prometheusStorageClient) init() {
 	} else {
 		promCli.federateURL = promCli.url
 	}
+
+	if viper.IsSet("maia.proxy") {
+		proxyURLString := viper.GetString("maia.proxy")
+		proxyURL, err := url.Parse(proxyURLString)
+		if err != nil {
+			panic(fmt.Errorf("parse proxy URL %q: %w", proxyURLString, err))
+		}
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.Proxy = http.ProxyURL(proxyURL)
+		promCli.httpClient = &http.Client{Transport: transport}
+		return
+	}
+	promCli.httpClient = &http.Client{}
 }
 
 func (promCli *prometheusStorageClient) Query(query, time, timeout, acceptContentType string) (*http.Response, error) {
