@@ -104,16 +104,6 @@ reuse:
       - web/ui/module/**
       SPDX-FileCopyrightText: The Prometheus Authors
       SPDX-License-Identifier: Apache-2.0
-    # The Accordion component subtree is dual-licensed: those files carry BOTH an
-    # MIT notice (parts derived from Mantine UI, (c) 2021 Vitaly Rtishchev) AND
-    # an Apache-2.0 notice for the fork's modifications. A narrower block with
-    # precedence "override" declares the accurate compound expression instead of
-    # the blanket Apache-2.0 from the mantine-ui block above.
-    - paths:
-      - web/ui/mantine-ui/src/components/Accordion/**
-      precedence: override
-      SPDX-FileCopyrightText: The Prometheus Authors
-      SPDX-License-Identifier: MIT AND Apache-2.0
     # Maia-specific UI files authored by SAP — override the upstream annotation.
     - paths:
       - web/ui/mantine-ui/src/lib/maiaFetch.ts
