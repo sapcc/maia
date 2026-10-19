@@ -22,10 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Listing projects is faster on a cold cache for users with many project assignments: project names now come from a single Keystone call instead of one call per project (needs Keystone Identity API v3.6+)
+- Listing projects is faster on a cold cache for users with many project assignments: project names now come from one Keystone call per monitoring role instead of one call per project (needs Keystone Identity API v3.6+)
 - The web UI now resolves its API calls relative to the path it is served from, so Maia's UI works both at its own address and when served behind a reverse proxy under a sub-path (no change when served at its own root)
 - `/{domain}/graph` is now a login-only stub: authenticates via all supported methods (cookie, Basic Auth, application credentials) then redirects to `/ui/query`
 - Root path `/` always redirects to `/ui/query`
+
+### Fixed
+
+- Users who hold any role on a domain object can open Maia again; listing their projects failed with HTTP 500 because Keystone could not resolve names for that assignment. A monitoring role on a domain object is ignored rather than treated as a project.
 
 ### Removed
 

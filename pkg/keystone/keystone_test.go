@@ -7,13 +7,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/tokens"
 	"github.com/h2non/gock"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/spf13/viper"
@@ -316,7 +319,9 @@ func TestAuthenticateRequest_guessScope(t *testing.T) {
 	ctx := t.Context()
 
 	gock.New(baseURL).Get("/v3/users").MatchParams(map[string]string{"domain_id": "d00001", "enabled": "true", "name": "testuser"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser.json").AddHeader("Content-Type", "application/json")
-	gock.New(baseURL).Get("/v3/role_assignments").MatchParams(map[string]string{"effective": "true", "include_names": "true", "user.id": "u00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser_roles.json").AddHeader("Content-Type", "application/json")
+	// one role_assignments call per monitoring role (all_roles.json has two)
+	gock.New(baseURL).Get("/v3/role_assignments").MatchParams(map[string]string{"effective": "true", "include_names": "true", "role.id": "r00001", "user.id": "u00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/testuser_roles.json").AddHeader("Content-Type", "application/json")
+	gock.New(baseURL).Get("/v3/role_assignments").MatchParams(map[string]string{"effective": "true", "include_names": "true", "role.id": "r00002", "user.id": "u00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).JSON(map[string]any{"role_assignments": []any{}})
 	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthScopeBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
 
@@ -773,12 +778,13 @@ func TestFetchUserProjects_IncludeNames(t *testing.T) {
 }
 
 // roleAssignmentsHandler serves body for GET /v3/role_assignments, but only when the
-// request asks for effective assignments with include_names=true. Anything else gets
-// a 400, so fetchUserProjects returns an error if include_names is ever dropped.
+// request asks for effective assignments of role r00001 with include_names=true.
+// Anything else gets a 400, so fetchUserProjects returns an error if include_names
+// or the role.id filter is ever dropped.
 func roleAssignmentsHandler(body []byte) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		if q.Get("include_names") != "true" || q.Get("effective") != "true" || q.Get("user.id") != "u00001" {
+		if q.Get("include_names") != "true" || q.Get("effective") != "true" || q.Get("user.id") != "u00001" || q.Get("role.id") != "r00001" {
 			http.Error(w, "unexpected query: "+r.URL.RawQuery, http.StatusBadRequest)
 			return
 		}
@@ -789,13 +795,182 @@ func roleAssignmentsHandler(body []byte) http.HandlerFunc {
 	}
 }
 
-// TestFetchUserProjects_EmptyNameNotCached verifies that a scope without a project
-// name (Keystone ignored include_names) is returned but not put in projectScopeCache.
-func TestFetchUserProjects_EmptyNameNotCached(t *testing.T) {
+// fakeAssignment is one effective role assignment of user u00001 in fakeKeystone.
+type fakeAssignment struct {
+	roleID    string
+	projectID string
+	// domainObject marks a project with is_domain=true. Keystone's include_names
+	// fails the whole request with 404 "Could not find domain: None" for these.
+	domainObject bool
+}
+
+// fakeKeystone mimics how Keystone serves GET /v3/role_assignments: it applies the
+// role.id filter first, then resolves include_names, failing the whole request with
+// 404 if any remaining assignment targets a domain object. It also serves
+// GET /v3/projects/<id> and counts those calls.
+type fakeKeystone struct {
+	assignments []fakeAssignment
+	// roleAssignmentsStatus, if set, is returned for every role_assignments call.
+	roleAssignmentsStatus int
+	projectGets           atomic.Int32
+}
+
+func (f *fakeKeystone) driver(t *testing.T, monitoringRoles map[string]string) *keystone {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v3/role_assignments", f.roleAssignments)
+	mux.HandleFunc("GET /v3/projects/{id}", func(w http.ResponseWriter, r *http.Request) {
+		f.projectGets.Add(1)
+		id := r.PathValue("id")
+		w.Header().Set("Content-Type", "application/json")
+		if slices.ContainsFunc(f.assignments, func(a fakeAssignment) bool { return a.projectID == id && a.domainObject }) {
+			// Keystone shows a domain object with is_domain=true and no parent domain.
+			fmt.Fprintf(w, `{"project":{"id":%q,"name":"name-%s","domain_id":null,"is_domain":true,"enabled":true}}`, id, id)
+			return
+		}
+		fmt.Fprintf(w, `{"project":{"id":%q,"name":"name-%s","domain_id":"d00001","enabled":true}}`, id, id)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return &keystone{
+		providerClient: &gophercloud.ServiceClient{
+			ProviderClient: &gophercloud.ProviderClient{},
+			Endpoint:       srv.URL + "/v3/",
+		},
+		monitoringRoles:   monitoringRoles,
+		projectScopeCache: cache.New(24*time.Hour, time.Hour),
+	}
+}
+
+func (f *fakeKeystone) roleAssignments(w http.ResponseWriter, r *http.Request) {
+	if f.roleAssignmentsStatus != 0 {
+		http.Error(w, "injected failure", f.roleAssignmentsStatus)
+		return
+	}
+	q := r.URL.Query()
+	if q.Get("effective") != "true" || q.Get("user.id") != "u00001" {
+		http.Error(w, "unexpected query: "+r.URL.RawQuery, http.StatusBadRequest)
+		return
+	}
+	includeNames := q.Get("include_names") == "true"
+	entries := []string{}
+	for _, a := range f.assignments {
+		if roleID := q.Get("role.id"); roleID != "" && roleID != a.roleID {
+			continue
+		}
+		if includeNames && a.domainObject {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, `{"error":{"code":404,"message":"Could not find domain: None.","title":"Not Found"}}`)
+			return
+		}
+		if includeNames {
+			entries = append(entries, fmt.Sprintf(`{"role":{"id":%q},"scope":{"project":{"id":%q,"name":"name-%s","domain":{"id":"d00001","name":"testdomain"}}}}`, a.roleID, a.projectID, a.projectID))
+		} else {
+			entries = append(entries, fmt.Sprintf(`{"role":{"id":%q},"scope":{"project":{"id":%q}}}`, a.roleID, a.projectID))
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, `{"role_assignments":[`+strings.Join(entries, ",")+`]}`)
+}
+
+func scopeProjectIDs(scopes []tokens.Scope) []string {
+	ids := make([]string, len(scopes))
+	for i, s := range scopes {
+		ids[i] = s.ProjectID
+	}
+	return ids
+}
+
+// TestFetchUserProjects_UnrelatedRoleOnDomainObject reproduces the "can't open Maia"
+// incident: the user holds a non-monitoring role (admin) on a domain object. An
+// unfiltered include_names call would 404; filtering by monitoring role avoids it.
+func TestFetchUserProjects_UnrelatedRoleOnDomainObject(t *testing.T) {
+	f := &fakeKeystone{assignments: []fakeAssignment{
+		{roleID: "r00001", projectID: "p00001"},
+		{roleID: "radmin", projectID: "dom0001", domainObject: true},
+		{roleID: "r00001", projectID: "p00002"},
+	}}
+	d := f.driver(t, map[string]string{"r00001": "monitoring_viewer"})
+
+	scopes, err := d.fetchUserProjects(t.Context(), "u00001")
+
+	if !assert.NoError(t, err) {
+		return
+	}
+	if assert.Equal(t, []string{"p00001", "p00002"}, scopeProjectIDs(scopes)) {
+		assert.Equal(t, "name-p00001", scopes[0].ProjectName)
+	}
+	assert.Zero(t, f.projectGets.Load(), "names must come from include_names, not per-project GETs")
+}
+
+// TestFetchUserProjects_MonitoringRoleOnDomainObject covers the case the role.id
+// filter alone cannot: the monitoring role itself sits on a domain object, so the
+// include_names call 404s and fetchUserProjects falls back to per-project lookups.
+// The domain object itself must not be returned: Maia would treat it as a project
+// and expand it to every project in the domain.
+func TestFetchUserProjects_MonitoringRoleOnDomainObject(t *testing.T) {
+	f := &fakeKeystone{assignments: []fakeAssignment{
+		{roleID: "r00001", projectID: "p00001"},
+		{roleID: "r00001", projectID: "dom0001", domainObject: true},
+	}}
+	d := f.driver(t, map[string]string{"r00001": "monitoring_viewer"})
+
+	scopes, err := d.fetchUserProjects(t.Context(), "u00001")
+
+	if !assert.NoError(t, err) {
+		return
+	}
+	if assert.Equal(t, []string{"p00001"}, scopeProjectIDs(scopes), "domain object must be skipped") {
+		assert.Equal(t, "name-p00001", scopes[0].ProjectName)
+	}
+	assert.EqualValues(t, 2, f.projectGets.Load(), "fallback looks up each project")
+	_, cached := d.projectScopeCache.Get("dom0001")
+	assert.False(t, cached, "domain object must not be cached as a project scope")
+}
+
+// TestFetchUserProjects_DedupesAcrossRoles verifies that a project reached through
+// more than one monitoring role is returned once.
+func TestFetchUserProjects_DedupesAcrossRoles(t *testing.T) {
+	f := &fakeKeystone{assignments: []fakeAssignment{
+		{roleID: "r00001", projectID: "p00001"},
+		{roleID: "r00002", projectID: "p00001"},
+		{roleID: "r00002", projectID: "p00002"},
+	}}
+	d := f.driver(t, map[string]string{"r00001": "monitoring_admin", "r00002": "monitoring_viewer"})
+
+	scopes, err := d.fetchUserProjects(t.Context(), "u00001")
+
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, []string{"p00001", "p00002"}, scopeProjectIDs(scopes))
+}
+
+// TestFetchUserProjects_NonNotFoundErrorReturned verifies that only a 404 triggers
+// the fallback; other Keystone errors are returned to the caller.
+func TestFetchUserProjects_NonNotFoundErrorReturned(t *testing.T) {
+	f := &fakeKeystone{roleAssignmentsStatus: http.StatusInternalServerError}
+	d := f.driver(t, map[string]string{"r00001": "monitoring_viewer"})
+
+	_, err := d.fetchUserProjects(t.Context(), "u00001")
+
+	assert.Error(t, err)
+	assert.Zero(t, f.projectGets.Load())
+}
+
+// TestFetchUserProjects_MissingNameUsesProjectGet verifies that when Keystone
+// ignores include_names (no name in the response), the name is looked up with
+// GET /v3/projects/<id> and the complete scope is cached.
+func TestFetchUserProjects_MissingNameUsesProjectGet(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v3/role_assignments", roleAssignmentsHandler(
 		[]byte(`{"role_assignments":[{"role":{"id":"r00001"},"scope":{"project":{"id":"p00001"}}}]}`),
 	))
+	mux.HandleFunc("GET /v3/projects/p00001", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"project":{"id":"p00001","name":"proj-p00001","domain_id":"d00001","enabled":true}}`)
+	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
@@ -812,10 +987,11 @@ func TestFetchUserProjects_EmptyNameNotCached(t *testing.T) {
 
 	assert.NoError(t, err)
 	if assert.Len(t, scopes, 1) {
-		assert.Equal(t, "p00001", scopes[0].ProjectID)
+		assert.Equal(t, "proj-p00001", scopes[0].ProjectName)
+		assert.Equal(t, "d00001", scopes[0].DomainID)
 	}
 	_, cached := d.projectScopeCache.Get("p00001")
-	assert.False(t, cached, "scope with empty project name must not be cached")
+	assert.True(t, cached, "scope with a looked-up name should be cached")
 }
 
 // buildRoleAssignmentsResponseJSON generates a Keystone role-assignments response

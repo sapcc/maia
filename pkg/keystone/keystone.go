@@ -6,9 +6,11 @@ package keystone
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -771,44 +773,93 @@ func (d *keystone) UserProjects(ctx context.Context, userID string) ([]tokens.Sc
 // fetchUserProjects lists all projects (i.e. scopes) the user may access using Keystone (no cache lookup)
 func (d *keystone) fetchUserProjects(ctx context.Context, userID string) ([]tokens.Scope, error) {
 	scopes := []tokens.Scope{}
-	// include_names=true (Identity API v3.6+) returns project and domain names inline,
-	// so we don't need a GET /v3/projects/<id> per project.
+	seen := map[string]bool{}
+	// One call per monitoring role. Keystone applies the role.id filter before it
+	// resolves include_names, so assignments Maia does not care about are never
+	// name-resolved. That matters: include_names fails the whole request with
+	// 404 "Could not find domain: None" if any assignment targets a domain object.
+	for _, roleID := range slices.Sorted(maps.Keys(d.monitoringRoles)) {
+		assignments, err := d.listUserRoleAssignments(ctx, userID, roleID, true)
+		if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
+			// Keystone could not resolve a name for one of this role's assignments,
+			// e.g. because the role itself sits on a domain object. Retry without
+			// include_names and look the names up per project instead.
+			logg.Info("include_names failed for user %s, role %s, falling back to per-project lookups: %v", userID, roleID, err)
+			assignments, err = d.listUserRoleAssignments(ctx, userID, roleID, false)
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, ra := range assignments {
+			projectID := ra.Scope.Project.ID
+			if projectID == "" || seen[projectID] {
+				continue
+			}
+			seen[projectID] = true
+			scope, ok, err := d.projectScope(ctx, ra)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				scopes = append(scopes, scope)
+			}
+		}
+	}
+
+	return scopes, nil
+}
+
+// listUserRoleAssignments returns the user's effective assignments of one role.
+// includeNames=true (Identity API v3.6+) returns project and domain names inline,
+// so no GET /v3/projects/<id> per project is needed.
+func (d *keystone) listUserRoleAssignments(ctx context.Context, userID, roleID string, includeNames bool) ([]roles.RoleAssignment, error) {
 	trueVal := true
-	opts := roles.ListAssignmentsOpts{UserID: userID, Effective: &trueVal, IncludeNames: &trueVal}
+	opts := roles.ListAssignmentsOpts{UserID: userID, RoleID: roleID, Effective: &trueVal}
+	if includeNames {
+		opts.IncludeNames = &trueVal
+	}
+	var result []roles.RoleAssignment
 	err := roles.ListAssignments(d.providerClient, opts).EachPage(ctx, func(ctx context.Context, page pagination.Page) (bool, error) {
-		logg.Debug("loading role assignment page")
 		slice, err := roles.ExtractRoleAssignments(page)
 		if err != nil {
 			return false, err
 		}
-		for _, ra := range slice {
-			if _, ok := d.monitoringRoles[ra.Role.ID]; ok && ra.Scope.Project.ID != "" {
-				scope, ok := d.projectScopeCache.Get(ra.Scope.Project.ID)
-				if !ok {
-					scope = tokens.Scope{
-						ProjectID:   ra.Scope.Project.ID,
-						ProjectName: ra.Scope.Project.Name,
-						DomainID:    ra.Scope.Project.Domain.ID,
-						DomainName:  ra.Scope.Project.Domain.Name,
-					}
-					if ra.Scope.Project.Name == "" {
-						// Keystone did not honor include_names. Use the scope but don't cache it,
-						// so a bad response doesn't stick for the projectScopeCache TTL (24h).
-						logg.Debug("[KEYSTONE_DEBUG] fetchUserProjects: include_names returned empty name for project %s — check Keystone version (v3.6+ required)", ra.Scope.Project.ID)
-					} else {
-						d.projectScopeCache.Set(ra.Scope.Project.ID, scope, cache.DefaultExpiration)
-					}
-				}
-				scopes = append(scopes, scope.(tokens.Scope))
-			}
-		}
+		result = append(result, slice...)
 		return true, nil
 	})
-	if err != nil {
-		return nil, err
-	}
+	return result, err
+}
 
-	return scopes, nil
+// projectScope builds the scope for a project role assignment. Names come from
+// the assignment when Keystone included them, otherwise from GET /v3/projects/<id>.
+// It returns ok=false for a domain object (a project with is_domain=true): Maia
+// would treat it as a project and expand it to every project in the domain.
+func (d *keystone) projectScope(ctx context.Context, ra roles.RoleAssignment) (scope tokens.Scope, ok bool, err error) {
+	projectID := ra.Scope.Project.ID
+	if cached, ok := d.projectScopeCache.Get(projectID); ok {
+		return cached.(tokens.Scope), true, nil
+	}
+	scope = tokens.Scope{
+		ProjectID:   projectID,
+		ProjectName: ra.Scope.Project.Name,
+		DomainID:    ra.Scope.Project.Domain.ID,
+		DomainName:  ra.Scope.Project.Domain.Name,
+	}
+	if scope.ProjectName == "" {
+		logg.Debug("[KEYSTONE_DEBUG] no name for project %s in role assignment, looking it up", projectID)
+		project, err := projects.Get(ctx, d.providerClient, projectID).Extract()
+		if err != nil {
+			return tokens.Scope{}, false, err
+		}
+		if project.IsDomain {
+			logg.Debug("[KEYSTONE_DEBUG] skipping role assignment on domain object %s", projectID)
+			return tokens.Scope{}, false, nil
+		}
+		// DomainName stays empty here: no caller of UserProjects reads it.
+		scope = tokens.Scope{ProjectID: projectID, ProjectName: project.Name, DomainID: project.DomainID}
+	}
+	d.projectScopeCache.Set(projectID, scope, cache.DefaultExpiration)
+	return scope, true, nil
 }
 
 func (d *keystone) UserID(ctx context.Context, username, userDomain string) (string, error) {
