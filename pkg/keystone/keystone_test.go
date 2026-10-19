@@ -16,6 +16,8 @@ import (
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/h2non/gock"
 	cache "github.com/patrickmn/go-cache"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -158,6 +160,52 @@ func TestChildProjects(t *testing.T) {
 
 	assert.Nil(t, err, "ChildProjects should not return error")
 	assert.EqualValues(t, []string{"p00002"}, ids)
+
+	assertDone(t)
+}
+
+// counterVecValue reads the current value of a CounterVec child selected by its
+// "cache" label, collecting directly from the collector (registry-independent).
+func counterVecValue(vec *prometheus.CounterVec, cacheLabel string) float64 { //nolint:unparam // helper reads any cache label; tests currently exercise project_tree
+	ch := make(chan prometheus.Metric, 64)
+	vec.Collect(ch)
+	close(ch)
+	for m := range ch {
+		var dm dto.Metric
+		if m.Write(&dm) != nil {
+			continue
+		}
+		for _, lp := range dm.Label {
+			if lp.GetName() == "cache" && lp.GetValue() == cacheLabel {
+				return dm.Counter.GetValue()
+			}
+		}
+	}
+	return 0
+}
+
+func TestChildProjectsCacheMetrics(t *testing.T) {
+	defer gock.Off()
+
+	ks := setupTest()
+
+	ctx := t.Context()
+
+	gock.New(baseURL).Get("/v3/projects").MatchParams(map[string]string{"enabled": "true", "parent_id": "p00001"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).File("fixtures/child_projects.json").AddHeader("Content-Type", "application/json")
+	gock.New(baseURL).Get("/v3/projects").MatchParams(map[string]string{"enabled": "true", "parent_id": "p00002"}).HeaderPresent("X-Auth-Token").Reply(http.StatusOK).BodyString("{ \"projects\": [] }").AddHeader("Content-Type", "application/json")
+
+	missBefore := counterVecValue(keystoneCacheMisses, "project_tree")
+	hitBefore := counterVecValue(keystoneCacheHits, "project_tree")
+
+	// first lookup: cache miss, fetched from keystone (consumes both gock mocks)
+	_, err := ks.ChildProjects(ctx, "p00001")
+	assert.NoError(t, err)
+	// second lookup: served from cache, no HTTP call
+	_, err = ks.ChildProjects(ctx, "p00001")
+	assert.NoError(t, err)
+
+	assert.Equal(t, missBefore+1, counterVecValue(keystoneCacheMisses, "project_tree"), "expected one project_tree cache miss")
+	assert.Equal(t, hitBefore+1, counterVecValue(keystoneCacheHits, "project_tree"), "expected one project_tree cache hit")
 
 	assertDone(t)
 }

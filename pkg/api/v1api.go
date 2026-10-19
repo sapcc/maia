@@ -50,21 +50,21 @@ func NewV1Handler(keystoneDriver keystone.Driver, storageDriver storage.Driver) 
 	// MAIA: parse_query removed — not available on Thanos query frontends
 
 	// tenant-aware query
-	r.Methods(http.MethodGet).Path("/query").HandlerFunc(authorize(
+	r.Methods(http.MethodGet).Path("/query").HandlerFunc(countRequests(authorize(
 		observeDuration(observeResponseSize(p.Query, "query"), "query"),
 		false,
-		"metric:show"))
+		"metric:show"), "query"))
 	// tenant-aware query range
-	r.Methods(http.MethodGet).Path("/query_range").HandlerFunc(authorize(
+	r.Methods(http.MethodGet).Path("/query_range").HandlerFunc(countRequests(authorize(
 		observeDuration(observeResponseSize(p.QueryRange, "query_range"), "query_range"),
 		false,
-		"metric:show"))
+		"metric:show"), "query_range"))
 	// tenant-aware label value lists
-	r.Methods(http.MethodGet).Path("/label/{name}/values").HandlerFunc(authorize(observeDuration(observeResponseSize(p.LabelValues, "label_values"), "label_values"), false, "metric:list"))
+	r.Methods(http.MethodGet).Path("/label/{name}/values").HandlerFunc(countRequests(authorize(observeDuration(observeResponseSize(p.LabelValues, "label_values"), "label_values"), false, "metric:list"), "label_values"))
 	// tenant-aware label name lists
-	r.Methods(http.MethodGet).Path("/labels").HandlerFunc(authorize(observeDuration(observeResponseSize(p.Labels, "labels"), "labels"), false, "metric:list"))
+	r.Methods(http.MethodGet).Path("/labels").HandlerFunc(countRequests(authorize(observeDuration(observeResponseSize(p.Labels, "labels"), "labels"), false, "metric:list"), "labels"))
 	// tenant-aware series metadata
-	r.Methods(http.MethodGet).Path("/series").HandlerFunc(authorize(observeDuration(observeResponseSize(p.Series, "series"), "series"), false, "metric:list"))
+	r.Methods(http.MethodGet).Path("/series").HandlerFunc(countRequests(authorize(observeDuration(observeResponseSize(p.Series, "series"), "series"), false, "metric:list"), "series"))
 
 	return r
 }
