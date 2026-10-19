@@ -9,14 +9,10 @@
       },
       "scope": {
         "project": {
-          "id": "p00001",
-          "name": "testproject",
-          "domain": {
-            "id": "d00001",
-            "name": "testdomain"
-          }
+          "id": "p00001"
         }
       }
     }
   ]
 }
+
