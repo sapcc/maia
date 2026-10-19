@@ -34,5 +34,7 @@ test("proxied 401 displays recovery instructions and permits retry without a Mai
     url.endsWith("whoami") ? { projectId: "project" } : [{ id: "project", name: "Project" }]
   )));
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(screen.getByText("Loading")).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   await waitFor(() => expect(screen.getByText("Query UI")).toBeInTheDocument());
 });

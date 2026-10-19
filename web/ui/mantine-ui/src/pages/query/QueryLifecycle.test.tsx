@@ -21,15 +21,14 @@ import TableTab from "./TableTab";
 import { UPlotChartProps } from "./UPlotChart";
 import { GraphDisplayMode } from "../../state/queryPageSlice";
 
-const { visualizer } = vi.hoisted(() => ({
+const { visualizer, maiaProject } = vi.hoisted(() => ({
   visualizer: { endTime: null as number | null, range: 10000 },
+  maiaProject: { current: { id: "test-project", name: "test" } },
 }));
 // MAIA: useAPIQuery only fires once a project is selected, and adds its ID
 // to every request.
 vi.mock("../../context/useMaiaProject", () => ({
-  useMaiaProject: () => ({
-    currentProject: { id: "test-project", name: "test" },
-  }),
+  useMaiaProject: () => ({ currentProject: maiaProject.current }),
 }));
 vi.mock("../../state/settingsSlice", () => ({
   useSettings: () => ({
@@ -123,6 +122,7 @@ beforeEach(() => {
   client = new QueryClient();
   now = 100000;
   visualizer.endTime = null;
+  maiaProject.current = { id: "test-project", name: "test" };
   vi.spyOn(Date, "now").mockImplementation(() => now);
   vi.stubGlobal(
     "matchMedia",
@@ -160,8 +160,26 @@ afterEach(() => {
 });
 
 describe("graph query executions", () => {
+  it("refetches for the new project when the project changes", async () => {
+    const { rerender } = render(<Graph {...graphProps} />, { wrapper });
+    await reply(0);
+    maiaProject.current = { id: "other-project", name: "other" };
+    rerender(<Graph {...graphProps} />);
+    await waitFor(() => expect(pending).toHaveLength(2));
+    expect(
+      new URL(pending[1].url, "http://localhost").searchParams.get(
+        "project_id",
+      ),
+    ).toBe("other-project");
+  });
+
   it("refreshes an identical result with its new range and retains the previous pair while loading", async () => {
     const { rerender } = render(<Graph {...graphProps} />, { wrapper });
+    expect(
+      new URL(pending[0].url, "http://localhost").searchParams.get(
+        "project_id",
+      ),
+    ).toBe("test-project");
     expect(
       new URL(pending[0].url, "http://localhost").searchParams.get("end"),
     ).toBe("100");
@@ -225,6 +243,11 @@ describe("table query executions", () => {
     now = 200000;
     act(() => onlineManager.setOnline(true));
     await waitFor(() => expect(pending).toHaveLength(2));
+    expect(
+      new URL(pending[1].url, "http://localhost").searchParams.get(
+        "project_id",
+      ),
+    ).toBe("test-project");
     expect(
       new URL(pending[1].url, "http://localhost").searchParams.get("time"),
     ).toBe("200");

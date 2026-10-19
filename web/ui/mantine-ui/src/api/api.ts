@@ -187,7 +187,9 @@ export function useAPIQuery<T, D>({
   const maiaParams = withProjectID(params, currentProject?.id);
 
   return useQuery<QueryResult<T>, Error, SuccessAPIResponse<T> | D>({
-    queryKey: key !== undefined ? key : [path, maiaParams],
+    // MAIA: explicit keys get the project appended so a project switch refetches.
+    queryKey:
+      key !== undefined ? [...key, currentProject?.id] : [path, maiaParams],
     retry: false,
     refetchOnWindowFocus: false,
     refetchInterval: refetchInterval,
@@ -216,7 +218,9 @@ export const useSuspenseAPIQuery = <T>({ key, path, params }: QueryOptions) => {
   const maiaParams = withProjectID(params, currentProject?.id);
 
   return useSuspenseQuery<QueryResult<T>, Error, SuccessAPIResponse<T>>({
-    queryKey: key !== undefined ? key : [path, maiaParams],
+    // MAIA: explicit keys get the project appended so a project switch refetches.
+    queryKey:
+      key !== undefined ? [...key, currentProject?.id] : [path, maiaParams],
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: Infinity,
