@@ -166,7 +166,7 @@ func TestChildProjects(t *testing.T) {
 
 // counterVecValue reads the current value of a CounterVec child selected by its
 // "cache" label, collecting directly from the collector (registry-independent).
-func counterVecValue(vec *prometheus.CounterVec, cacheLabel string) float64 { //nolint:unparam // helper reads any cache label; tests currently exercise project_tree
+func counterVecValue(vec *prometheus.CounterVec, cacheLabel string) float64 {
 	ch := make(chan prometheus.Metric, 64)
 	vec.Collect(ch)
 	close(ch)
@@ -206,6 +206,31 @@ func TestChildProjectsCacheMetrics(t *testing.T) {
 
 	assert.Equal(t, missBefore+1, counterVecValue(keystoneCacheMisses, "project_tree"), "expected one project_tree cache miss")
 	assert.Equal(t, hitBefore+1, counterVecValue(keystoneCacheHits, "project_tree"), "expected one project_tree cache hit")
+
+	assertDone(t)
+}
+
+func TestTokenCacheMetrics(t *testing.T) {
+	defer gock.Off()
+
+	ks := setupTest()
+	ctx := t.Context()
+
+	// only one validation call: the second request must be served from the token cache
+	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+
+	missBefore := counterVecValue(keystoneCacheMisses, "token")
+	hitBefore := counterVecValue(keystoneCacheHits, "token")
+
+	for range 2 {
+		req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", http.NoBody)
+		req.Header.Set("X-Auth-Token", userToken)
+		_, err := ks.AuthenticateRequest(ctx, req, false)
+		assert.Nil(t, err, "AuthenticateRequest should not fail")
+	}
+
+	assert.Equal(t, missBefore+1, counterVecValue(keystoneCacheMisses, "token"), "first request should count one token cache miss")
+	assert.Equal(t, hitBefore+1, counterVecValue(keystoneCacheHits, "token"), "second request should count exactly one token cache hit")
 
 	assertDone(t)
 }
