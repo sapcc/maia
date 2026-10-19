@@ -6,11 +6,13 @@ package keystone
 import (
 	"context"
 	"fmt"
+
 	"net/http"
 	"net/url"
+	"sync"
+
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	policy "github.com/databus23/goslo.policy"
@@ -55,6 +57,8 @@ type keystone struct {
 	serviceURL                                                                      string
 	// role-id --> role-name
 	monitoringRoles map[string]string
+	// domain-id --> domain-name
+	domainNames map[string]string
 	// domain-name --> domain-id
 	domainIDs map[string]string
 	// Configuration section for viper keys
@@ -248,6 +252,7 @@ func (d *keystone) loadDomainsAndRoles(ctx context.Context) {
 	}
 
 	// load domains
+	d.domainNames = map[string]string{}
 	d.domainIDs = map[string]string{}
 	trueVal := true
 	err = projects.List(d.providerClient, projects.ListOpts{IsDomain: &trueVal, Enabled: &trueVal}).EachPage(ctx, func(ctx context.Context, page pagination.Page) (bool, error) {
@@ -256,6 +261,7 @@ func (d *keystone) loadDomainsAndRoles(ctx context.Context) {
 			panic(err)
 		}
 		for _, domain := range domains {
+			d.domainNames[domain.ID] = domain.Name
 			d.domainIDs[domain.Name] = domain.ID
 		}
 		return true, nil
@@ -771,11 +777,9 @@ func (d *keystone) UserProjects(ctx context.Context, userID string) ([]tokens.Sc
 // fetchUserProjects lists all projects (i.e. scopes) the user may access using Keystone (no cache lookup)
 func (d *keystone) fetchUserProjects(ctx context.Context, userID string) ([]tokens.Scope, error) {
 	scopes := []tokens.Scope{}
-	// include_names=true (Identity API v3.6+) returns project and domain names inline,
-	// so we don't need a GET /v3/projects/<id> per project.
-	trueVal := true
-	opts := roles.ListAssignmentsOpts{UserID: userID, Effective: &trueVal, IncludeNames: &trueVal}
-	err := roles.ListAssignments(d.providerClient, opts).EachPage(ctx, func(ctx context.Context, page pagination.Page) (bool, error) {
+	effectiveVal := true
+	// iterate of all pages returned by the list-role-assignments API call
+	err := roles.ListAssignments(d.providerClient, roles.ListAssignmentsOpts{UserID: userID, Effective: &effectiveVal}).EachPage(ctx, func(ctx context.Context, page pagination.Page) (bool, error) {
 		logg.Debug("loading role assignment page")
 		slice, err := roles.ExtractRoleAssignments(page)
 		if err != nil {
@@ -785,19 +789,13 @@ func (d *keystone) fetchUserProjects(ctx context.Context, userID string) ([]toke
 			if _, ok := d.monitoringRoles[ra.Role.ID]; ok && ra.Scope.Project.ID != "" {
 				scope, ok := d.projectScopeCache.Get(ra.Scope.Project.ID)
 				if !ok {
-					scope = tokens.Scope{
-						ProjectID:   ra.Scope.Project.ID,
-						ProjectName: ra.Scope.Project.Name,
-						DomainID:    ra.Scope.Project.Domain.ID,
-						DomainName:  ra.Scope.Project.Domain.Name,
+					project, err := projects.Get(ctx, d.providerClient, ra.Scope.Project.ID).Extract()
+					if err != nil {
+						return false, err
 					}
-					if ra.Scope.Project.Name == "" {
-						// Keystone did not honor include_names. Use the scope but don't cache it,
-						// so a bad response doesn't stick for the projectScopeCache TTL (24h).
-						logg.Debug("[KEYSTONE_DEBUG] fetchUserProjects: include_names returned empty name for project %s — check Keystone version (v3.6+ required)", ra.Scope.Project.ID)
-					} else {
-						d.projectScopeCache.Set(ra.Scope.Project.ID, scope, cache.DefaultExpiration)
-					}
+					domainName := d.domainNames[project.DomainID] // this will panic if domains have been added meanwhile --> USE AS A TRIGGER TO RELOAD?
+					scope = tokens.Scope{ProjectID: ra.Scope.Project.ID, ProjectName: project.Name, DomainID: project.DomainID, DomainName: domainName}
+					d.projectScopeCache.Set(ra.Scope.Project.ID, scope, cache.DefaultExpiration)
 				}
 				scopes = append(scopes, scope.(tokens.Scope))
 			}
