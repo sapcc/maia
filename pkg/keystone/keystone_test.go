@@ -235,6 +235,58 @@ func TestTokenCacheMetrics(t *testing.T) {
 	assertDone(t)
 }
 
+func TestTokenCacheMetrics_rescope(t *testing.T) {
+	defer gock.Off()
+
+	ks := setupTest()
+	ctx := t.Context()
+
+	// validate the p00001-scoped token, rescope it to p00002, then validate the new token
+	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+	gock.New(baseURL).Post("/v3/auth/tokens").Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+
+	missBefore := counterVecValue(keystoneCacheMisses, "token")
+
+	req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate?project_id=p00002", http.NoBody)
+	req.Header.Set("X-Auth-Token", userToken)
+	_, err := ks.AuthenticateRequest(ctx, req, false)
+	assert.Nil(t, err, "AuthenticateRequest should not fail")
+
+	// one request is one lookup: the rescope and the validation of the minted
+	// token are internal and must not count as extra misses
+	assert.Equal(t, missBefore+1, counterVecValue(keystoneCacheMisses, "token"), "a rescoped request should count exactly one token cache miss")
+
+	assertDone(t)
+}
+
+func TestTokenCacheMetrics_basicAuth(t *testing.T) {
+	defer gock.Off()
+
+	ks := setupTest()
+	ctx := t.Context()
+
+	// one token creation and one validation: the second request is served from the cache
+	gock.New(baseURL).Post("/v3/auth/tokens").JSON(userAuthScopeBody).Reply(http.StatusCreated).File("fixtures/user_token_create.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+	gock.New(baseURL).Get("/v3/auth/tokens").Reply(http.StatusOK).File("fixtures/user_token_validate.json").AddHeader("X-Subject-Token", userToken).AddHeader("Content-Type", "application/json")
+
+	missBefore := counterVecValue(keystoneCacheMisses, "token")
+	hitBefore := counterVecValue(keystoneCacheHits, "token")
+
+	for range 2 {
+		req := httptest.NewRequest(http.MethodGet, "http://maia.local/federate", http.NoBody)
+		req.SetBasicAuth("testuser@testdomain|p00001", "testpw")
+		_, err := ks.AuthenticateRequest(ctx, req, false)
+		assert.Nil(t, err, "AuthenticateRequest should not fail")
+	}
+
+	// the cold login validates the minted token internally; that must not count as a second miss
+	assert.Equal(t, missBefore+1, counterVecValue(keystoneCacheMisses, "token"), "first login should count exactly one token cache miss")
+	assert.Equal(t, hitBefore+1, counterVecValue(keystoneCacheHits, "token"), "second login should count exactly one token cache hit")
+
+	assertDone(t)
+}
+
 func TestAuthenticateRequest(t *testing.T) {
 	defer gock.Off()
 
