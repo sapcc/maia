@@ -9,8 +9,8 @@
     "build": "npm run build:lib",
     "build:lib": "bash ./build.sh",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
-    "lint": "eslint src/ --ext .ts",
-    "lint:fix": "eslint --fix src/ --ext .ts"
+    "lint": "eslint src/",
+    "lint:fix": "eslint --fix src/"
   },
   "repository": {
     "type": "git",
@@ -38,9 +38,15 @@
     "@codemirror/lint": "^6.9.5",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.40.0",
+    "@eslint/compat": "^2.0.0",
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.0",
     "@lezer/common": "^1.5.1",
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.8",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
+    "eslint": "^10.0.0",
     "eslint-plugin-prettier": "^5.5.5",
     "isomorphic-fetch": "^3.0.0",
     "nock": "^15.0.0"

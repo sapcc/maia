@@ -3,7 +3,7 @@
 
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { MaiaProjectProvider } from "./MaiaProjectContext";
-import { vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 
 vi.mock("../state/settingsSlice", () => ({
   useSettings: () => ({ pathPrefix: "/domain/project/metrics/maia/ui" }),
