@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `maia_request_duration_seconds` and `maia_response_size_bytes` are now Histograms instead of Summaries, enabling `histogram_quantile()` queries and multi-replica aggregation. Alert expressions using `{quantile="..."}` labels need to be updated to use `histogram_quantile(0.99, ..._bucket[...])`.
+- `maia_request_duration_seconds` and `maia_response_size_bytes` are now Histograms instead of Summaries, enabling `histogram_quantile()` queries and multi-replica aggregation. The Summaries had no quantile objectives, so expressions using `{quantile="..."}` never matched anything; use `histogram_quantile(0.99, sum by (le, handler) (rate(maia_request_duration_seconds_bucket[5m])))` instead.
 - The web UI now resolves its API calls relative to the path it is served from, so Maia's UI works both at its own address and when served behind a reverse proxy under a sub-path (no change when served at its own root)
 - `/{domain}/graph` is now a login-only stub: authenticates via all supported methods (cookie, Basic Auth, application credentials) then redirects to `/ui/query`
 - Root path `/` always redirects to `/ui/query`
