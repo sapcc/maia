@@ -16,7 +16,7 @@ const compat = new FlatCompat({
 });
 
 export default [{
-    ignores: ['**/dist', '**/.eslintrc.cjs', 'src/components/Accordion/**'],
+    ignores: ['**/dist', '**/.eslintrc.cjs'],
 }, ...fixupConfigRules(compat.extends(
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',

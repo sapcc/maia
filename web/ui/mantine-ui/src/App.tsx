@@ -53,6 +53,8 @@ const highlightJsAdapter = createHighlightJsAdapter(hljs);
 const queryClient = new QueryClient();
 
 const theme = createTheme({
+  // Preserve v8 default border-radius for now (was 'sm' in v8, changed to 'md' in v9).
+  defaultRadius: "sm",
   colors: {
     "codebox-bg": [
       "#f5f5f5", "#e7e7e7", "#cdcdcd", "#b2b2b2", "#9a9a9a",
