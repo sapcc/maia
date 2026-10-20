@@ -14,6 +14,7 @@ import (
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/tokens"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -892,4 +893,94 @@ func TestRedirectPreservesGlobalFlag(t *testing.T) {
 		location := resp.Header.Get("Location")
 		assert.Equal(t, "/ui/query", location, "Should redirect to /ui/query")
 	})
+}
+
+// sumRequestsTotal collects maia_requests_total directly from the collector and
+// sums all samples for the given handler, independent of any registry.
+func sumRequestsTotal(handler string) float64 {
+	ch := make(chan prometheus.Metric, 256)
+	requestsTotal.Collect(ch)
+	close(ch)
+	var sum float64
+	for m := range ch {
+		var dm dto.Metric
+		if m.Write(&dm) != nil {
+			continue
+		}
+		for _, lp := range dm.Label {
+			if lp.GetName() == "handler" && lp.GetValue() == handler {
+				sum += dm.Counter.GetValue()
+			}
+		}
+	}
+	return sum
+}
+
+// requestsTotalByCode reads maia_requests_total for a specific handler+code pair.
+func requestsTotalByCode(handler, code string) float64 {
+	ch := make(chan prometheus.Metric, 256)
+	requestsTotal.Collect(ch)
+	close(ch)
+	for m := range ch {
+		var dm dto.Metric
+		if m.Write(&dm) != nil {
+			continue
+		}
+		labels := map[string]string{}
+		for _, lp := range dm.Label {
+			labels[lp.GetName()] = lp.GetValue()
+		}
+		if labels["handler"] == handler && labels["code"] == code {
+			return dm.Counter.GetValue()
+		}
+	}
+	return 0
+}
+
+func TestRequestMetrics(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	router, keystoneMock, storageMock := setupTest(t, ctrl)
+	gatherer, ok := prometheus.DefaultRegisterer.(prometheus.Gatherer)
+	assert.True(t, ok, "DefaultRegisterer should also be a Gatherer")
+
+	expectAuthWithChildren(keystoneMock)
+	storageMock.EXPECT().Series([]string{"{component!=\"\",project_id=~\"12345|67890\"}"}, "2017-07-01T20:10:30.781Z", "2017-07-02T04:00:00.000Z", storage.JSON).Return(test.HTTPResponseFromFile("fixtures/series.json"), nil)
+
+	before := sumRequestsTotal("series")
+
+	test.APIRequest{
+		Headers:          map[string]string{"X-Auth-Token": "someverylongtokenideed", "Accept": storage.JSON},
+		Method:           "GET",
+		Path:             "/api/v1/series?match[]={component!=%22%22}&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z",
+		ExpectStatusCode: http.StatusOK,
+		ExpectJSON:       "fixtures/series.json",
+	}.Check(t, router)
+
+	// maia_requests_total{handler="series"} must increment by exactly one
+	assert.Equal(t, before+1, sumRequestsTotal("series"), "maia_requests_total should increment for the series handler")
+
+	// countRequests wraps authorize(), so an authorization rejection (403) must
+	// still be counted — otherwise the counter would miss exactly the failures an
+	// error rate needs.
+	denied403Before := requestsTotalByCode("series", "403")
+	expectAuthAndDenyAuthorization(keystoneMock)
+	test.APIRequest{
+		Headers:          map[string]string{"X-Auth-Token": "someverylongtokenideed", "Accept": storage.JSON},
+		Method:           "GET",
+		Path:             "/api/v1/series?match[]={component!=%22%22}&end=2017-07-02T04:00:00.000Z&start=2017-07-01T20:10:30.781Z",
+		ExpectStatusCode: http.StatusForbidden,
+	}.Check(t, router)
+	assert.Equal(t, denied403Before+1, requestsTotalByCode("series", "403"), "maia_requests_total must count authorization rejections (403)")
+
+	// Guard the Summary->Histogram fix: these must be histograms (expose _bucket),
+	// not summaries (which never emitted the quantile series the alert queried).
+	mfs, err := gatherer.Gather()
+	assert.NoError(t, err)
+	seen := map[string]dto.MetricType{}
+	for _, mf := range mfs {
+		seen[mf.GetName()] = mf.GetType()
+	}
+	assert.Equal(t, dto.MetricType_HISTOGRAM, seen["maia_request_duration_seconds"], "maia_request_duration_seconds must be a Histogram")
+	assert.Equal(t, dto.MetricType_HISTOGRAM, seen["maia_response_size_bytes"], "maia_response_size_bytes must be a Histogram")
 }

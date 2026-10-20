@@ -254,11 +254,16 @@ project_domain_name = "Default"
 | Type | Metric | Labels |
 |------|--------|--------|
 | Gauge | `maia_requests_inflight` | — |
-| Summary | `maia_request_duration_seconds` | `handler` |
-| Summary | `maia_response_size_bytes` | `handler` |
+| Histogram | `maia_request_duration_seconds` | `handler` |
+| Histogram | `maia_response_size_bytes` | `handler` |
+| Counter | `maia_requests_total` | `handler`, `code`, `method` |
 | Counter | `maia_logon_errors_count` | — |
 | Counter | `maia_logon_failures_count` | — |
 | Counter | `maia_tsdb_errors_count` | — |
+| Counter | `maia_keystone_cache_hits_total` | `cache` |
+| Counter | `maia_keystone_cache_misses_total` | `cache` |
+
+`maia_keystone_cache_*` `cache` label values: `token`, `project_tree`, `user_projects`, `user_id`, `project_scope`.
 
 ## Extended Basic Auth Format
 

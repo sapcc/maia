@@ -343,7 +343,7 @@ func (d *keystone) getKeystoneContext() string {
 // Authenticate authenticates a non-service user using available authOptionsFromRequest (username+password or token)
 // It returns the authorization context
 func (d *keystone) Authenticate(ctx context.Context, authOpts gophercloud.AuthOptions) (*policy.Context, string, AuthenticationError) {
-	return d.authenticate(ctx, authOpts, false, false)
+	return d.authenticate(ctx, authOpts, false, false, true)
 }
 
 // AuthenticateRequest attempts to Authenticate a user using the request header contents
@@ -360,7 +360,7 @@ func (d *keystone) AuthenticateRequest(ctx context.Context, r *http.Request, gue
 
 	// if the request does not have a keystone token, then a token must be requested on behalf of the client
 	// prevents wrong credentials from causing service user reauthentication
-	policyContext, _, err := d.authenticate(ctx, *authOpts, true, false)
+	policyContext, _, err := d.authenticate(ctx, *authOpts, true, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -577,8 +577,11 @@ func (d *keystone) guessScope(ctx context.Context, ba *gophercloud.AuthOptions) 
 // credentials are passed in.
 // `rescope` when `true` indicates that the token passed requires creation of a token
 // because the scope requires modification.
+// `countLookup` is true only for the caller-facing lookup, so the internal
+// recursions (rescope, validating a freshly minted token) do not inflate the
+// token cache hit/miss counters.
 // It returns the authorization context
-func (d *keystone) authenticate(ctx context.Context, authOpts gophercloud.AuthOptions, asServiceUser, rescope bool) (*policy.Context, string, AuthenticationError) {
+func (d *keystone) authenticate(ctx context.Context, authOpts gophercloud.AuthOptions, asServiceUser, rescope, countLookup bool) (*policy.Context, string, AuthenticationError) {
 	// Use secure contextual cache key for lookup
 	cacheKey := d.authOpts2StringKey(authOpts)
 
@@ -587,12 +590,18 @@ func (d *keystone) authenticate(ctx context.Context, authOpts gophercloud.AuthOp
 
 	// check cache, but ignore the result if tokens are rescoped
 	if entry, found := d.tokenCache.Get(cacheKey); found && !rescope && (authOpts.Scope == nil || authOpts.Scope.ProjectID == entry.(*cacheEntry).context.Auth["project_id"]) {
+		if countLookup {
+			keystoneCacheHits.WithLabelValues("token").Inc()
+		}
 		if authOpts.TokenID != "" {
 			logg.Debug("[%s-keystone] Token cache hit: token %s... for scope %+v", keystoneContext, authOpts.TokenID[:1+len(authOpts.TokenID)/4], authOpts.Scope)
 		} else {
 			logg.Debug("[%s-keystone] Token cache hit: user %s%s and password ***** for scope %+v", keystoneContext, authOpts.Username, authOpts.UserID, authOpts.Scope)
 		}
 		return entry.(*cacheEntry).context, entry.(*cacheEntry).endpointURL, nil
+	}
+	if countLookup {
+		keystoneCacheMisses.WithLabelValues("token").Inc()
 	}
 
 	var tokenData keystoneToken
@@ -612,7 +621,7 @@ func (d *keystone) authenticate(ctx context.Context, authOpts gophercloud.AuthOp
 		// detect rescoping
 		if authOpts.Scope != nil && authOpts.Scope.ProjectID != tokenData.ProjectScope.ID {
 			logg.Debug("scope change detected")
-			return d.authenticate(ctx, authOpts, asServiceUser, true)
+			return d.authenticate(ctx, authOpts, asServiceUser, true, false)
 		}
 		tokenInfo, err := response.ExtractToken()
 		if err != nil {
@@ -661,7 +670,7 @@ func (d *keystone) authenticate(ctx context.Context, authOpts gophercloud.AuthOp
 			// recurse in order to obtain catalog entry; login in via token, to provide scope information
 			var ce cacheEntry
 			var authErr AuthenticationError
-			ce.context, ce.endpointURL, authErr = d.authenticate(ctx, gophercloud.AuthOptions{IdentityEndpoint: authOpts.IdentityEndpoint, TokenID: tokenID}, asServiceUser, false)
+			ce.context, ce.endpointURL, authErr = d.authenticate(ctx, gophercloud.AuthOptions{IdentityEndpoint: authOpts.IdentityEndpoint, TokenID: tokenID}, asServiceUser, false, false)
 			if authErr == nil && authOpts.TokenID == "" {
 				// cache basic and application credential authentication like token validations
 				basicAuthCacheKey := d.authOpts2StringKey(authOpts)
@@ -712,9 +721,11 @@ func (d *keystone) ChildProjects(ctx context.Context, projectID string) ([]strin
 
 	if ce, ok := d.projectTreeCache.Get(projectID); ok {
 		cached := ce.([]string)
+		keystoneCacheHits.WithLabelValues("project_tree").Inc()
 		logg.Debug("[CHILD_PROJECTS_DEBUG] [%s-keystone] Cache hit for %s: %v", keystoneContext, projectID, cached)
 		return cached, nil
 	}
+	keystoneCacheMisses.WithLabelValues("project_tree").Inc()
 
 	logg.Debug("[CHILD_PROJECTS_DEBUG] [%s-keystone] Cache miss for %s, fetching from keystone", keystoneContext, projectID)
 	childprojects, err := d.fetchChildProjects(ctx, projectID)
@@ -760,8 +771,10 @@ func (d *keystone) fetchChildProjects(ctx context.Context, projectID string) ([]
 
 func (d *keystone) UserProjects(ctx context.Context, userID string) ([]tokens.Scope, error) {
 	if up, ok := d.userProjectsCache.Get(userID); ok {
+		keystoneCacheHits.WithLabelValues("user_projects").Inc()
 		return up.([]tokens.Scope), nil
 	}
+	keystoneCacheMisses.WithLabelValues("user_projects").Inc()
 
 	up, err := d.fetchUserProjects(ctx, userID)
 	if err != nil {
@@ -789,6 +802,7 @@ func (d *keystone) fetchUserProjects(ctx context.Context, userID string) ([]toke
 			if _, ok := d.monitoringRoles[ra.Role.ID]; ok && ra.Scope.Project.ID != "" {
 				scope, ok := d.projectScopeCache.Get(ra.Scope.Project.ID)
 				if !ok {
+					keystoneCacheMisses.WithLabelValues("project_scope").Inc()
 					project, err := projects.Get(ctx, d.providerClient, ra.Scope.Project.ID).Extract()
 					if err != nil {
 						return false, err
@@ -796,6 +810,8 @@ func (d *keystone) fetchUserProjects(ctx context.Context, userID string) ([]toke
 					domainName := d.domainNames[project.DomainID] // this will panic if domains have been added meanwhile --> USE AS A TRIGGER TO RELOAD?
 					scope = tokens.Scope{ProjectID: ra.Scope.Project.ID, ProjectName: project.Name, DomainID: project.DomainID, DomainName: domainName}
 					d.projectScopeCache.Set(ra.Scope.Project.ID, scope, cache.DefaultExpiration)
+				} else {
+					keystoneCacheHits.WithLabelValues("project_scope").Inc()
 				}
 				scopes = append(scopes, scope.(tokens.Scope))
 			}
@@ -812,8 +828,10 @@ func (d *keystone) fetchUserProjects(ctx context.Context, userID string) ([]toke
 func (d *keystone) UserID(ctx context.Context, username, userDomain string) (string, error) {
 	key := username + "@" + userDomain
 	if ce, ok := d.userIDCache.Get(key); ok {
+		keystoneCacheHits.WithLabelValues("user_id").Inc()
 		return ce.(string), nil
 	}
+	keystoneCacheMisses.WithLabelValues("user_id").Inc()
 
 	id, err := d.fetchUserID(ctx, username, userDomain)
 	if err != nil {
