@@ -34,7 +34,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           check-latest: true
-          go-version: 1.27.2
+          go-version: 1.27.3
       - name: Run prepare make target
         run: make generate
       - name: Build all binaries
@@ -74,7 +74,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           check-latest: true
-          go-version: 1.27.2
+          go-version: 1.27.3
       - name: Run prepare make target
         run: make generate
       - name: Run tests and generate coverage report
