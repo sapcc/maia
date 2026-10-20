@@ -1,7 +1,7 @@
 // MAIA: project switcher navbar component — shows current project dropdown
 // and logged-in username. Maia-specific — do not overwrite during upstream syncs.
 import { Group, Loader, Select, Text } from "@mantine/core";
-import { useMaiaProject } from "../context/MaiaProjectContext";
+import { useMaiaProject } from "../context/useMaiaProject";
 
 export function MaiaProjectSwitcher() {
   const { user, projects, currentProject, isLoading, setProject } = useMaiaProject();

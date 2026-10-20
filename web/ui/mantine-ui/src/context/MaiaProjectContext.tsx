@@ -2,11 +2,9 @@
 // currentProject / setProject, persists selection to localStorage.
 // This file is Maia-specific — do not overwrite during upstream syncs.
 import {
-  createContext,
   FC,
   PropsWithChildren,
   useCallback,
-  useContext,
   useEffect,
   useState,
 } from "react";
@@ -16,32 +14,7 @@ import { maiaFetch } from "../lib/maiaFetch";
 // (supports reverse-proxy sub-paths)
 import { apiBase, servedRoot } from "../api/apiBase";
 import { useSettings } from "../state/settingsSlice";
-
-export interface MaiaUser {
-  userId: string;
-  userName: string;
-  userDomainName: string;
-  projectId: string;
-  projectName: string;
-  domainId: string;
-  domainName: string;
-  roles: string[];
-}
-
-export interface MaiaProject {
-  id: string;
-  name: string;
-}
-
-interface MaiaProjectContextValue {
-  user: MaiaUser | null;
-  projects: MaiaProject[];
-  currentProject: MaiaProject | null;
-  // isLoading is true during the initial whoami/projects fetch.
-  // Consumers can use this to show a skeleton instead of empty state.
-  isLoading: boolean;
-  setProject: (project: MaiaProject) => void;
-}
+import { MaiaProject, MaiaProjectContext, MaiaUser } from "./useMaiaProject";
 
 const LOCAL_STORAGE_KEY = "maia_project_id";
 
@@ -65,14 +38,6 @@ function getCookie(name: string): string | undefined {
   }
 }
 
-const MaiaProjectContext = createContext<MaiaProjectContextValue>({
-  user: null,
-  projects: [],
-  currentProject: null,
-  isLoading: true,
-  setProject: () => undefined,
-});
-
 export const MaiaProjectProvider: FC<PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<MaiaUser | null>(null);
   const [projects, setProjects] = useState<MaiaProject[]>([]);
@@ -90,8 +55,6 @@ export const MaiaProjectProvider: FC<PropsWithChildren> = ({ children }) => {
     // MAIA: base is derived from the served path (apiBase) so these resolve
     // correctly whether Maia is served at its own root or behind a proxy.
     const base = apiBase(pathPrefix);
-    setIsLoading(true);
-    setLoadError(null);
     Promise.all([
       maiaFetch(`${base}/whoami`),
       maiaFetch(`${base}/projects`),
@@ -169,6 +132,14 @@ export const MaiaProjectProvider: FC<PropsWithChildren> = ({ children }) => {
     });
   }, [reloadKey, pathPrefix]);
 
+  // Reset to the loading state before re-running the fetch effect, so a
+  // retry shows the loader again instead of the stale error.
+  const retry = () => {
+    setLoadError(null);
+    setIsLoading(true);
+    setReloadKey((v) => v + 1);
+  };
+
   const setProject = useCallback((project: MaiaProject) => {
     localStorage.setItem(LOCAL_STORAGE_KEY, project.id);
     setCurrentProject(project);
@@ -183,7 +154,7 @@ export const MaiaProjectProvider: FC<PropsWithChildren> = ({ children }) => {
           <Alert color="red" title="Could not load your projects" maw={480}>
             {loadError}
           </Alert>
-          <Button onClick={() => setReloadKey((v) => v + 1)}>Retry</Button>
+          <Button onClick={retry}>Retry</Button>
         </Stack>
       </Center>
     );
@@ -210,5 +181,3 @@ export const MaiaProjectProvider: FC<PropsWithChildren> = ({ children }) => {
     </MaiaProjectContext.Provider>
   );
 };
-
-export const useMaiaProject = () => useContext(MaiaProjectContext);

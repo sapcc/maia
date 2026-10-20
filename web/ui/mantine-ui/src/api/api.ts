@@ -1,8 +1,14 @@
-import { QueryKey, useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  QueryKey,
+  useQuery,
+  UseQueryResult,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 // MAIA: replaced fetch with maiaFetch for X-Auth-Token injection
 import { maiaFetch } from "../lib/maiaFetch";
 // MAIA: inject project_id into every API call
-import { useMaiaProject } from "../context/MaiaProjectContext";
+import { useMaiaProject } from "../context/useMaiaProject";
 // MAIA: resolve the API base from the served path (supports reverse-proxy sub-paths)
 import { apiBase, API_PATH } from "./apiBase";
 import { useSettings } from "../state/settingsSlice";
@@ -25,6 +31,21 @@ export type ErrorAPIResponse = {
 
 export type APIResponse<T> = SuccessAPIResponse<T> | ErrorAPIResponse;
 
+/** APIQueryMetadata describes the request that produced a successful response. */
+export type APIQueryMetadata = {
+  params: Readonly<Record<string, string>>;
+  responseTimeMs: number;
+  receivedAtMs: number;
+};
+
+type QueryResult<T> = {
+  response: SuccessAPIResponse<T>;
+  metadata: APIQueryMetadata;
+};
+
+type QueryParams =
+  Record<string, string> | ((requestTimeMs: number) => Record<string, string>);
+
 const createQueryFn =
   <T>({
     apiBasePath,
@@ -34,16 +55,18 @@ const createQueryFn =
   }: {
     apiBasePath: string;
     path: string;
-    params?: Record<string, string>;
+    params?: QueryParams;
     recordResponseTime?: (time: number) => void;
   }) =>
   async ({ signal }: { signal: AbortSignal }) => {
-    const queryString = params
-      ? `?${new URLSearchParams(params).toString()}`
-      : "";
-
     try {
       const startTime = Date.now();
+      const resolvedParams =
+        typeof params === "function" ? params(startTime) : params;
+      const requestParams = { ...resolvedParams };
+      const queryString = resolvedParams
+        ? `?${new URLSearchParams(requestParams).toString()}`
+        : "";
 
       // MAIA: apiBasePath is derived from the served path (apiBase()), so the
       // same bundle works served at Maia's own root (/api/v1) or behind a
@@ -67,9 +90,11 @@ const createQueryFn =
       }
 
       const apiRes = (await res.json()) as APIResponse<T>;
+      const receivedAtMs = Date.now();
+      const responseTimeMs = receivedAtMs - startTime;
 
       if (recordResponseTime) {
-        recordResponseTime(Date.now() - startTime);
+        recordResponseTime(responseTimeMs);
       }
 
       if (apiRes.status === "error") {
@@ -80,17 +105,22 @@ const createQueryFn =
         );
       }
 
-      return apiRes as SuccessAPIResponse<T>;
+      return {
+        response: apiRes,
+        metadata: { params: requestParams, responseTimeMs, receivedAtMs },
+      };
     } catch (error) {
       if (!(error instanceof Error)) {
-        throw new Error("Unknown error");
+        throw new Error("Unknown error", { cause: error });
       }
 
       switch (error.name) {
         case "TypeError":
-          throw new Error("Network error or unable to reach the server");
+          throw new Error("Network error or unable to reach the server", {
+            cause: error,
+          });
         case "SyntaxError":
-          throw new Error("Invalid JSON response");
+          throw new Error("Invalid JSON response", { cause: error });
         default:
           throw error;
       }
@@ -98,32 +128,68 @@ const createQueryFn =
   };
 
 type QueryOptions = {
-  key?: QueryKey;
   path: string;
-  params?: Record<string, string>;
   enabled?: boolean;
   refetchInterval?: false | number;
   recordResponseTime?: (time: number) => void;
+  keepPreviousData?: boolean;
+} & (
+  | { key?: QueryKey; params?: Record<string, string> }
+  | { key: QueryKey; params: (requestTimeMs: number) => Record<string, string> }
+);
+
+// MAIA: add project_id to the request params, including deferred params that
+// are only resolved when the fetch starts.
+const withProjectID = (
+  params: QueryParams | undefined,
+  projectID: string | undefined,
+): QueryParams | undefined => {
+  if (projectID === undefined) {
+    return params;
+  }
+  if (typeof params === "function") {
+    return (requestTimeMs: number) => ({
+      ...params(requestTimeMs),
+      project_id: projectID,
+    });
+  }
+  return { ...params, project_id: projectID };
 };
 
-export const useAPIQuery = <T>({
+/**
+ * Queries the API, optionally selecting a response with its request metadata.
+ * Deferred params receive the fetch start time in milliseconds and require an explicit key.
+ */
+export function useAPIQuery<T>(
+  options: QueryOptions,
+): UseQueryResult<SuccessAPIResponse<T>>;
+export function useAPIQuery<T, D>(
+  options: QueryOptions & {
+    select: (response: SuccessAPIResponse<T>, metadata: APIQueryMetadata) => D;
+  },
+): UseQueryResult<D>;
+export function useAPIQuery<T, D>({
   key,
   path,
   params,
   enabled,
   recordResponseTime,
   refetchInterval,
-}: QueryOptions) => {
+  keepPreviousData: retainPreviousData,
+  select,
+}: QueryOptions & {
+  select?: (response: SuccessAPIResponse<T>, metadata: APIQueryMetadata) => D;
+}): UseQueryResult<SuccessAPIResponse<T> | D> {
   // MAIA: inject project_id into every API call
   const { currentProject } = useMaiaProject();
   // MAIA: resolve API base from the served path
   const { pathPrefix } = useSettings();
-  const maiaParams = currentProject
-    ? { ...params, project_id: currentProject.id }
-    : params;
+  const maiaParams = withProjectID(params, currentProject?.id);
 
-  return useQuery<SuccessAPIResponse<T>>({
-    queryKey: key !== undefined ? key : [path, maiaParams],
+  return useQuery<QueryResult<T>, Error, SuccessAPIResponse<T> | D>({
+    // MAIA: explicit keys get the project appended so a project switch refetches.
+    queryKey:
+      key !== undefined ? [...key, currentProject?.id] : [path, maiaParams],
     retry: false,
     refetchOnWindowFocus: false,
     refetchInterval: refetchInterval,
@@ -132,30 +198,34 @@ export const useAPIQuery = <T>({
     // that would silently fall back to the Keystone token scope instead of
     // the project the user selected in the switcher.
     enabled: enabled !== false && currentProject !== null,
-    queryFn: createQueryFn({
+    queryFn: createQueryFn<T>({
       apiBasePath: apiBase(pathPrefix),
       path,
       params: maiaParams,
       recordResponseTime,
     }),
+    placeholderData: retainPreviousData ? keepPreviousData : undefined,
+    select: (result) =>
+      select ? select(result.response, result.metadata) : result.response,
   });
-};
+}
 
 export const useSuspenseAPIQuery = <T>({ key, path, params }: QueryOptions) => {
   // MAIA: inject project_id into every API call
   const { currentProject } = useMaiaProject();
   // MAIA: resolve API base from the served path
   const { pathPrefix } = useSettings();
-  const maiaParams = currentProject
-    ? { ...params, project_id: currentProject.id }
-    : params;
+  const maiaParams = withProjectID(params, currentProject?.id);
 
-  return useSuspenseQuery<SuccessAPIResponse<T>>({
-    queryKey: key !== undefined ? key : [path, maiaParams],
+  return useSuspenseQuery<QueryResult<T>, Error, SuccessAPIResponse<T>>({
+    // MAIA: explicit keys get the project appended so a project switch refetches.
+    queryKey:
+      key !== undefined ? [...key, currentProject?.id] : [path, maiaParams],
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: Infinity,
     gcTime: 0,
-    queryFn: createQueryFn({ apiBasePath: apiBase(pathPrefix), path, params: maiaParams }),
+    queryFn: createQueryFn<T>({ apiBasePath: apiBase(pathPrefix), path, params: maiaParams }),
+    select: (result) => result.response,
   });
 };

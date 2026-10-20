@@ -62,7 +62,7 @@ import {
 import { useSettings } from "../../state/settingsSlice";
 // MAIA: resolve the API base from the served path (supports reverse-proxy sub-paths)
 import { completionConfig } from "../../api/completionConfig";
-import { useMaiaProject } from "../../context/MaiaProjectContext";
+import { useMaiaProject } from "../../context/useMaiaProject";
 import MetricsExplorer from "./MetricsExplorer/MetricsExplorer";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import { useAppSelector } from "../../state/hooks";
@@ -98,9 +98,11 @@ const ExpressionInput: FC<ExpressionInputProps> = ({
     enableQueryHistory,
   } = useSettings();
   const [expr, setExpr] = useState(initialExpr);
-  useEffect(() => {
+  const [previousInitialExpr, setPreviousInitialExpr] = useState(initialExpr);
+  if (previousInitialExpr !== initialExpr) {
+    setPreviousInitialExpr(initialExpr);
     setExpr(initialExpr);
-  }, [initialExpr]);
+  }
 
   const cmRef = useRef<ReactCodeMirrorRef>(null);
 
