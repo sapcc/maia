@@ -17,7 +17,7 @@ described below.
      Keep the exact `UPSTREAM_VERSION=vX.Y.Z` format on its own line. -->
 ```
 UPSTREAM_REPO=https://github.com/prometheus/prometheus
-UPSTREAM_VERSION=v3.15.0
+UPSTREAM_VERSION=v3.15.1
 UPSTREAM_SHA=2a20609389fa1f0221e4fa8f6c7e1e4817b5c284
 SYNCED_ON=2025-08-13
 ```
